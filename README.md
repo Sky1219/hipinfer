@@ -9,8 +9,7 @@ are no vendor libraries in the hot path: the GEMV, GEMM, RMSNorm, RoPE and Flash
 kernels are all hand-written, the KV cache is contiguous, and the decode loop is captured once as a
 CUDA/HIP graph and replayed.
 
-**Charts and full results: [sky1219.github.io/hipinfer](https://sky1219.github.io/hipinfer/)** (rebuilt
-from `results/` on every push by [scripts/build_site.py](scripts/build_site.py))
+**Charts and full results: [sky1219.github.io/hipinfer](https://sky1219.github.io/hipinfer/)**
 
 ## What it runs, and where
 
@@ -22,8 +21,7 @@ Hardware:
 - **NVIDIA, tested:** RTX 2080 Ti (Turing, sm_75), on one card and on two with tensor parallelism,
   and RTX A6000 (Ampere, sm_86). All kernel tests pass on both.
 - **AMD, compile-checked only.** It builds for MI200 (gfx90a), MI300 (gfx942) and RDNA3 (gfx1100)
-  with ROCm 7 and rocWMMA, but **it has never run on AMD hardware**. If you have an MI300X for an
-  hour, see [Help wanted](#help-wanted).
+  with ROCm 7 and rocWMMA, but **it has never run on AMD hardware**.
 
 > **How fresh are the numbers?** On 2026-10-15 I rewrote the Turing prefill GEMM
 > ([write-up](docs/turing-prefill-gemm.md)). Since then I have re-run only the 2080 Ti kernel tests
@@ -338,24 +336,6 @@ each product explicitly.
 - **Sliding-window models:** Mistral-7B-v0.1 (4,096-token window) loads only with `max_seq` within
   its window, where full attention gives the same result, and the benchmarks cap its context there.
   Weight files exported before this check carry no window and should be re-exported.
-
-## Help wanted
-
-Benchmark runs on hardware I don't have would be the most useful contribution:
-
-- **AMD MI300X (CDNA3, gfx942, 5.3 TB/s, wave64)** matters most. The whole point of HIP is that this runs on AMD, and
-  it never has. One hour of `scripts/run_all.sh` on the AMD Developer Cloud or an hourly GPU cloud
-  would settle it.
-- **An NVLink box** (2× A100 / H100) is where tensor parallelism should shine: P2P staging instead
-  of host memory, plus tp=4/8. The P2P path has never run anywhere.
-- **Colab A100 (1.5–2 TB/s)** drops the decode floor to ≈ 1–1.4 ms/token for 1B models, which
-  exposes launch latency. It also fits the 7–8B models on one GPU.
-- **Cheap or free checks:** a Colab T4 (same arch as the 2080 Ti, but 320 GB/s; fits the 0.5–1.5B
-  models), Colab L4 (the sm_89 build and autotuner; fits Llama-3.2-3B), Colab G4 / Blackwell (the
-  forward-compatible path: compute_80 PTX JIT-compiled if Colab's nvcc predates sm_120), and
-  Kaggle's 2× T4 (does it have a peer path?).
-
-TPUs and CPUs can't run it: the kernels are GPU code.
 
 ## Author
 
