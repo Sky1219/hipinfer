@@ -5,3 +5,4 @@ results/*.log
 tmp_weights/
 results/2080ti-wip/
 .superpowers/
+site/

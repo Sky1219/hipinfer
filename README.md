@@ -27,6 +27,9 @@ QKV bias).
 - **AMD is compile-checked only:** the build succeeds for MI200 (gfx90a), MI300 (gfx942) and RDNA3
   (gfx1100) with ROCm 7 hipcc and rocWMMA, but it has **not been run on AMD hardware yet**.
 
+**Results page with charts: [sky1219.github.io/hipinfer](https://sky1219.github.io/hipinfer/)** (rebuilt from
+`results/` on every push by [scripts/build_site.py](scripts/build_site.py)).
+
 Author: Akash Dasarraju. The code was written with Claude (AI pair programmer); design
 decisions, benchmarks and claims were reviewed by me.
 
