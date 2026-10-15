@@ -1,0 +1,32 @@
+Loading weights:   0%|          | 0/201 [00:00<?, ?it/s]Loading weights:  38%|███▊      | 76/201 [00:00<00:00, 756.63it/s]Loading weights:  78%|███████▊  | 156/201 [00:00<00:00, 781.68it/s]Loading weights: 100%|██████████| 201/201 [00:00<00:00, 833.16it/s]
+TinyLlama/TinyLlama-1.1B-Chat-v1.0: layers 22 hidden 2048 heads 32/4 head_dim 64 vocab 32000 tied=False qkv_bias=False
+prompt 0 (len 6): prefill logits max |diff| = 0.0234
+  prompt 0 single graph=True: 128/128 tokens identical
+  prompt 0 single graph=False: 128/128 tokens identical
+prompt 1 (len 24): prefill logits max |diff| = 0.0215
+  prompt 1 single graph=True: 128/128 tokens identical
+  prompt 1 single graph=False: 128/128 tokens identical
+prompt 2 (len 18): prefill logits max |diff| = 0.0156
+  prompt 2 single graph=True: 128/128 tokens identical
+  prompt 2 single graph=False: 128/128 tokens identical
+prompt 3 (len 20): prefill logits max |diff| = 0.0156
+  prompt 3 single graph=True: 128/128 tokens identical
+  prompt 3 single graph=False: 128/128 tokens identical
+prompt 4 (len 19): prefill logits max |diff| = 0.0156
+  prompt 4 single graph=True: 128/128 tokens identical
+  prompt 4 single graph=False: 128/128 tokens identical
+prompt 5 (len 16): prefill logits max |diff| = 0.0273
+  prompt 5 single graph=True: 128/128 tokens identical
+  prompt 5 single graph=False: 128/128 tokens identical
+prompt 6 (len 700): prefill logits max |diff| = 0.0195
+  prompt 6 single graph=True: 128/128 tokens identical
+  prompt 6 single graph=False: 128/128 tokens identical
+  batched B=6 slot 0: 128/128 tokens identical
+  batched B=6 slot 1: 128/128 tokens identical
+  batched B=6 slot 2: 128/128 tokens identical
+  batched B=6 slot 3: 128/128 tokens identical
+  batched B=6 slot 4: 128/128 tokens identical
+  batched B=6 slot 5: 128/128 tokens identical
+
+20/20 runs token-identical, max prefill-logit |diff| 0.0273
+GATE PASS

@@ -1,0 +1,4 @@
+[transformers] Token indices sequence length is longer than the specified maximum sequence length for this model (289076 > 131072). Running this sequence through the model will result in indexing errors
+unsloth/Llama-3.2-1B: 289076 test tokens, 16 windows of 1024
+Loading weights:   0%|          | 0/146 [00:00<?, ?it/s]Loading weights:  34%|███▎      | 49/146 [00:00<00:00, 482.13it/s]Loading weights:  77%|███████▋  | 112/146 [00:00<00:00, 561.15it/s]Loading weights: 100%|██████████| 146/146 [00:00<00:00, 596.62it/s]
+HIP error out of memory at src/api.cu:518

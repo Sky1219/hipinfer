@@ -1,0 +1,32 @@
+Loading weights:   0%|          | 0/254 [00:00<?, ?it/s]Loading weights:  19%|█▉        | 49/254 [00:00<00:00, 460.17it/s]Loading weights:  40%|████      | 102/254 [00:00<00:00, 482.69it/s]Loading weights:  61%|██████▏   | 156/254 [00:00<00:00, 497.97it/s]Loading weights:  83%|████████▎ | 210/254 [00:00<00:00, 509.35it/s]Loading weights: 100%|██████████| 254/254 [00:00<00:00, 513.91it/s]
+unsloth/Llama-3.2-3B: layers 28 hidden 3072 heads 24/8 head_dim 128 vocab 128256 tied=True qkv_bias=False
+prompt 0 (len 6): prefill logits max |diff| = 0.0156
+  prompt 0 single graph=True: 128/128 tokens identical
+  prompt 0 single graph=False: 128/128 tokens identical
+prompt 1 (len 14): prefill logits max |diff| = 0.0205
+  prompt 1 single graph=True: 128/128 tokens identical
+  prompt 1 single graph=False: 128/128 tokens identical
+prompt 2 (len 18): prefill logits max |diff| = 0.0117
+  prompt 2 single graph=True: 128/128 tokens identical
+  prompt 2 single graph=False: 128/128 tokens identical
+prompt 3 (len 20): prefill logits max |diff| = 0.0195
+  prompt 3 single graph=True: 128/128 tokens identical
+  prompt 3 single graph=False: 128/128 tokens identical
+prompt 4 (len 16): prefill logits max |diff| = 0.0156
+  prompt 4 single graph=True: 128/128 tokens identical
+  prompt 4 single graph=False: 128/128 tokens identical
+prompt 5 (len 13): prefill logits max |diff| = 0.0234
+  prompt 5 single graph=True: 128/128 tokens identical
+  prompt 5 single graph=False: 128/128 tokens identical
+prompt 6 (len 700): prefill logits max |diff| = 0.0234
+  prompt 6 single graph=True: 128/128 tokens identical
+  prompt 6 single graph=False: 128/128 tokens identical
+  batched B=6 slot 0: 128/128 tokens identical
+  batched B=6 slot 1: 128/128 tokens identical
+  batched B=6 slot 2: 128/128 tokens identical
+  batched B=6 slot 3: 128/128 tokens identical
+  batched B=6 slot 4: 128/128 tokens identical
+  batched B=6 slot 5: 128/128 tokens identical
+
+20/20 runs token-identical, max prefill-logit |diff| 0.0234
+GATE PASS

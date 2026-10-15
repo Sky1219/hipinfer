@@ -1,0 +1,31 @@
+[transformers] Token indices sequence length is longer than the specified maximum sequence length for this model (341468 > 2048). Running this sequence through the model will result in indexing errors
+TinyLlama/TinyLlama-1.1B-Chat-v1.0: 341468 test tokens, 16 windows of 1024
+Loading weights:   0%|          | 0/201 [00:00<?, ?it/s]Loading weights:  47%|████▋     | 95/201 [00:00<00:00, 934.71it/s]Loading weights:  96%|█████████▌| 193/201 [00:00<00:00, 934.57it/s]Loading weights: 100%|██████████| 201/201 [00:00<00:00, 965.76it/s]
+window   0: ppl HF 5.0281  hipinfer 5.0283  top-1 agree 99.902%  mean KL 5.40e-06  max |dlogit| 0.059
+window   1: ppl HF 7.2867  hipinfer 7.2868  top-1 agree 99.902%  mean KL 6.14e-06  max |dlogit| 0.102
+window   2: ppl HF 8.1305  hipinfer 8.1301  top-1 agree 99.902%  mean KL 6.11e-06  max |dlogit| 0.111
+window   3: ppl HF 8.7579  hipinfer 8.7577  top-1 agree 99.902%  mean KL 6.00e-06  max |dlogit| 0.111
+window   4: ppl HF 9.5214  hipinfer 9.5212  top-1 agree 99.883%  mean KL 6.03e-06  max |dlogit| 0.111
+window   5: ppl HF 10.2285  hipinfer 10.2282  top-1 agree 99.886%  mean KL 6.07e-06  max |dlogit| 0.111
+window   6: ppl HF 10.5900  hipinfer 10.5898  top-1 agree 99.888%  mean KL 6.19e-06  max |dlogit| 0.111
+window   7: ppl HF 10.7328  hipinfer 10.7326  top-1 agree 99.878%  mean KL 6.30e-06  max |dlogit| 0.111
+window   8: ppl HF 10.3816  hipinfer 10.3815  top-1 agree 99.881%  mean KL 6.36e-06  max |dlogit| 0.111
+window   9: ppl HF 9.7848  hipinfer 9.7845  top-1 agree 99.863%  mean KL 6.32e-06  max |dlogit| 0.111
+window  10: ppl HF 9.6780  hipinfer 9.6777  top-1 agree 99.867%  mean KL 6.33e-06  max |dlogit| 0.111
+window  11: ppl HF 9.4961  hipinfer 9.4961  top-1 agree 99.870%  mean KL 6.29e-06  max |dlogit| 0.111
+window  12: ppl HF 9.3891  hipinfer 9.3890  top-1 agree 99.857%  mean KL 6.38e-06  max |dlogit| 0.111
+window  13: ppl HF 8.9721  hipinfer 8.9720  top-1 agree 99.860%  mean KL 6.46e-06  max |dlogit| 0.111
+window  14: ppl HF 8.7222  hipinfer 8.7222  top-1 agree 99.870%  mean KL 6.53e-06  max |dlogit| 0.111
+window  15: ppl HF 8.5150  hipinfer 8.5149  top-1 agree 99.878%  mean KL 6.56e-06  max |dlogit| 0.111
+{
+ "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+ "gpu": "NVIDIA RTX A6000",
+ "seq": 1024,
+ "windows": 16,
+ "tokens": 16368,
+ "ppl_hf": 8.51500459315103,
+ "ppl_hipinfer": 8.514877368320615,
+ "top1_agreement": 0.9987781036168133,
+ "mean_kl_hf_to_hipinfer": 6.5602356181520955e-06,
+ "max_logit_diff": 0.111328125
+}

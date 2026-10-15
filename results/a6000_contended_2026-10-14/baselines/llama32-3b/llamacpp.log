@@ -1,0 +1,12 @@
+$ /data/axd200066/llama.cpp/build/bin/llama-bench -m /data/axd200066/gguf/llama32-3b-f16.gguf -ngl 99 -r 5 -o json -p 128,512,2000 -n 0 -fa 0,1 -ub 512,2048 -b 2048
+ggml_cuda_init: found 1 CUDA devices (Total VRAM: 48539 MiB):
+  Device 0: NVIDIA RTX A6000, compute capability 8.6, VMM: yes, VRAM: 48539 MiB
+$ /data/axd200066/llama.cpp/build/bin/llama-bench -m /data/axd200066/gguf/llama32-3b-f16.gguf -ngl 99 -r 5 -o json -p 0 -n 256 -d 128,1024 -fa 0,1
+ggml_cuda_init: found 1 CUDA devices (Total VRAM: 48539 MiB):
+  Device 0: NVIDIA RTX A6000, compute capability 8.6, VMM: yes, VRAM: 48539 MiB
+llama.cpp prefill T=  128     19.59 ms  (fa=1 ub=512)
+llama.cpp prefill T=  512     56.50 ms  (fa=1 ub=512)
+llama.cpp prefill T= 2000    223.71 ms  (fa=1 ub=512)
+llama.cpp decode  ctx=  128  13.956 ms/token  (fa=0)
+llama.cpp decode  ctx= 1024  29.158 ms/token  (fa=1)
+wrote results/baselines/a6000/llama32-3b/llamacpp.json

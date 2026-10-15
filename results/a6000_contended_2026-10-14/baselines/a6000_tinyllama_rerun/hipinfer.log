@@ -1,0 +1,34 @@
+NVIDIA RTX A6000 peak BW 768.0 GB/s | TinyLlama/TinyLlama-1.1B-Chat-v1.0 {'vocab': 32000, 'hidden': 2048, 'inter': 5632, 'layers': 22, 'heads': 32, 'kv_heads': 4, 'head_dim': 64, 'max_pos': 2048, 'tied': False, 'qkv_bias': False, 'weight_bytes': 2069024768}
+
+== HF transformers reference timings ==
+HF prefill T=  128:    19.64 ms
+HF prefill T=  512:    21.09 ms
+HF prefill T= 1024:    36.37 ms
+HF prefill T= 2000:    66.78 ms
+HF decode ctx=  128:  19.47 ms/token
+HF decode ctx= 1024:  19.73 ms/token
+
+== Prefill latency (ms) ==
+T=  128  hipinfer    7.14 ms (   17927 tok/s)   HF   19.64 ms   x2.75
+T=  512  hipinfer   18.81 ms (   27213 tok/s)   HF   21.09 ms   x1.12
+T= 1024  hipinfer   32.07 ms (   31932 tok/s)   HF   36.37 ms   x1.13
+T= 2000  hipinfer   64.17 ms (   31166 tok/s)   HF   66.78 ms   x1.04
+
+== Decode, batch 1 (ms/token) ==
+ctx=  128  hipinfer  3.483 ms (graph) /  3.600 ms (no graph)   HF  19.47 ms   x5.6   roofline 2.702 ms -> 78% of peak BW
+ctx= 1024  hipinfer  3.556 ms (graph) /  3.685 ms (no graph)   HF  19.73 ms   x5.5   roofline 2.728 ms -> 77% of peak BW
+
+== Decode latency vs context length (batch 1, 128 new tokens) ==
+ctx=   128   3.565 ms/token   KV read     4.3 MB/step   roofline 2.700 ms  76% BW
+ctx=   512   3.553 ms/token   KV read    13.0 MB/step   roofline 2.711 ms  76% BW
+ctx=  1024   3.603 ms/token   KV read    24.5 MB/step   roofline 2.726 ms  76% BW
+
+== Batched decode throughput (ctx 512, 128 new tokens; up to 64 sequences fit) ==
+B=  1   3.575 ms/step        280 tok/s     126 W   450.78 mJ/token
+B=  2   3.730 ms/step        536 tok/s     170 W   316.86 mJ/token
+B=  4   4.036 ms/step        991 tok/s     188 W   189.79 mJ/token
+B=  8   4.336 ms/step       1845 tok/s     217 W   117.69 mJ/token
+B= 16   4.638 ms/step       3450 tok/s     217 W    62.96 mJ/token
+B= 32   5.414 ms/step       5910 tok/s     207 W    35.08 mJ/token
+B= 64   7.879 ms/step       8123 tok/s     193 W    23.81 mJ/token
+wrote results/baselines/a6000_tinyllama_rerun/hipinfer.json

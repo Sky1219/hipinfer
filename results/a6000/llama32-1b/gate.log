@@ -1,0 +1,2 @@
+Loading weights:   0%|          | 0/146 [00:00<?, ?it/s]Loading weights:  33%|███▎      | 48/146 [00:00<00:00, 466.44it/s]Loading weights:  82%|████████▏ | 120/146 [00:00<00:00, 607.95it/s]Loading weights: 100%|██████████| 146/146 [00:00<00:00, 628.71it/s]
+HIP error out of memory at src/api.cu:518

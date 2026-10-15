@@ -1,0 +1,32 @@
+Loading weights:   0%|          | 0/291 [00:00<?, ?it/s]Loading weights:  11%|█         | 31/291 [00:00<00:00, 270.26it/s]Loading weights:  20%|██        | 59/291 [00:00<00:00, 246.41it/s]Loading weights:  30%|██▉       | 86/291 [00:00<00:00, 238.70it/s]Loading weights:  38%|███▊      | 112/291 [00:00<00:00, 241.24it/s]Loading weights:  48%|████▊     | 139/291 [00:00<00:00, 245.38it/s]Loading weights:  57%|█████▋    | 166/291 [00:00<00:00, 247.79it/s]Loading weights:  66%|██████▋   | 193/291 [00:00<00:00, 246.33it/s]Loading weights:  76%|███████▌  | 221/291 [00:00<00:00, 255.37it/s]Loading weights:  85%|████████▌ | 248/291 [00:00<00:00, 256.45it/s]Loading weights:  94%|█████████▍| 274/291 [00:01<00:00, 255.54it/s]Loading weights: 100%|██████████| 291/291 [00:01<00:00, 257.82it/s]
+mistralai/Mistral-7B-v0.1: layers 32 hidden 4096 heads 32/8 head_dim 128 vocab 32000 tied=False qkv_bias=False
+prompt 0 (len 6): prefill logits max |diff| = 0.0117
+  prompt 0 single graph=True: 128/128 tokens identical
+  prompt 0 single graph=False: 128/128 tokens identical
+prompt 1 (len 23): prefill logits max |diff| = 0.0225
+  prompt 1 single graph=True: 128/128 tokens identical
+  prompt 1 single graph=False: 128/128 tokens identical
+prompt 2 (len 18): prefill logits max |diff| = 0.0117
+  prompt 2 single graph=True: 128/128 tokens identical
+  prompt 2 single graph=False: 128/128 tokens identical
+prompt 3 (len 20): prefill logits max |diff| = 0.0156
+  prompt 3 single graph=True: 128/128 tokens identical
+  prompt 3 single graph=False: 128/128 tokens identical
+prompt 4 (len 19): prefill logits max |diff| = 0.0117
+  prompt 4 single graph=True: 128/128 tokens identical
+  prompt 4 single graph=False: 128/128 tokens identical
+prompt 5 (len 16): prefill logits max |diff| = 0.0234
+  prompt 5 single graph=True: 128/128 tokens identical
+  prompt 5 single graph=False: 128/128 tokens identical
+prompt 6 (len 700): prefill logits max |diff| = 0.0137
+  prompt 6 single graph=True: 128/128 tokens identical
+  prompt 6 single graph=False: 128/128 tokens identical
+  batched B=6 slot 0: 128/128 tokens identical
+  batched B=6 slot 1: 128/128 tokens identical
+  batched B=6 slot 2: 128/128 tokens identical
+  batched B=6 slot 3: 128/128 tokens identical
+  batched B=6 slot 4: 128/128 tokens identical
+  batched B=6 slot 5: 128/128 tokens identical
+
+20/20 runs token-identical, max prefill-logit |diff| 0.0234
+GATE PASS

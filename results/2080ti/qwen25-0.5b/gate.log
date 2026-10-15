@@ -1,0 +1,32 @@
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]Loading weights:  68%|██████▊   | 196/290 [00:00<00:00, 1897.99it/s]Loading weights: 100%|██████████| 290/290 [00:00<00:00, 1964.42it/s]
+Qwen/Qwen2.5-0.5B: layers 24 hidden 896 heads 14/2 head_dim 64 vocab 151936 tied=True qkv_bias=True
+prompt 0 (len 5): prefill logits max |diff| = 0.0430
+  prompt 0 single graph=True: 128/128 tokens identical
+  prompt 0 single graph=False: 128/128 tokens identical
+prompt 1 (len 13): prefill logits max |diff| = 0.0312
+  prompt 1 single graph=True: 128/128 tokens identical
+  prompt 1 single graph=False: 128/128 tokens identical
+prompt 2 (len 17): prefill logits max |diff| = 0.0469
+  prompt 2 single graph=True: 128/128 tokens identical
+  prompt 2 single graph=False: 128/128 tokens identical
+prompt 3 (len 19): prefill logits max |diff| = 0.0312
+  prompt 3 single graph=True: 128/128 tokens identical
+  prompt 3 single graph=False: 128/128 tokens identical
+prompt 4 (len 15): prefill logits max |diff| = 0.0312
+  prompt 4 single graph=True: 128/128 tokens identical
+  prompt 4 single graph=False: 128/128 tokens identical
+prompt 5 (len 14): prefill logits max |diff| = 0.0493
+  prompt 5 single graph=True: 128/128 tokens identical
+  prompt 5 single graph=False: 128/128 tokens identical
+prompt 6 (len 700): prefill logits max |diff| = 0.0273
+  prompt 6 single graph=True: 128/128 tokens identical
+  prompt 6 single graph=False: 128/128 tokens identical
+  batched B=6 slot 0: diverges at step 94 (hf gap 0.0000) -> near-tie, OK
+  batched B=6 slot 1: 128/128 tokens identical
+  batched B=6 slot 2: 128/128 tokens identical
+  batched B=6 slot 3: 128/128 tokens identical
+  batched B=6 slot 4: 128/128 tokens identical
+  batched B=6 slot 5: diverges at step 11 (hf gap 0.0156) -> near-tie, OK
+
+18/20 runs token-identical, max prefill-logit |diff| 0.0493
+GATE PASS

@@ -1,0 +1,39 @@
+NVIDIA RTX A6000 peak BW 768.0 GB/s | unsloth/Meta-Llama-3.1-8B {'vocab': 128256, 'hidden': 4096, 'inter': 14336, 'layers': 32, 'heads': 32, 'kv_heads': 8, 'head_dim': 128, 'max_pos': 131072, 'tied': False, 'qkv_bias': False, 'weight_bytes': 15009849344}
+
+== HF transformers reference timings ==
+HF prefill T=  128:    37.91 ms
+HF prefill T=  512:    90.38 ms
+HF prefill T= 1024:   174.03 ms
+HF prefill T= 2000:   337.14 ms
+HF prefill T= 4096:   683.83 ms
+HF decode ctx=  128:  37.26 ms/token
+HF decode ctx= 1024:  37.21 ms/token
+
+== Prefill latency (ms) ==
+T=  128  hipinfer   35.54 ms (    3602 tok/s)   HF   37.91 ms   x1.07
+T=  512  hipinfer  104.39 ms (    4905 tok/s)   HF   90.38 ms   x0.87
+T= 1024  hipinfer  200.60 ms (    5105 tok/s)   HF  174.03 ms   x0.87
+T= 2000  hipinfer  393.75 ms (    5079 tok/s)   HF  337.14 ms   x0.86
+T= 4096  hipinfer 1050.88 ms (    3898 tok/s)   HF  683.83 ms   x0.65
+
+== Decode, batch 1 (ms/token) ==
+ctx=  128  hipinfer 24.674 ms (graph) / 32.151 ms (no graph)   HF  37.26 ms   x1.5   roofline 19.588 ms -> 79% of peak BW
+ctx= 1024  hipinfer 26.541 ms (graph) / 25.810 ms (no graph)   HF  37.21 ms   x1.4   roofline 19.741 ms -> 74% of peak BW
+
+== Decode latency vs context length (batch 1, 128 new tokens) ==
+ctx=   128  29.795 ms/token   KV read    25.2 MB/step   roofline 19.577 ms  66% BW
+ctx=   512  30.059 ms/token   KV read    75.5 MB/step   roofline 19.642 ms  65% BW
+ctx=  1024  30.331 ms/token   KV read   142.6 MB/step   roofline 19.730 ms  65% BW
+ctx=  2048  23.291 ms/token   KV read   276.8 MB/step   roofline 19.905 ms  85% BW
+ctx=  4096  23.525 ms/token   KV read   545.3 MB/step   roofline 20.254 ms  86% BW
+ctx=  8192  24.446 ms/token   KV read  1082.1 MB/step   roofline 20.953 ms  86% BW
+
+== Batched decode throughput (ctx 512, 128 new tokens; up to 64 sequences fit) ==
+B=  1  22.632 ms/step         44 tok/s     211 W   4764.55 mJ/token
+B=  2  23.656 ms/step         85 tok/s     224 W   2654.21 mJ/token
+B=  4  28.172 ms/step        142 tok/s     199 W   1400.31 mJ/token
+B=  8  43.503 ms/step        184 tok/s     172 W   933.72 mJ/token
+B= 16  41.500 ms/step        386 tok/s     177 W   459.16 mJ/token
+B= 32  49.097 ms/step        652 tok/s     175 W   268.06 mJ/token
+B= 64  82.206 ms/step        779 tok/s     172 W   220.59 mJ/token
+wrote results/baselines/a6000/llama31-8b/hipinfer.json

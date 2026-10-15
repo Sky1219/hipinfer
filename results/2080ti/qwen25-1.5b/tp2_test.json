@@ -1,0 +1,240 @@
+{
+ "weights": "qwen25-1.5b.bin",
+ "tp": 2,
+ "gpus": [
+  "NVIDIA GeForce RTX 2080 Ti",
+  "NVIDIA GeForce RTX 2080 Ti"
+ ],
+ "backends": {
+  "oneshot": {
+   "allreduce_max_err": 0.0,
+   "prefill_max_logit_diff": 1.203125,
+   "prefill_top1_agreement": 0.9875,
+   "runs": [
+    {
+     "run": "single prompt 0 (len 7)",
+     "identical": true,
+     "accepted": true
+    },
+    {
+     "run": "single prompt 1 (len 33)",
+     "identical": true,
+     "accepted": true
+    },
+    {
+     "run": "single prompt 2 (len 200)",
+     "identical": true,
+     "accepted": true
+    },
+    {
+     "run": "single prompt 3 (len 400)",
+     "identical": true,
+     "accepted": true
+    },
+    {
+     "run": "single prompt 4 (len 700)",
+     "identical": true,
+     "accepted": true
+    },
+    {
+     "run": "batched B=8 slot 0",
+     "identical": true,
+     "accepted": true
+    },
+    {
+     "run": "batched B=8 slot 1",
+     "identical": true,
+     "accepted": true
+    },
+    {
+     "run": "batched B=8 slot 2",
+     "identical": true,
+     "accepted": true
+    },
+    {
+     "run": "batched B=8 slot 3",
+     "identical": true,
+     "accepted": true
+    },
+    {
+     "run": "batched B=8 slot 4",
+     "identical": true,
+     "accepted": true
+    },
+    {
+     "run": "batched B=8 slot 5",
+     "identical": true,
+     "accepted": true
+    },
+    {
+     "run": "batched B=8 slot 6",
+     "identical": true,
+     "accepted": true
+    },
+    {
+     "run": "batched B=8 slot 7",
+     "identical": true,
+     "accepted": true
+    }
+   ],
+   "identical": 13
+  },
+  "nccl": {
+   "allreduce_max_err": 0.0,
+   "prefill_max_logit_diff": 1.203125,
+   "prefill_top1_agreement": 0.9875,
+   "runs": [
+    {
+     "run": "single prompt 0 (len 7)",
+     "identical": true,
+     "accepted": true
+    },
+    {
+     "run": "single prompt 1 (len 33)",
+     "identical": true,
+     "accepted": true
+    },
+    {
+     "run": "single prompt 2 (len 200)",
+     "identical": true,
+     "accepted": true
+    },
+    {
+     "run": "single prompt 3 (len 400)",
+     "identical": true,
+     "accepted": true
+    },
+    {
+     "run": "single prompt 4 (len 700)",
+     "identical": true,
+     "accepted": true
+    },
+    {
+     "run": "batched B=8 slot 0",
+     "identical": true,
+     "accepted": true
+    },
+    {
+     "run": "batched B=8 slot 1",
+     "identical": true,
+     "accepted": true
+    },
+    {
+     "run": "batched B=8 slot 2",
+     "identical": true,
+     "accepted": true
+    },
+    {
+     "run": "batched B=8 slot 3",
+     "identical": true,
+     "accepted": true
+    },
+    {
+     "run": "batched B=8 slot 4",
+     "identical": true,
+     "accepted": true
+    },
+    {
+     "run": "batched B=8 slot 5",
+     "identical": true,
+     "accepted": true
+    },
+    {
+     "run": "batched B=8 slot 6",
+     "identical": true,
+     "accepted": true
+    },
+    {
+     "run": "batched B=8 slot 7",
+     "identical": true,
+     "accepted": true
+    }
+   ],
+   "identical": 13,
+   "bitwise_equal_to_oneshot": true
+  },
+  "auto": {
+   "allreduce_max_err": 0.0,
+   "prefill_max_logit_diff": 1.203125,
+   "prefill_top1_agreement": 0.9875,
+   "runs": [
+    {
+     "run": "single prompt 0 (len 7)",
+     "identical": true,
+     "accepted": true
+    },
+    {
+     "run": "single prompt 1 (len 33)",
+     "identical": true,
+     "accepted": true
+    },
+    {
+     "run": "single prompt 2 (len 200)",
+     "identical": true,
+     "accepted": true
+    },
+    {
+     "run": "single prompt 3 (len 400)",
+     "identical": true,
+     "accepted": true
+    },
+    {
+     "run": "single prompt 4 (len 700)",
+     "identical": true,
+     "accepted": true
+    },
+    {
+     "run": "batched B=8 slot 0",
+     "identical": true,
+     "accepted": true
+    },
+    {
+     "run": "batched B=8 slot 1",
+     "identical": true,
+     "accepted": true
+    },
+    {
+     "run": "batched B=8 slot 2",
+     "identical": true,
+     "accepted": true
+    },
+    {
+     "run": "batched B=8 slot 3",
+     "identical": true,
+     "accepted": true
+    },
+    {
+     "run": "batched B=8 slot 4",
+     "identical": true,
+     "accepted": true
+    },
+    {
+     "run": "batched B=8 slot 5",
+     "identical": true,
+     "accepted": true
+    },
+    {
+     "run": "batched B=8 slot 6",
+     "identical": true,
+     "accepted": true
+    },
+    {
+     "run": "batched B=8 slot 7",
+     "identical": true,
+     "accepted": true
+    }
+   ],
+   "identical": 13,
+   "bitwise_equal_to_oneshot": true
+  }
+ },
+ "tp_info": {
+  "world": 2,
+  "p2p": false,
+  "nccl": true,
+  "allreduce": "auto",
+  "oneshot_max_bytes": 524288,
+  "prefill_overlap": true
+ },
+ "pass": true
+}

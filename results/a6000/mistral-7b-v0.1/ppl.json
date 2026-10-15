@@ -1,0 +1,12 @@
+{
+ "model": "mistralai/Mistral-7B-v0.1",
+ "gpu": "NVIDIA RTX A6000",
+ "seq": 1024,
+ "windows": 16,
+ "tokens": 16368,
+ "ppl_hf": 5.689323798595085,
+ "ppl_hipinfer": 5.689298756212829,
+ "top1_agreement": 0.9984115347018573,
+ "mean_kl_hf_to_hipinfer": 4.61568482558039e-06,
+ "max_logit_diff": 0.505859375
+}

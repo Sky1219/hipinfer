@@ -1,0 +1,118 @@
+{
+ "model": "unsloth/Meta-Llama-3.1-8B",
+ "gpu": "NVIDIA RTX A6000",
+ "new_tokens": 128,
+ "pass": true,
+ "identical": 14,
+ "runs": 20,
+ "max_prefill_logit_diff": 0.0283203125,
+ "prompt_lens": [
+  6,
+  14,
+  18,
+  20,
+  16,
+  13,
+  700
+ ],
+ "log": [
+  {
+   "run": "prompt 0 single graph=True",
+   "identical": false,
+   "step": 13,
+   "hf_gap": 0.0,
+   "accepted": true
+  },
+  {
+   "run": "prompt 0 single graph=False",
+   "identical": false,
+   "step": 13,
+   "hf_gap": 0.0,
+   "accepted": true
+  },
+  {
+   "run": "prompt 1 single graph=True",
+   "identical": true
+  },
+  {
+   "run": "prompt 1 single graph=False",
+   "identical": true
+  },
+  {
+   "run": "prompt 2 single graph=True",
+   "identical": true
+  },
+  {
+   "run": "prompt 2 single graph=False",
+   "identical": true
+  },
+  {
+   "run": "prompt 3 single graph=True",
+   "identical": true
+  },
+  {
+   "run": "prompt 3 single graph=False",
+   "identical": true
+  },
+  {
+   "run": "prompt 4 single graph=True",
+   "identical": false,
+   "step": 22,
+   "hf_gap": 0.0,
+   "accepted": true
+  },
+  {
+   "run": "prompt 4 single graph=False",
+   "identical": false,
+   "step": 22,
+   "hf_gap": 0.0,
+   "accepted": true
+  },
+  {
+   "run": "prompt 5 single graph=True",
+   "identical": true
+  },
+  {
+   "run": "prompt 5 single graph=False",
+   "identical": true
+  },
+  {
+   "run": "prompt 6 single graph=True",
+   "identical": true
+  },
+  {
+   "run": "prompt 6 single graph=False",
+   "identical": true
+  },
+  {
+   "run": "batched B=6 slot 0",
+   "identical": false,
+   "step": 13,
+   "hf_gap": 0.0,
+   "accepted": true
+  },
+  {
+   "run": "batched B=6 slot 1",
+   "identical": true
+  },
+  {
+   "run": "batched B=6 slot 2",
+   "identical": false,
+   "step": 111,
+   "hf_gap": 0.0,
+   "accepted": true
+  },
+  {
+   "run": "batched B=6 slot 3",
+   "identical": true
+  },
+  {
+   "run": "batched B=6 slot 4",
+   "identical": true
+  },
+  {
+   "run": "batched B=6 slot 5",
+   "identical": true
+  }
+ ]
+}

@@ -1,0 +1,3 @@
+HF static+compile decode ctx=  128   5.509 ms/token
+HF static+compile decode ctx= 1024   7.095 ms/token
+wrote results/baselines/2080ti/hf_static.json

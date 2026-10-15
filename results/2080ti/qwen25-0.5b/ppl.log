@@ -1,0 +1,31 @@
+[transformers] Token indices sequence length is longer than the specified maximum sequence length for this model (299078 > 131072). Running this sequence through the model will result in indexing errors
+Qwen/Qwen2.5-0.5B: 299078 test tokens, 16 windows of 1024
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]Loading weights:  67%|██████▋   | 195/290 [00:00<00:00, 1912.60it/s]Loading weights: 100%|██████████| 290/290 [00:00<00:00, 1986.18it/s]
+window   0: ppl HF 8.7937  hipinfer 8.7929  top-1 agree 99.804%  mean KL 1.31e-05  max |dlogit| 0.094
+window   1: ppl HF 12.3113  hipinfer 12.3101  top-1 agree 99.706%  mean KL 1.46e-05  max |dlogit| 0.094
+window   2: ppl HF 13.1289  hipinfer 13.1263  top-1 agree 99.739%  mean KL 1.53e-05  max |dlogit| 0.129
+window   3: ppl HF 14.3451  hipinfer 14.3438  top-1 agree 99.804%  mean KL 1.54e-05  max |dlogit| 0.129
+window   4: ppl HF 15.9719  hipinfer 15.9706  top-1 agree 99.824%  mean KL 1.55e-05  max |dlogit| 0.129
+window   5: ppl HF 16.2419  hipinfer 16.2406  top-1 agree 99.837%  mean KL 1.56e-05  max |dlogit| 0.129
+window   6: ppl HF 16.9259  hipinfer 16.9243  top-1 agree 99.804%  mean KL 1.57e-05  max |dlogit| 0.129
+window   7: ppl HF 17.2238  hipinfer 17.2227  top-1 agree 99.768%  mean KL 1.56e-05  max |dlogit| 0.129
+window   8: ppl HF 16.1118  hipinfer 16.1114  top-1 agree 99.750%  mean KL 1.55e-05  max |dlogit| 0.129
+window   9: ppl HF 16.3692  hipinfer 16.3691  top-1 agree 99.775%  mean KL 1.54e-05  max |dlogit| 0.129
+window  10: ppl HF 15.9285  hipinfer 15.9283  top-1 agree 99.769%  mean KL 1.53e-05  max |dlogit| 0.129
+window  11: ppl HF 14.9165  hipinfer 14.9165  top-1 agree 99.772%  mean KL 1.54e-05  max |dlogit| 0.129
+window  12: ppl HF 14.1901  hipinfer 14.1904  top-1 agree 99.782%  mean KL 1.55e-05  max |dlogit| 0.129
+window  13: ppl HF 13.5750  hipinfer 13.5753  top-1 agree 99.783%  mean KL 1.55e-05  max |dlogit| 0.129
+window  14: ppl HF 13.5135  hipinfer 13.5136  top-1 agree 99.791%  mean KL 1.55e-05  max |dlogit| 0.129
+window  15: ppl HF 13.4851  hipinfer 13.4851  top-1 agree 99.792%  mean KL 1.55e-05  max |dlogit| 0.129
+{
+ "model": "Qwen/Qwen2.5-0.5B",
+ "gpu": "NVIDIA GeForce RTX 2080 Ti",
+ "seq": 1024,
+ "windows": 16,
+ "tokens": 16352,
+ "ppl_hf": 13.485075652311172,
+ "ppl_hipinfer": 13.485113100956154,
+ "top1_agreement": 0.9979207436399217,
+ "mean_kl_hf_to_hipinfer": 1.5530987905152508e-05,
+ "max_logit_diff": 0.12890625
+}

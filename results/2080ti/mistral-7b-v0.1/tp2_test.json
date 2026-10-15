@@ -1,0 +1,30 @@
+{
+ "weights": "mistral-7b.bin",
+ "tp": 2,
+ "gpus": [
+  "NVIDIA GeForce RTX 2080 Ti",
+  "NVIDIA GeForce RTX 2080 Ti"
+ ],
+ "backends": {
+  "oneshot": {
+   "allreduce_max_err": 0.0
+  },
+  "nccl": {
+   "allreduce_max_err": 0.0,
+   "bitwise_equal_to_oneshot": true
+  },
+  "auto": {
+   "allreduce_max_err": 0.0,
+   "bitwise_equal_to_oneshot": true
+  }
+ },
+ "tp_info": {
+  "world": 2,
+  "p2p": false,
+  "nccl": true,
+  "allreduce": "auto",
+  "oneshot_max_bytes": 524288,
+  "prefill_overlap": true
+ },
+ "pass": true
+}

@@ -1,0 +1,12 @@
+{
+ "model": "unsloth/Meta-Llama-3.1-8B",
+ "gpu": "NVIDIA RTX A6000",
+ "seq": 1024,
+ "windows": 16,
+ "tokens": 16368,
+ "ppl_hf": 6.546910622384431,
+ "ppl_hipinfer": 6.546884515802326,
+ "top1_agreement": 0.9986559139784946,
+ "mean_kl_hf_to_hipinfer": 1.0559455244262536e-05,
+ "max_logit_diff": 2.4052734375
+}

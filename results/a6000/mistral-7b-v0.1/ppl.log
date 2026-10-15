@@ -1,0 +1,30 @@
+mistralai/Mistral-7B-v0.1: 334660 test tokens, 16 windows of 1024
+Loading weights:   0%|          | 0/291 [00:00<?, ?it/s]Loading weights:  11%|█         | 31/291 [00:00<00:01, 246.44it/s]Loading weights:  20%|█▉        | 58/291 [00:00<00:00, 239.65it/s]Loading weights:  29%|██▉       | 85/291 [00:00<00:00, 247.44it/s]Loading weights:  38%|███▊      | 112/291 [00:00<00:00, 238.12it/s]Loading weights:  48%|████▊     | 139/291 [00:00<00:00, 245.51it/s]Loading weights:  57%|█████▋    | 166/291 [00:00<00:00, 246.15it/s]Loading weights:  66%|██████▋   | 193/291 [00:00<00:00, 242.30it/s]Loading weights:  76%|███████▌  | 220/291 [00:00<00:00, 241.21it/s]Loading weights:  85%|████████▍ | 247/291 [00:01<00:00, 246.54it/s]Loading weights:  94%|█████████▍| 274/291 [00:01<00:00, 240.97it/s]Loading weights: 100%|██████████| 291/291 [00:01<00:00, 248.52it/s]
+window   0: ppl HF 3.8293  hipinfer 3.8291  top-1 agree 99.902%  mean KL 3.83e-06  max |dlogit| 0.315
+window   1: ppl HF 5.1499  hipinfer 5.1492  top-1 agree 99.902%  mean KL 4.17e-06  max |dlogit| 0.315
+window   2: ppl HF 5.6202  hipinfer 5.6201  top-1 agree 99.902%  mean KL 4.33e-06  max |dlogit| 0.315
+window   3: ppl HF 6.2760  hipinfer 6.2762  top-1 agree 99.902%  mean KL 4.38e-06  max |dlogit| 0.315
+window   4: ppl HF 6.8356  hipinfer 6.8358  top-1 agree 99.883%  mean KL 4.45e-06  max |dlogit| 0.315
+window   5: ppl HF 7.2482  hipinfer 7.2486  top-1 agree 99.886%  mean KL 4.49e-06  max |dlogit| 0.315
+window   6: ppl HF 7.2826  hipinfer 7.2831  top-1 agree 99.888%  mean KL 4.59e-06  max |dlogit| 0.315
+window   7: ppl HF 7.1834  hipinfer 7.1838  top-1 agree 99.890%  mean KL 4.62e-06  max |dlogit| 0.315
+window   8: ppl HF 7.0234  hipinfer 7.0237  top-1 agree 99.881%  mean KL 4.61e-06  max |dlogit| 0.315
+window   9: ppl HF 6.7025  hipinfer 6.7026  top-1 agree 99.863%  mean KL 4.60e-06  max |dlogit| 0.506
+window  10: ppl HF 6.5903  hipinfer 6.5904  top-1 agree 99.867%  mean KL 4.58e-06  max |dlogit| 0.506
+window  11: ppl HF 6.4494  hipinfer 6.4493  top-1 agree 99.870%  mean KL 4.56e-06  max |dlogit| 0.506
+window  12: ppl HF 6.2485  hipinfer 6.2484  top-1 agree 99.842%  mean KL 4.60e-06  max |dlogit| 0.506
+window  13: ppl HF 5.9436  hipinfer 5.9435  top-1 agree 99.846%  mean KL 4.59e-06  max |dlogit| 0.506
+window  14: ppl HF 5.7221  hipinfer 5.7220  top-1 agree 99.837%  mean KL 4.59e-06  max |dlogit| 0.506
+window  15: ppl HF 5.6893  hipinfer 5.6893  top-1 agree 99.841%  mean KL 4.62e-06  max |dlogit| 0.506
+{
+ "model": "mistralai/Mistral-7B-v0.1",
+ "gpu": "NVIDIA RTX A6000",
+ "seq": 1024,
+ "windows": 16,
+ "tokens": 16368,
+ "ppl_hf": 5.689323798595085,
+ "ppl_hipinfer": 5.689298756212829,
+ "top1_agreement": 0.9984115347018573,
+ "mean_kl_hf_to_hipinfer": 4.61568482558039e-06,
+ "max_logit_diff": 0.505859375
+}

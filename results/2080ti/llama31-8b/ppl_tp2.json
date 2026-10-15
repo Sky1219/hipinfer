@@ -1,0 +1,13 @@
+{
+ "model": "unsloth/Meta-Llama-3.1-8B",
+ "gpu": "NVIDIA GeForce RTX 2080 Ti",
+ "tp": 2,
+ "seq": 1024,
+ "windows": 8,
+ "tokens": 8184,
+ "ppl_hf": 8.151095701697868,
+ "ppl_hipinfer": 8.150533096684153,
+ "top1_agreement": 0.998900293255132,
+ "mean_kl_hf_to_hipinfer": 1.2248966620756152e-05,
+ "max_logit_diff": 1.927490234375
+}

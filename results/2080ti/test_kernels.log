@@ -1,0 +1,775 @@
+NVIDIA GeForce RTX 2080 Ti
+OK   rmsnorm M=1 H=2048 (vs HF fp16 order)                max_abs_err=0.000e+00
+OK   rmsnorm M=7 H=2048 (vs HF fp16 order)                max_abs_err=0.000e+00
+OK   rmsnorm M=300 H=4096 (vs HF fp16 order)              max_abs_err=1.953e-03
+OK   rmsnorm M=5 H=896 (vs HF fp16 order)                 max_abs_err=0.000e+00
+OK   rmsnorm M=33 H=3072 (vs HF fp16 order)               max_abs_err=9.766e-04
+OK   gemv M=1 N=2560 K=2048                               max_abs_err=9.692e-04
+OK   gemv+rmsnorm M=1 K=2048                              max_abs_err=9.758e-04
+OK   gemv+residual M=1 K=5632                             max_abs_err=1.221e-04
+OK   gemv+swiglu M=1 I=5632                               max_abs_err=1.221e-04
+OK   gemv M=3 N=2560 K=2048                               max_abs_err=9.708e-04
+OK   gemv+rmsnorm M=3 K=2048                              max_abs_err=9.708e-04
+OK   gemv+residual M=3 K=5632                             max_abs_err=1.953e-03
+OK   gemv+swiglu M=3 I=5632                               max_abs_err=4.883e-04
+OK   gemv M=8 N=2560 K=2048                               max_abs_err=9.763e-04
+OK   gemv+rmsnorm M=8 K=2048                              max_abs_err=1.166e-03
+OK   gemv+residual M=8 K=5632                             max_abs_err=3.906e-03
+OK   gemv+swiglu M=8 I=5632                               max_abs_err=4.883e-04
+OK   gemv M=11 N=2560 K=2048                              max_abs_err=9.763e-04
+OK   gemv+rmsnorm M=11 K=2048                             max_abs_err=9.727e-04
+OK   gemv+residual M=11 K=5632                            max_abs_err=9.766e-04
+OK   gemv+swiglu M=11 I=5632                              max_abs_err=9.766e-04
+OK   gemv M=1 N=2560 K=896                                max_abs_err=7.486e-04
+OK   gemv+rmsnorm M=1 K=896                               max_abs_err=9.413e-04
+OK   gemv+residual M=1 K=4864                             max_abs_err=0.000e+00
+OK   gemv+swiglu M=1 I=4864                               max_abs_err=9.766e-04
+OK   gemv M=3 N=2560 K=896                                max_abs_err=8.492e-04
+OK   gemv+rmsnorm M=3 K=896                               max_abs_err=6.092e-04
+OK   gemv+residual M=3 K=4864                             max_abs_err=3.906e-03
+OK   gemv+swiglu M=3 I=4864                               max_abs_err=6.104e-05
+OK   gemv M=8 N=2560 K=896                                max_abs_err=9.508e-04
+OK   gemv+rmsnorm M=8 K=896                               max_abs_err=8.643e-04
+OK   gemv+residual M=8 K=4864                             max_abs_err=9.766e-04
+OK   gemv+swiglu M=8 I=4864                               max_abs_err=4.883e-04
+OK   gemv M=11 N=2560 K=896                               max_abs_err=9.732e-04
+OK   gemv+rmsnorm M=11 K=896                              max_abs_err=9.036e-04
+OK   gemv+residual M=11 K=4864                            max_abs_err=9.766e-04
+OK   gemv+swiglu M=11 I=4864                              max_abs_err=4.883e-04
+OK   gemv M=1 N=2560 K=3072                               max_abs_err=9.727e-04
+OK   gemv+rmsnorm M=1 K=3072                              max_abs_err=9.844e-04
+OK   gemv+residual M=1 K=8192                             max_abs_err=6.104e-05
+OK   gemv+swiglu M=1 I=8192                               max_abs_err=2.441e-04
+OK   gemv M=3 N=2560 K=3072                               max_abs_err=9.766e-04
+OK   gemv+rmsnorm M=3 K=3072                              max_abs_err=1.903e-03
+OK   gemv+residual M=3 K=8192                             max_abs_err=1.953e-03
+OK   gemv+swiglu M=3 I=8192                               max_abs_err=1.953e-03
+OK   gemv M=8 N=2560 K=3072                               max_abs_err=1.527e-03
+OK   gemv+rmsnorm M=8 K=3072                              max_abs_err=1.866e-03
+OK   gemv+residual M=8 K=8192                             max_abs_err=1.953e-03
+OK   gemv+swiglu M=8 I=8192                               max_abs_err=1.953e-03
+OK   gemv M=11 N=2560 K=3072                              max_abs_err=1.899e-03
+OK   gemv+rmsnorm M=11 K=3072                             max_abs_err=1.913e-03
+OK   gemv+residual M=11 K=8192                            max_abs_err=3.906e-03
+OK   gemv+swiglu M=11 I=8192                              max_abs_err=3.906e-03
+OK   gemm split-K=2 M=9 N=2560                            max_abs_err=9.780e-04
+OK   gemm split-K=2 +bias M=9                             max_abs_err=1.903e-03
+OK   gemm split-K=2 +residual M=9 K=5632                  max_abs_err=3.906e-03
+OK   gemm split-K=2 +swiglu M=9                           max_abs_err=1.953e-03
+OK   gemm split-K=2 M=32 N=2560                           max_abs_err=9.818e-04
+OK   gemm split-K=2 +bias M=32                            max_abs_err=1.922e-03
+OK   gemm split-K=2 +residual M=32 K=5632                 max_abs_err=3.906e-03
+OK   gemm split-K=2 +swiglu M=32                          max_abs_err=1.953e-03
+OK   gemm split-K=2 M=64 N=2560                           max_abs_err=1.832e-03
+OK   gemm split-K=2 +bias M=64                            max_abs_err=1.946e-03
+OK   gemm split-K=2 +residual M=64 K=5632                 max_abs_err=7.812e-03
+OK   gemm split-K=2 +swiglu M=64                          max_abs_err=3.906e-03
+OK   gemm split-K=4 M=9 N=2560                            max_abs_err=9.747e-04
+OK   gemm split-K=4 +bias M=9                             max_abs_err=1.933e-03
+OK   gemm split-K=4 +residual M=9 K=5632                  max_abs_err=3.906e-03
+OK   gemm split-K=4 +swiglu M=9                           max_abs_err=1.953e-03
+OK   gemm split-K=4 M=32 N=2560                           max_abs_err=9.778e-04
+OK   gemm split-K=4 +bias M=32                            max_abs_err=1.945e-03
+OK   gemm split-K=4 +residual M=32 K=5632                 max_abs_err=3.906e-03
+OK   gemm split-K=4 +swiglu M=32                          max_abs_err=1.953e-03
+OK   gemm split-K=4 M=64 N=2560                           max_abs_err=9.780e-04
+OK   gemm split-K=4 +bias M=64                            max_abs_err=1.947e-03
+OK   gemm split-K=4 +residual M=64 K=5632                 max_abs_err=3.906e-03
+OK   gemm split-K=4 +swiglu M=64                          max_abs_err=3.906e-03
+OK   gemm split-K=8 M=9 N=2560                            max_abs_err=9.756e-04
+OK   gemm split-K=8 +bias M=9                             max_abs_err=1.917e-03
+OK   gemm split-K=8 +residual M=9 K=5632                  max_abs_err=3.906e-03
+OK   gemm split-K=8 +swiglu M=9                           max_abs_err=9.766e-04
+OK   gemm split-K=8 M=32 N=2560                           max_abs_err=1.297e-03
+OK   gemm split-K=8 +bias M=32                            max_abs_err=1.950e-03
+OK   gemm split-K=8 +residual M=32 K=5632                 max_abs_err=3.906e-03
+OK   gemm split-K=8 +swiglu M=32                          max_abs_err=3.906e-03
+OK   gemm split-K=8 M=64 N=2560                           max_abs_err=1.454e-03
+OK   gemm split-K=8 +bias M=64                            max_abs_err=1.948e-03
+OK   gemm split-K=8 +residual M=64 K=5632                 max_abs_err=3.906e-03
+OK   gemm split-K=8 +swiglu M=64                          max_abs_err=1.953e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 1 k-slices split=1 M=1 +bias max_abs_err=1.834e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 1 k-slices split=1 M=1 +residual max_abs_err=1.953e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 1 k-slices split=1 M=9 +bias max_abs_err=1.954e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 1 k-slices split=1 M=9 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 1 k-slices split=1 M=16 +bias max_abs_err=1.951e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 1 k-slices split=1 M=16 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 1 k-slices split=1 M=33 +bias max_abs_err=1.955e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 1 k-slices split=1 M=33 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 1 k-slices split=1 M=64 +bias max_abs_err=1.956e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 1 k-slices split=1 M=64 +residual max_abs_err=7.812e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 1 k-slices split=2 M=1 +bias max_abs_err=1.862e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 1 k-slices split=2 M=1 +residual max_abs_err=1.953e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 1 k-slices split=2 M=9 +bias max_abs_err=1.944e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 1 k-slices split=2 M=9 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 1 k-slices split=2 M=16 +bias max_abs_err=1.911e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 1 k-slices split=2 M=16 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 1 k-slices split=2 M=33 +bias max_abs_err=1.951e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 1 k-slices split=2 M=33 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 1 k-slices split=2 M=64 +bias max_abs_err=1.954e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 1 k-slices split=2 M=64 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 1 k-slices split=4 M=1 +bias max_abs_err=1.938e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 1 k-slices split=4 M=1 +residual max_abs_err=1.953e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 1 k-slices split=4 M=9 +bias max_abs_err=1.916e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 1 k-slices split=4 M=9 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 1 k-slices split=4 M=16 +bias max_abs_err=1.950e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 1 k-slices split=4 M=16 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 1 k-slices split=4 M=33 +bias max_abs_err=1.950e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 1 k-slices split=4 M=33 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 1 k-slices split=4 M=64 +bias max_abs_err=1.953e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 1 k-slices split=4 M=64 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 1 k-slices split=1 M=1 +bias max_abs_err=1.904e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 1 k-slices split=1 M=1 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 1 k-slices split=1 M=9 +bias max_abs_err=1.950e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 1 k-slices split=1 M=9 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 1 k-slices split=1 M=16 +bias max_abs_err=1.940e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 1 k-slices split=1 M=16 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 1 k-slices split=1 M=33 +bias max_abs_err=1.942e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 1 k-slices split=1 M=33 +residual max_abs_err=7.812e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 1 k-slices split=1 M=64 +bias max_abs_err=1.947e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 1 k-slices split=1 M=64 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 1 k-slices split=2 M=1 +bias max_abs_err=9.720e-04
+OK   gemm skinny mma.sync, 16 weight rows per warp, 1 k-slices split=2 M=1 +residual max_abs_err=1.953e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 1 k-slices split=2 M=9 +bias max_abs_err=1.949e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 1 k-slices split=2 M=9 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 1 k-slices split=2 M=16 +bias max_abs_err=1.942e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 1 k-slices split=2 M=16 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 1 k-slices split=2 M=33 +bias max_abs_err=1.951e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 1 k-slices split=2 M=33 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 1 k-slices split=2 M=64 +bias max_abs_err=1.955e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 1 k-slices split=2 M=64 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 1 k-slices split=4 M=1 +bias max_abs_err=1.898e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 1 k-slices split=4 M=1 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 1 k-slices split=4 M=9 +bias max_abs_err=1.904e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 1 k-slices split=4 M=9 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 1 k-slices split=4 M=16 +bias max_abs_err=1.951e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 1 k-slices split=4 M=16 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 1 k-slices split=4 M=33 +bias max_abs_err=1.945e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 1 k-slices split=4 M=33 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 1 k-slices split=4 M=64 +bias max_abs_err=1.947e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 1 k-slices split=4 M=64 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=1 M=1 +bias max_abs_err=1.757e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=1 M=1 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=1 M=1 +swiglu max_abs_err=1.953e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=1 M=9 +bias max_abs_err=1.956e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=1 M=9 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=1 M=9 +swiglu max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=1 M=16 +bias max_abs_err=1.935e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=1 M=16 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=1 M=16 +swiglu max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=1 M=33 +bias max_abs_err=1.948e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=1 M=33 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=1 M=33 +swiglu max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=1 M=64 +bias max_abs_err=1.960e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=1 M=64 +residual max_abs_err=7.812e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=1 M=64 +swiglu max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=2 M=1 +bias max_abs_err=1.400e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=2 M=1 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=2 M=1 +swiglu max_abs_err=1.953e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=2 M=9 +bias max_abs_err=1.945e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=2 M=9 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=2 M=9 +swiglu max_abs_err=2.930e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=2 M=16 +bias max_abs_err=1.943e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=2 M=16 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=2 M=16 +swiglu max_abs_err=5.859e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=2 M=33 +bias max_abs_err=1.941e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=2 M=33 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=2 M=33 +swiglu max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=2 M=64 +bias max_abs_err=1.943e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=2 M=64 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=2 M=64 +swiglu max_abs_err=7.812e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=4 M=1 +bias max_abs_err=1.674e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=4 M=1 +residual max_abs_err=4.883e-04
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=4 M=1 +swiglu max_abs_err=4.883e-04
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=4 M=9 +bias max_abs_err=1.927e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=4 M=9 +residual max_abs_err=1.953e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=4 M=9 +swiglu max_abs_err=9.766e-04
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=4 M=16 +bias max_abs_err=1.952e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=4 M=16 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=4 M=16 +swiglu max_abs_err=1.953e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=4 M=33 +bias max_abs_err=1.945e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=4 M=33 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=4 M=33 +swiglu max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=4 M=64 +bias max_abs_err=1.948e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=4 M=64 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 1 k-slices split=4 M=64 +swiglu max_abs_err=1.953e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 2 k-slices split=1 M=1 +bias max_abs_err=1.887e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 2 k-slices split=1 M=1 +residual max_abs_err=1.953e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 2 k-slices split=1 M=9 +bias max_abs_err=1.891e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 2 k-slices split=1 M=9 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 2 k-slices split=1 M=16 +bias max_abs_err=1.919e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 2 k-slices split=1 M=16 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 2 k-slices split=1 M=33 +bias max_abs_err=1.945e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 2 k-slices split=1 M=33 +residual max_abs_err=7.812e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 2 k-slices split=1 M=64 +bias max_abs_err=1.955e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 2 k-slices split=1 M=64 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 2 k-slices split=2 M=1 +bias max_abs_err=1.235e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 2 k-slices split=2 M=1 +residual max_abs_err=1.953e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 2 k-slices split=2 M=9 +bias max_abs_err=1.949e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 2 k-slices split=2 M=9 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 2 k-slices split=2 M=16 +bias max_abs_err=1.953e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 2 k-slices split=2 M=16 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 2 k-slices split=2 M=33 +bias max_abs_err=1.949e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 2 k-slices split=2 M=33 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 2 k-slices split=2 M=64 +bias max_abs_err=1.939e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 2 k-slices split=2 M=64 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 2 k-slices split=4 M=1 +bias max_abs_err=1.734e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 2 k-slices split=4 M=1 +residual max_abs_err=1.953e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 2 k-slices split=4 M=9 +bias max_abs_err=1.947e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 2 k-slices split=4 M=9 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 2 k-slices split=4 M=16 +bias max_abs_err=1.924e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 2 k-slices split=4 M=16 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 2 k-slices split=4 M=33 +bias max_abs_err=1.936e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 2 k-slices split=4 M=33 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 2 k-slices split=4 M=64 +bias max_abs_err=1.953e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 2 k-slices split=4 M=64 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 2 k-slices split=1 M=1 +bias max_abs_err=1.941e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 2 k-slices split=1 M=1 +residual max_abs_err=1.953e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 2 k-slices split=1 M=9 +bias max_abs_err=1.947e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 2 k-slices split=1 M=9 +residual max_abs_err=1.953e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 2 k-slices split=1 M=16 +bias max_abs_err=1.940e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 2 k-slices split=1 M=16 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 2 k-slices split=1 M=33 +bias max_abs_err=1.955e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 2 k-slices split=1 M=33 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 2 k-slices split=1 M=64 +bias max_abs_err=1.952e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 2 k-slices split=1 M=64 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 2 k-slices split=2 M=1 +bias max_abs_err=1.948e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 2 k-slices split=2 M=1 +residual max_abs_err=1.953e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 2 k-slices split=2 M=9 +bias max_abs_err=1.925e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 2 k-slices split=2 M=9 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 2 k-slices split=2 M=16 +bias max_abs_err=1.954e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 2 k-slices split=2 M=16 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 2 k-slices split=2 M=33 +bias max_abs_err=1.946e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 2 k-slices split=2 M=33 +residual max_abs_err=7.812e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 2 k-slices split=2 M=64 +bias max_abs_err=1.959e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 2 k-slices split=2 M=64 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 2 k-slices split=4 M=1 +bias max_abs_err=1.581e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 2 k-slices split=4 M=1 +residual max_abs_err=1.953e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 2 k-slices split=4 M=9 +bias max_abs_err=1.944e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 2 k-slices split=4 M=9 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 2 k-slices split=4 M=16 +bias max_abs_err=1.898e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 2 k-slices split=4 M=16 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 2 k-slices split=4 M=33 +bias max_abs_err=1.949e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 2 k-slices split=4 M=33 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 2 k-slices split=4 M=64 +bias max_abs_err=1.946e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 2 k-slices split=4 M=64 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=1 M=1 +bias max_abs_err=1.742e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=1 M=1 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=1 M=1 +swiglu max_abs_err=1.953e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=1 M=9 +bias max_abs_err=1.947e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=1 M=9 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=1 M=9 +swiglu max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=1 M=16 +bias max_abs_err=1.944e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=1 M=16 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=1 M=16 +swiglu max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=1 M=33 +bias max_abs_err=1.944e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=1 M=33 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=1 M=33 +swiglu max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=1 M=64 +bias max_abs_err=1.959e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=1 M=64 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=1 M=64 +swiglu max_abs_err=7.812e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=2 M=1 +bias max_abs_err=1.731e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=2 M=1 +residual max_abs_err=1.953e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=2 M=1 +swiglu max_abs_err=2.441e-04
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=2 M=9 +bias max_abs_err=1.867e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=2 M=9 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=2 M=9 +swiglu max_abs_err=1.953e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=2 M=16 +bias max_abs_err=1.947e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=2 M=16 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=2 M=16 +swiglu max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=2 M=33 +bias max_abs_err=1.953e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=2 M=33 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=2 M=33 +swiglu max_abs_err=7.812e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=2 M=64 +bias max_abs_err=1.949e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=2 M=64 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=2 M=64 +swiglu max_abs_err=2.930e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=4 M=1 +bias max_abs_err=1.827e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=4 M=1 +residual max_abs_err=1.953e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=4 M=1 +swiglu max_abs_err=2.441e-04
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=4 M=9 +bias max_abs_err=1.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=4 M=9 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=4 M=9 +swiglu max_abs_err=1.953e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=4 M=16 +bias max_abs_err=1.907e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=4 M=16 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=4 M=16 +swiglu max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=4 M=33 +bias max_abs_err=1.950e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=4 M=33 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=4 M=33 +swiglu max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=4 M=64 +bias max_abs_err=1.954e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=4 M=64 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 32 weight rows per warp, 2 k-slices split=4 M=64 +swiglu max_abs_err=2.930e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 4 k-slices split=1 M=1 +bias max_abs_err=1.431e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 4 k-slices split=1 M=1 +residual max_abs_err=1.953e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 4 k-slices split=1 M=9 +bias max_abs_err=1.940e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 4 k-slices split=1 M=9 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 4 k-slices split=1 M=16 +bias max_abs_err=1.952e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 4 k-slices split=1 M=16 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 4 k-slices split=1 M=33 +bias max_abs_err=1.918e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 4 k-slices split=1 M=33 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 4 k-slices split=1 M=64 +bias max_abs_err=1.952e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 4 k-slices split=1 M=64 +residual max_abs_err=7.812e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 4 k-slices split=2 M=1 +bias max_abs_err=1.660e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 4 k-slices split=2 M=1 +residual max_abs_err=1.953e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 4 k-slices split=2 M=9 +bias max_abs_err=1.944e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 4 k-slices split=2 M=9 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 4 k-slices split=2 M=16 +bias max_abs_err=1.948e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 4 k-slices split=2 M=16 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 4 k-slices split=2 M=33 +bias max_abs_err=1.956e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 4 k-slices split=2 M=33 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 4 k-slices split=2 M=64 +bias max_abs_err=1.950e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 4 k-slices split=2 M=64 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 4 k-slices split=4 M=1 +bias max_abs_err=1.937e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 4 k-slices split=4 M=1 +residual max_abs_err=1.953e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 4 k-slices split=4 M=9 +bias max_abs_err=1.909e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 4 k-slices split=4 M=9 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 4 k-slices split=4 M=16 +bias max_abs_err=1.944e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 4 k-slices split=4 M=16 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 4 k-slices split=4 M=33 +bias max_abs_err=1.946e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 4 k-slices split=4 M=33 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 4 k-slices split=4 M=64 +bias max_abs_err=1.955e-03
+OK   gemm skinny mma.sync, 8 weight rows per warp, 4 k-slices split=4 M=64 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 4 k-slices split=1 M=1 +bias max_abs_err=1.442e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 4 k-slices split=1 M=1 +residual max_abs_err=1.953e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 4 k-slices split=1 M=9 +bias max_abs_err=1.925e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 4 k-slices split=1 M=9 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 4 k-slices split=1 M=16 +bias max_abs_err=1.941e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 4 k-slices split=1 M=16 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 4 k-slices split=1 M=33 +bias max_abs_err=1.964e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 4 k-slices split=1 M=33 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 4 k-slices split=1 M=64 +bias max_abs_err=1.965e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 4 k-slices split=1 M=64 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 4 k-slices split=2 M=1 +bias max_abs_err=1.934e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 4 k-slices split=2 M=1 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 4 k-slices split=2 M=9 +bias max_abs_err=1.943e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 4 k-slices split=2 M=9 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 4 k-slices split=2 M=16 +bias max_abs_err=1.937e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 4 k-slices split=2 M=16 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 4 k-slices split=2 M=33 +bias max_abs_err=1.943e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 4 k-slices split=2 M=33 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 4 k-slices split=2 M=64 +bias max_abs_err=1.950e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 4 k-slices split=2 M=64 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 4 k-slices split=4 M=1 +bias max_abs_err=1.886e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 4 k-slices split=4 M=1 +residual max_abs_err=1.953e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 4 k-slices split=4 M=9 +bias max_abs_err=1.934e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 4 k-slices split=4 M=9 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 4 k-slices split=4 M=16 +bias max_abs_err=1.940e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 4 k-slices split=4 M=16 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 4 k-slices split=4 M=33 +bias max_abs_err=1.950e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 4 k-slices split=4 M=33 +residual max_abs_err=3.906e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 4 k-slices split=4 M=64 +bias max_abs_err=1.945e-03
+OK   gemm skinny mma.sync, 16 weight rows per warp, 4 k-slices split=4 M=64 +residual max_abs_err=3.906e-03
+OK   gemm cfg=-1 M=128 N=2560 K=2048                      max_abs_err=1.637e-03
+OK   gemm cfg=-1 M=77 N=2048 K=5632                       max_abs_err=1.963e-03
+OK   gemm cfg=-1 M=512 N=32000 K=2048                     max_abs_err=1.931e-03
+OK   gemm cfg=-1 M=1000 N=2048 K=2048                     max_abs_err=1.884e-03
+OK   gemm cfg=-1 M=300 N=1152 K=896                       max_abs_err=9.730e-04
+OK   gemm cfg=-1 M=64 N=6144 K=4096                       max_abs_err=1.980e-03
+OK   gemm cfg=-1 M=257 N=4096 K=14336                     max_abs_err=4.007e-03
+OK   gemm+bias cfg=-1 M=200                               max_abs_err=1.947e-03
+OK   gemm+swiglu cfg=-1 M=200                             max_abs_err=3.906e-03
+OK   gemm+residual cfg=-1                                 max_abs_err=7.812e-03
+OK   gemm cfg=0 M=128 N=2560 K=2048                       max_abs_err=1.638e-03
+OK   gemm cfg=0 M=77 N=2048 K=5632                        max_abs_err=1.997e-03
+OK   gemm cfg=0 M=512 N=32000 K=2048                      max_abs_err=1.935e-03
+OK   gemm cfg=0 M=1000 N=2048 K=2048                      max_abs_err=1.922e-03
+OK   gemm cfg=0 M=300 N=1152 K=896                        max_abs_err=9.737e-04
+OK   gemm cfg=0 M=64 N=6144 K=4096                        max_abs_err=1.976e-03
+OK   gemm cfg=0 M=257 N=4096 K=14336                      max_abs_err=4.159e-03
+OK   gemm+bias cfg=0 M=200                                max_abs_err=1.958e-03
+OK   gemm+swiglu cfg=0 M=200                              max_abs_err=3.906e-03
+OK   gemm+residual cfg=0                                  max_abs_err=7.812e-03
+OK   gemm cfg=1 M=128 N=2560 K=2048                       max_abs_err=1.835e-03
+OK   gemm cfg=1 M=77 N=2048 K=5632                        max_abs_err=2.011e-03
+OK   gemm cfg=1 M=512 N=32000 K=2048                      max_abs_err=1.946e-03
+OK   gemm cfg=1 M=1000 N=2048 K=2048                      max_abs_err=1.900e-03
+OK   gemm cfg=1 M=300 N=1152 K=896                        max_abs_err=9.677e-04
+OK   gemm cfg=1 M=64 N=6144 K=4096                        max_abs_err=2.002e-03
+OK   gemm cfg=1 M=257 N=4096 K=14336                      max_abs_err=4.107e-03
+OK   gemm+bias cfg=1 M=200                                max_abs_err=1.954e-03
+OK   gemm+swiglu cfg=1 M=200                              max_abs_err=7.812e-03
+OK   gemm+residual cfg=1                                  max_abs_err=7.812e-03
+OK   gemm cfg=2 M=128 N=2560 K=2048                       max_abs_err=1.767e-03
+OK   gemm cfg=2 M=77 N=2048 K=5632                        max_abs_err=1.986e-03
+OK   gemm cfg=2 M=512 N=32000 K=2048                      max_abs_err=1.933e-03
+OK   gemm cfg=2 M=1000 N=2048 K=2048                      max_abs_err=1.910e-03
+OK   gemm cfg=2 M=300 N=1152 K=896                        max_abs_err=9.766e-04
+OK   gemm cfg=2 M=64 N=6144 K=4096                        max_abs_err=1.968e-03
+OK   gemm cfg=2 M=257 N=4096 K=14336                      max_abs_err=4.210e-03
+OK   gemm+bias cfg=2 M=200                                max_abs_err=1.955e-03
+OK   gemm+swiglu cfg=2 M=200                              max_abs_err=5.859e-03
+OK   gemm+residual cfg=2                                  max_abs_err=7.812e-03
+OK   gemm cfg=3 M=128 N=2560 K=2048                       max_abs_err=1.148e-03
+OK   gemm cfg=3 M=77 N=2048 K=5632                        max_abs_err=2.000e-03
+OK   gemm cfg=3 M=512 N=32000 K=2048                      max_abs_err=1.945e-03
+OK   gemm cfg=3 M=1000 N=2048 K=2048                      max_abs_err=1.879e-03
+OK   gemm cfg=3 M=300 N=1152 K=896                        max_abs_err=9.766e-04
+OK   gemm cfg=3 M=64 N=6144 K=4096                        max_abs_err=1.974e-03
+OK   gemm cfg=3 M=257 N=4096 K=14336                      max_abs_err=4.084e-03
+OK   gemm+bias cfg=3 M=200                                max_abs_err=1.961e-03
+OK   gemm+swiglu cfg=3 M=200                              max_abs_err=7.812e-03
+OK   gemm+residual cfg=3                                  max_abs_err=7.812e-03
+OK   gemm cfg=4 M=128 N=2560 K=2048                       max_abs_err=1.613e-03
+OK   gemm cfg=4 M=77 N=2048 K=5632                        max_abs_err=1.987e-03
+OK   gemm cfg=4 M=512 N=32000 K=2048                      max_abs_err=1.955e-03
+OK   gemm cfg=4 M=1000 N=2048 K=2048                      max_abs_err=1.876e-03
+OK   gemm cfg=4 M=300 N=1152 K=896                        max_abs_err=9.778e-04
+OK   gemm cfg=4 M=64 N=6144 K=4096                        max_abs_err=1.976e-03
+OK   gemm cfg=4 M=257 N=4096 K=14336                      max_abs_err=4.132e-03
+OK   gemm+bias cfg=4 M=200                                max_abs_err=1.963e-03
+OK   gemm+swiglu cfg=4 M=200                              max_abs_err=7.812e-03
+OK   gemm+residual cfg=4                                  max_abs_err=7.812e-03
+OK   gemm cfg=5 M=128 N=2560 K=2048                       max_abs_err=1.274e-03
+OK   gemm cfg=5 M=77 N=2048 K=5632                        max_abs_err=1.998e-03
+OK   gemm cfg=5 M=512 N=32000 K=2048                      max_abs_err=1.954e-03
+OK   gemm cfg=5 M=1000 N=2048 K=2048                      max_abs_err=1.868e-03
+OK   gemm cfg=5 M=300 N=1152 K=896                        max_abs_err=9.551e-04
+OK   gemm cfg=5 M=64 N=6144 K=4096                        max_abs_err=1.979e-03
+OK   gemm cfg=5 M=257 N=4096 K=14336                      max_abs_err=4.076e-03
+OK   gemm+bias cfg=5 M=200                                max_abs_err=1.948e-03
+OK   gemm+swiglu cfg=5 M=200                              max_abs_err=7.812e-03
+OK   gemm+residual cfg=5                                  max_abs_err=7.812e-03
+OK   gemm cfg=6 M=128 N=2560 K=2048                       max_abs_err=1.823e-03
+OK   gemm cfg=6 M=77 N=2048 K=5632                        max_abs_err=2.016e-03
+OK   gemm cfg=6 M=512 N=32000 K=2048                      max_abs_err=1.953e-03
+OK   gemm cfg=6 M=1000 N=2048 K=2048                      max_abs_err=1.902e-03
+OK   gemm cfg=6 M=300 N=1152 K=896                        max_abs_err=9.735e-04
+OK   gemm cfg=6 M=64 N=6144 K=4096                        max_abs_err=2.001e-03
+OK   gemm cfg=6 M=257 N=4096 K=14336                      max_abs_err=4.046e-03
+OK   gemm+bias cfg=6 M=200                                max_abs_err=1.958e-03
+OK   gemm+swiglu cfg=6 M=200                              max_abs_err=7.812e-03
+OK   gemm+residual cfg=6                                  max_abs_err=7.812e-03
+OK   gemm cfg=7 M=128 N=2560 K=2048                       max_abs_err=1.839e-03
+OK   gemm cfg=7 M=77 N=2048 K=5632                        max_abs_err=1.999e-03
+OK   gemm cfg=7 M=512 N=32000 K=2048                      max_abs_err=1.956e-03
+OK   gemm cfg=7 M=1000 N=2048 K=2048                      max_abs_err=1.922e-03
+OK   gemm cfg=7 M=300 N=1152 K=896                        max_abs_err=9.785e-04
+OK   gemm cfg=7 M=64 N=6144 K=4096                        max_abs_err=1.981e-03
+OK   gemm cfg=7 M=257 N=4096 K=14336                      max_abs_err=4.135e-03
+OK   gemm+bias cfg=7 M=200                                max_abs_err=1.954e-03
+OK   gemm+swiglu cfg=7 M=200                              max_abs_err=3.906e-03
+OK   gemm+residual cfg=7                                  max_abs_err=7.812e-03
+OK   gemm cfg=8 M=128 N=2560 K=2048                       max_abs_err=1.538e-03
+OK   gemm cfg=8 M=77 N=2048 K=5632                        max_abs_err=2.004e-03
+OK   gemm cfg=8 M=512 N=32000 K=2048                      max_abs_err=1.925e-03
+OK   gemm cfg=8 M=1000 N=2048 K=2048                      max_abs_err=1.870e-03
+OK   gemm cfg=8 M=300 N=1152 K=896                        max_abs_err=9.778e-04
+OK   gemm cfg=8 M=64 N=6144 K=4096                        max_abs_err=1.985e-03
+OK   gemm cfg=8 M=257 N=4096 K=14336                      max_abs_err=4.131e-03
+OK   gemm+bias cfg=8 M=200                                max_abs_err=1.951e-03
+OK   gemm+swiglu cfg=8 M=200                              max_abs_err=7.812e-03
+OK   gemm+residual cfg=8                                  max_abs_err=7.812e-03
+OK   gemm cfg=9 M=128 N=2560 K=2048                       max_abs_err=1.878e-03
+OK   gemm cfg=9 M=77 N=2048 K=5632                        max_abs_err=1.995e-03
+OK   gemm cfg=9 M=512 N=32000 K=2048                      max_abs_err=1.942e-03
+OK   gemm cfg=9 M=1000 N=2048 K=2048                      max_abs_err=1.878e-03
+OK   gemm cfg=9 M=300 N=1152 K=896                        max_abs_err=9.725e-04
+OK   gemm cfg=9 M=64 N=6144 K=4096                        max_abs_err=1.977e-03
+OK   gemm cfg=9 M=257 N=4096 K=14336                      max_abs_err=4.067e-03
+OK   gemm+bias cfg=9 M=200                                max_abs_err=1.953e-03
+OK   gemm+swiglu cfg=9 M=200                              max_abs_err=3.906e-03
+OK   gemm+residual cfg=9                                  max_abs_err=7.812e-03
+OK   gemm cfg=10 M=128 N=2560 K=2048                      max_abs_err=1.559e-03
+OK   gemm cfg=10 M=77 N=2048 K=5632                       max_abs_err=2.017e-03
+OK   gemm cfg=10 M=512 N=32000 K=2048                     max_abs_err=1.968e-03
+OK   gemm cfg=10 M=1000 N=2048 K=2048                     max_abs_err=1.875e-03
+OK   gemm cfg=10 M=300 N=1152 K=896                       max_abs_err=9.761e-04
+OK   gemm cfg=10 M=64 N=6144 K=4096                       max_abs_err=1.987e-03
+OK   gemm cfg=10 M=257 N=4096 K=14336                     max_abs_err=4.158e-03
+OK   gemm+bias cfg=10 M=200                               max_abs_err=1.953e-03
+OK   gemm+swiglu cfg=10 M=200                             max_abs_err=7.812e-03
+OK   gemm+residual cfg=10                                 max_abs_err=7.812e-03
+OK   gemm cfg=11 M=128 N=2560 K=2048                      max_abs_err=1.191e-03
+OK   gemm cfg=11 M=77 N=2048 K=5632                       max_abs_err=1.986e-03
+OK   gemm cfg=11 M=512 N=32000 K=2048                     max_abs_err=1.932e-03
+OK   gemm cfg=11 M=1000 N=2048 K=2048                     max_abs_err=1.924e-03
+OK   gemm cfg=11 M=300 N=1152 K=896                       max_abs_err=9.768e-04
+OK   gemm cfg=11 M=64 N=6144 K=4096                       max_abs_err=1.975e-03
+OK   gemm cfg=11 M=257 N=4096 K=14336                     max_abs_err=4.147e-03
+OK   gemm+bias cfg=11 M=200                               max_abs_err=1.962e-03
+OK   gemm+swiglu cfg=11 M=200                             max_abs_err=5.859e-03
+OK   gemm+residual cfg=11                                 max_abs_err=7.812e-03
+OK   gemm cfg=12 M=128 N=2560 K=2048                      max_abs_err=1.285e-03
+OK   gemm cfg=12 M=77 N=2048 K=5632                       max_abs_err=1.995e-03
+OK   gemm cfg=12 M=512 N=32000 K=2048                     max_abs_err=1.962e-03
+OK   gemm cfg=12 M=1000 N=2048 K=2048                     max_abs_err=1.487e-03
+OK   gemm cfg=12 M=300 N=1152 K=896                       max_abs_err=9.737e-04
+OK   gemm cfg=12 M=64 N=6144 K=4096                       max_abs_err=1.986e-03
+OK   gemm cfg=12 M=257 N=4096 K=14336                     max_abs_err=4.148e-03
+OK   gemm+bias cfg=12 M=200                               max_abs_err=1.945e-03
+OK   gemm+swiglu cfg=12 M=200                             max_abs_err=5.859e-03
+OK   gemm+residual cfg=12                                 max_abs_err=7.812e-03
+OK   gemm cfg=13 M=128 N=2560 K=2048                      max_abs_err=1.870e-03
+OK   gemm cfg=13 M=77 N=2048 K=5632                       max_abs_err=1.999e-03
+OK   gemm cfg=13 M=512 N=32000 K=2048                     max_abs_err=1.945e-03
+OK   gemm cfg=13 M=1000 N=2048 K=2048                     max_abs_err=1.888e-03
+OK   gemm cfg=13 M=300 N=1152 K=896                       max_abs_err=9.763e-04
+OK   gemm cfg=13 M=64 N=6144 K=4096                       max_abs_err=1.965e-03
+OK   gemm cfg=13 M=257 N=4096 K=14336                     max_abs_err=4.127e-03
+OK   gemm+bias cfg=13 M=200                               max_abs_err=1.954e-03
+OK   gemm+swiglu cfg=13 M=200                             max_abs_err=7.812e-03
+OK   gemm+residual cfg=13                                 max_abs_err=3.906e-03
+OK   gemm cfg=14 M=128 N=2560 K=2048                      max_abs_err=1.516e-03
+OK   gemm cfg=14 M=77 N=2048 K=5632                       max_abs_err=1.992e-03
+OK   gemm cfg=14 M=512 N=32000 K=2048                     max_abs_err=1.960e-03
+OK   gemm cfg=14 M=1000 N=2048 K=2048                     max_abs_err=1.887e-03
+OK   gemm cfg=14 M=300 N=1152 K=896                       max_abs_err=9.804e-04
+OK   gemm cfg=14 M=64 N=6144 K=4096                       max_abs_err=1.981e-03
+OK   gemm cfg=14 M=257 N=4096 K=14336                     max_abs_err=4.097e-03
+OK   gemm+bias cfg=14 M=200                               max_abs_err=1.944e-03
+OK   gemm+swiglu cfg=14 M=200                             max_abs_err=7.812e-03
+OK   gemm+residual cfg=14                                 max_abs_err=7.812e-03
+OK   gemm cfg=15 M=128 N=2560 K=2048                      max_abs_err=1.702e-03
+OK   gemm cfg=15 M=77 N=2048 K=5632                       max_abs_err=1.987e-03
+OK   gemm cfg=15 M=512 N=32000 K=2048                     max_abs_err=1.951e-03
+OK   gemm cfg=15 M=1000 N=2048 K=2048                     max_abs_err=1.903e-03
+OK   gemm cfg=15 M=300 N=1152 K=896                       max_abs_err=9.747e-04
+OK   gemm cfg=15 M=64 N=6144 K=4096                       max_abs_err=1.978e-03
+OK   gemm cfg=15 M=257 N=4096 K=14336                     max_abs_err=4.086e-03
+OK   gemm+bias cfg=15 M=200                               max_abs_err=1.962e-03
+OK   gemm+swiglu cfg=15 M=200                             max_abs_err=3.906e-03
+OK   gemm+residual cfg=15                                 max_abs_err=7.812e-03
+OK   gemm cfg=16 M=128 N=2560 K=2048                      max_abs_err=1.217e-03
+OK   gemm cfg=16 M=77 N=2048 K=5632                       max_abs_err=1.996e-03
+OK   gemm cfg=16 M=512 N=32000 K=2048                     max_abs_err=1.942e-03
+OK   gemm cfg=16 M=1000 N=2048 K=2048                     max_abs_err=1.760e-03
+OK   gemm cfg=16 M=300 N=1152 K=896                       max_abs_err=9.737e-04
+OK   gemm cfg=16 M=64 N=6144 K=4096                       max_abs_err=1.967e-03
+OK   gemm cfg=16 M=257 N=4096 K=14336                     max_abs_err=4.072e-03
+OK   gemm+bias cfg=16 M=200                               max_abs_err=1.942e-03
+OK   gemm+swiglu cfg=16 M=200                             max_abs_err=5.859e-03
+OK   gemm+residual cfg=16                                 max_abs_err=3.906e-03
+OK   gemm cfg=17 M=128 N=2560 K=2048                      max_abs_err=1.619e-03
+OK   gemm cfg=17 M=77 N=2048 K=5632                       max_abs_err=2.010e-03
+OK   gemm cfg=17 M=512 N=32000 K=2048                     max_abs_err=1.962e-03
+OK   gemm cfg=17 M=1000 N=2048 K=2048                     max_abs_err=1.884e-03
+OK   gemm cfg=17 M=300 N=1152 K=896                       max_abs_err=9.735e-04
+OK   gemm cfg=17 M=64 N=6144 K=4096                       max_abs_err=1.973e-03
+OK   gemm cfg=17 M=257 N=4096 K=14336                     max_abs_err=4.118e-03
+OK   gemm+bias cfg=17 M=200                               max_abs_err=1.945e-03
+OK   gemm+swiglu cfg=17 M=200                             max_abs_err=7.812e-03
+OK   gemm+residual cfg=17                                 max_abs_err=3.906e-03
+OK   gemm cfg=18 M=128 N=2560 K=2048                      max_abs_err=1.290e-03
+OK   gemm cfg=18 M=77 N=2048 K=5632                       max_abs_err=1.990e-03
+OK   gemm cfg=18 M=512 N=32000 K=2048                     max_abs_err=1.967e-03
+OK   gemm cfg=18 M=1000 N=2048 K=2048                     max_abs_err=1.960e-03
+OK   gemm cfg=18 M=300 N=1152 K=896                       max_abs_err=9.758e-04
+OK   gemm cfg=18 M=64 N=6144 K=4096                       max_abs_err=1.976e-03
+OK   gemm cfg=18 M=257 N=4096 K=14336                     max_abs_err=4.179e-03
+OK   gemm+bias cfg=18 M=200                               max_abs_err=1.943e-03
+OK   gemm+swiglu cfg=18 M=200                             max_abs_err=1.172e-02
+OK   gemm+residual cfg=18                                 max_abs_err=3.906e-03
+OK   gemm cfg=19 M=128 N=2560 K=2048                      max_abs_err=9.918e-04
+OK   gemm cfg=19 M=77 N=2048 K=5632                       max_abs_err=1.991e-03
+OK   gemm cfg=19 M=512 N=32000 K=2048                     max_abs_err=1.941e-03
+OK   gemm cfg=19 M=1000 N=2048 K=2048                     max_abs_err=1.918e-03
+OK   gemm cfg=19 M=300 N=1152 K=896                       max_abs_err=9.785e-04
+OK   gemm cfg=19 M=64 N=6144 K=4096                       max_abs_err=1.970e-03
+OK   gemm cfg=19 M=257 N=4096 K=14336                     max_abs_err=4.071e-03
+OK   gemm+bias cfg=19 M=200                               max_abs_err=1.946e-03
+OK   gemm+swiglu cfg=19 M=200                             max_abs_err=1.172e-02
+OK   gemm+residual cfg=19                                 max_abs_err=7.812e-03
+OK   gemm cfg=20 M=128 N=2560 K=2048                      max_abs_err=9.890e-04
+OK   gemm cfg=20 M=77 N=2048 K=5632                       max_abs_err=1.989e-03
+OK   gemm cfg=20 M=512 N=32000 K=2048                     max_abs_err=1.959e-03
+OK   gemm cfg=20 M=1000 N=2048 K=2048                     max_abs_err=1.724e-03
+OK   gemm cfg=20 M=300 N=1152 K=896                       max_abs_err=9.785e-04
+OK   gemm cfg=20 M=64 N=6144 K=4096                       max_abs_err=1.974e-03
+OK   gemm cfg=20 M=257 N=4096 K=14336                     max_abs_err=4.120e-03
+OK   gemm+bias cfg=20 M=200                               max_abs_err=1.955e-03
+OK   gemm+swiglu cfg=20 M=200                             max_abs_err=7.812e-03
+OK   gemm+residual cfg=20                                 max_abs_err=3.906e-03
+OK   gemm cfg=21 M=128 N=2560 K=2048                      max_abs_err=1.560e-03
+OK   gemm cfg=21 M=77 N=2048 K=5632                       max_abs_err=1.988e-03
+OK   gemm cfg=21 M=512 N=32000 K=2048                     max_abs_err=1.945e-03
+OK   gemm cfg=21 M=1000 N=2048 K=2048                     max_abs_err=1.730e-03
+OK   gemm cfg=21 M=300 N=1152 K=896                       max_abs_err=9.766e-04
+OK   gemm cfg=21 M=64 N=6144 K=4096                       max_abs_err=1.975e-03
+OK   gemm cfg=21 M=257 N=4096 K=14336                     max_abs_err=4.177e-03
+OK   gemm+bias cfg=21 M=200                               max_abs_err=1.957e-03
+OK   gemm+swiglu cfg=21 M=200                             max_abs_err=7.812e-03
+OK   gemm+residual cfg=21                                 max_abs_err=7.812e-03
+OK   gemm cfg=22 M=128 N=2560 K=2048                      max_abs_err=1.153e-03
+OK   gemm cfg=22 M=77 N=2048 K=5632                       max_abs_err=2.013e-03
+OK   gemm cfg=22 M=512 N=32000 K=2048                     max_abs_err=1.934e-03
+OK   gemm cfg=22 M=1000 N=2048 K=2048                     max_abs_err=1.733e-03
+OK   gemm cfg=22 M=300 N=1152 K=896                       max_abs_err=9.742e-04
+OK   gemm cfg=22 M=64 N=6144 K=4096                       max_abs_err=1.979e-03
+OK   gemm cfg=22 M=257 N=4096 K=14336                     max_abs_err=4.122e-03
+OK   gemm+bias cfg=22 M=200                               max_abs_err=1.956e-03
+OK   gemm+swiglu cfg=22 M=200                             max_abs_err=7.812e-03
+OK   gemm+residual cfg=22                                 max_abs_err=7.812e-03
+OK   gemm cfg=23 M=128 N=2560 K=2048                      max_abs_err=1.535e-03
+OK   gemm cfg=23 M=77 N=2048 K=5632                       max_abs_err=2.011e-03
+OK   gemm cfg=23 M=512 N=32000 K=2048                     max_abs_err=1.940e-03
+OK   gemm cfg=23 M=1000 N=2048 K=2048                     max_abs_err=1.914e-03
+OK   gemm cfg=23 M=300 N=1152 K=896                       max_abs_err=9.792e-04
+OK   gemm cfg=23 M=64 N=6144 K=4096                       max_abs_err=1.979e-03
+OK   gemm cfg=23 M=257 N=4096 K=14336                     max_abs_err=4.083e-03
+OK   gemm+bias cfg=23 M=200                               max_abs_err=1.953e-03
+OK   gemm+swiglu cfg=23 M=200                             max_abs_err=7.812e-03
+OK   gemm+residual cfg=23                                 max_abs_err=3.906e-03
+OK   gemm cfg=24 M=128 N=2560 K=2048                      max_abs_err=9.842e-04
+OK   gemm cfg=24 M=77 N=2048 K=5632                       max_abs_err=2.006e-03
+OK   gemm cfg=24 M=512 N=32000 K=2048                     max_abs_err=1.951e-03
+OK   gemm cfg=24 M=1000 N=2048 K=2048                     max_abs_err=1.628e-03
+OK   gemm cfg=24 M=300 N=1152 K=896                       max_abs_err=9.756e-04
+OK   gemm cfg=24 M=64 N=6144 K=4096                       max_abs_err=1.985e-03
+OK   gemm cfg=24 M=257 N=4096 K=14336                     max_abs_err=4.106e-03
+OK   gemm+bias cfg=24 M=200                               max_abs_err=1.948e-03
+OK   gemm+swiglu cfg=24 M=200                             max_abs_err=7.812e-03
+OK   gemm+residual cfg=24                                 max_abs_err=7.812e-03
+OK   gemm cfg=25 M=128 N=2560 K=2048                      max_abs_err=9.892e-04
+OK   gemm cfg=25 M=77 N=2048 K=5632                       max_abs_err=1.997e-03
+OK   gemm cfg=25 M=512 N=32000 K=2048                     max_abs_err=1.944e-03
+OK   gemm cfg=25 M=1000 N=2048 K=2048                     max_abs_err=1.956e-03
+OK   gemm cfg=25 M=300 N=1152 K=896                       max_abs_err=9.742e-04
+OK   gemm cfg=25 M=64 N=6144 K=4096                       max_abs_err=1.948e-03
+OK   gemm cfg=25 M=257 N=4096 K=14336                     max_abs_err=4.101e-03
+OK   gemm+bias cfg=25 M=200                               max_abs_err=1.957e-03
+OK   gemm+swiglu cfg=25 M=200                             max_abs_err=7.812e-03
+OK   gemm+residual cfg=25                                 max_abs_err=7.812e-03
+OK   rope D=64 q (exact HF fp16 order)                    max_abs_err=0.000e+00
+OK   rope D=64 k -> cache                                 max_abs_err=0.000e+00
+OK   rope D=64 v -> cache                                 max_abs_err=0.000e+00
+OK   rope D=64 decode per-row positions                   max_abs_err=0.000e+00
+OK   rope D=128 q (exact HF fp16 order)                   max_abs_err=0.000e+00
+OK   rope D=128 k -> cache                                max_abs_err=0.000e+00
+OK   rope D=128 v -> cache                                max_abs_err=0.000e+00
+OK   rope D=128 decode per-row positions                  max_abs_err=0.000e+00
+OK   rope D=128 q (exact HF fp16 order)                   max_abs_err=0.000e+00
+OK   rope D=128 k -> cache                                max_abs_err=0.000e+00
+OK   rope D=128 v -> cache                                max_abs_err=0.000e+00
+OK   rope D=128 decode per-row positions                  max_abs_err=0.000e+00
+OK   fused qkv+rope+cache D=64 G=8 M=1: q                 max_abs_err=9.766e-04
+OK   fused qkv+rope+cache D=64 G=8 M=1: k cache           max_abs_err=1.221e-04
+OK   fused qkv+rope+cache D=64 G=8 M=1: v cache           max_abs_err=9.766e-04
+OK   fused qkv+rope+cache D=64 G=8 M=3: q                 max_abs_err=1.953e-03
+OK   fused qkv+rope+cache D=64 G=8 M=3: k cache           max_abs_err=9.766e-04
+OK   fused qkv+rope+cache D=64 G=8 M=3: v cache           max_abs_err=1.221e-04
+OK   fused qkv+rope+cache D=64 G=8 M=8: q                 max_abs_err=1.953e-03
+OK   fused qkv+rope+cache D=64 G=8 M=8: k cache           max_abs_err=9.766e-04
+OK   fused qkv+rope+cache D=64 G=8 M=8: v cache           max_abs_err=4.883e-04
+OK   fused qkv+rope+cache D=128 G=3 M=1: q                max_abs_err=1.953e-03
+OK   fused qkv+rope+cache D=128 G=3 M=1: k cache          max_abs_err=9.766e-04
+OK   fused qkv+rope+cache D=128 G=3 M=1: v cache          max_abs_err=9.766e-04
+OK   fused qkv+rope+cache D=128 G=3 M=3: q                max_abs_err=1.953e-03
+OK   fused qkv+rope+cache D=128 G=3 M=3: k cache          max_abs_err=1.953e-03
+OK   fused qkv+rope+cache D=128 G=3 M=3: v cache          max_abs_err=1.953e-03
+OK   fused qkv+rope+cache D=128 G=3 M=8: q                max_abs_err=3.906e-03
+OK   fused qkv+rope+cache D=128 G=3 M=8: k cache          max_abs_err=1.953e-03
+OK   fused qkv+rope+cache D=128 G=3 M=8: v cache          max_abs_err=1.953e-03
+OK   fused qkv+rope+cache D=128 G=6 bias M=1: q           max_abs_err=9.766e-04
+OK   fused qkv+rope+cache D=128 G=6 bias M=1: k cache     max_abs_err=0.000e+00
+OK   fused qkv+rope+cache D=128 G=6 bias M=1: v cache     max_abs_err=1.526e-05
+OK   fused qkv+rope+cache D=128 G=6 bias M=3: q           max_abs_err=1.953e-03
+OK   fused qkv+rope+cache D=128 G=6 bias M=3: k cache     max_abs_err=4.883e-04
+OK   fused qkv+rope+cache D=128 G=6 bias M=3: v cache     max_abs_err=9.766e-04
+OK   fused qkv+rope+cache D=128 G=6 bias M=8: q           max_abs_err=9.766e-04
+OK   fused qkv+rope+cache D=128 G=6 bias M=8: k cache     max_abs_err=4.883e-04
+OK   fused qkv+rope+cache D=128 G=6 bias M=8: v cache     max_abs_err=4.883e-04
+OK   fused qkv+rope+cache D=64 G=7 bias M=1: q            max_abs_err=7.629e-06
+OK   fused qkv+rope+cache D=64 G=7 bias M=1: k cache      max_abs_err=0.000e+00
+OK   fused qkv+rope+cache D=64 G=7 bias M=1: v cache      max_abs_err=7.629e-06
+OK   fused qkv+rope+cache D=64 G=7 bias M=3: q            max_abs_err=2.441e-04
+OK   fused qkv+rope+cache D=64 G=7 bias M=3: k cache      max_abs_err=9.766e-04
+OK   fused qkv+rope+cache D=64 G=7 bias M=3: v cache      max_abs_err=9.537e-07
+OK   fused qkv+rope+cache D=64 G=7 bias M=8: q            max_abs_err=1.953e-03
+OK   fused qkv+rope+cache D=64 G=7 bias M=8: k cache      max_abs_err=0.000e+00
+OK   fused qkv+rope+cache D=64 G=7 bias M=8: v cache      max_abs_err=9.766e-04
+OK   flash prefill D=64 G=8 T=1 p0=0                      max_abs_err=0.000e+00
+OK   flash prefill D=64 G=8 T=64 p0=0                     max_abs_err=9.422e-04
+OK   flash prefill D=64 G=8 T=100 p0=0                    max_abs_err=1.105e-03
+OK   flash prefill D=64 G=8 T=517 p0=0                    max_abs_err=9.749e-04
+OK   flash prefill D=64 G=8 T=1024 p0=0                   max_abs_err=1.012e-03
+OK   flash prefill D=64 G=8 T=70 p0=300                   max_abs_err=1.891e-04
+OK   flash prefill D=64 G=8 T=33 p0=1000                  max_abs_err=8.455e-05
+OK   flash prefill D=64 G=4 T=1 p0=0                      max_abs_err=0.000e+00
+OK   flash prefill D=64 G=4 T=64 p0=0                     max_abs_err=1.078e-03
+OK   flash prefill D=64 G=4 T=100 p0=0                    max_abs_err=1.024e-03
+OK   flash prefill D=64 G=4 T=517 p0=0                    max_abs_err=1.001e-03
+OK   flash prefill D=64 G=4 T=1024 p0=0                   max_abs_err=1.011e-03
+OK   flash prefill D=64 G=4 T=70 p0=300                   max_abs_err=2.424e-04
+OK   flash prefill D=64 G=4 T=33 p0=1000                  max_abs_err=8.130e-05
+OK   flash prefill D=128 G=3 T=1 p0=0                     max_abs_err=0.000e+00
+OK   flash prefill D=128 G=3 T=64 p0=0                    max_abs_err=1.184e-03
+OK   flash prefill D=128 G=3 T=100 p0=0                   max_abs_err=1.310e-03
+OK   flash prefill D=128 G=3 T=517 p0=0                   max_abs_err=9.813e-04
+OK   flash prefill D=128 G=3 T=1024 p0=0                  max_abs_err=1.087e-03
+OK   flash prefill D=128 G=3 T=70 p0=300                  max_abs_err=1.745e-04
+OK   flash prefill D=128 G=3 T=33 p0=1000                 max_abs_err=9.817e-05
+OK   flash prefill D=128 G=1 T=1 p0=0                     max_abs_err=0.000e+00
+OK   flash prefill D=128 G=1 T=64 p0=0                    max_abs_err=9.975e-04
+OK   flash prefill D=128 G=1 T=100 p0=0                   max_abs_err=9.880e-04
+OK   flash prefill D=128 G=1 T=517 p0=0                   max_abs_err=9.673e-04
+OK   flash prefill D=128 G=1 T=1024 p0=0                  max_abs_err=9.675e-04
+OK   flash prefill D=128 G=1 T=70 p0=300                  max_abs_err=2.441e-04
+OK   flash prefill D=128 G=1 T=33 p0=1000                 max_abs_err=1.202e-04
+OK   flash prefill D=128 G=7 T=1 p0=0                     max_abs_err=0.000e+00
+OK   flash prefill D=128 G=7 T=64 p0=0                    max_abs_err=1.185e-03
+OK   flash prefill D=128 G=7 T=100 p0=0                   max_abs_err=1.132e-03
+OK   flash prefill D=128 G=7 T=517 p0=0                   max_abs_err=1.017e-03
+OK   flash prefill D=128 G=7 T=1024 p0=0                  max_abs_err=1.041e-03
+OK   flash prefill D=128 G=7 T=70 p0=300                  max_abs_err=2.221e-04
+OK   flash prefill D=128 G=7 T=33 p0=1000                 max_abs_err=9.124e-05
+OK   decode attn D=64 G=8 B=1 lens=[1]                    worst_excess=0.000e+00
+OK   decode attn D=64 G=8 B=1 lens=[37]                   worst_excess=0.000e+00
+OK   decode attn D=64 G=8 B=1 lens=[4000]                 worst_excess=0.000e+00
+OK   decode attn D=64 G=8 B=4 lens=[1, 300, 1024, 2049]   worst_excess=0.000e+00
+OK   decode attn D=64 G=8 B=16 lens=5..3755               worst_excess=0.000e+00
+OK   decode attn D=64 G=4 B=1 lens=[1]                    worst_excess=0.000e+00
+OK   decode attn D=64 G=4 B=1 lens=[37]                   worst_excess=0.000e+00
+OK   decode attn D=64 G=4 B=1 lens=[4000]                 worst_excess=0.000e+00
+OK   decode attn D=64 G=4 B=4 lens=[1, 300, 1024, 2049]   worst_excess=0.000e+00
+OK   decode attn D=64 G=4 B=16 lens=5..3755               worst_excess=0.000e+00
+OK   decode attn D=64 G=1 B=1 lens=[1]                    worst_excess=0.000e+00
+OK   decode attn D=64 G=1 B=1 lens=[37]                   worst_excess=0.000e+00
+OK   decode attn D=64 G=1 B=1 lens=[4000]                 worst_excess=0.000e+00
+OK   decode attn D=64 G=1 B=4 lens=[1, 300, 1024, 2049]   worst_excess=0.000e+00
+OK   decode attn D=64 G=1 B=16 lens=5..3755               worst_excess=0.000e+00
+OK   decode attn D=128 G=4 B=1 lens=[1]                   worst_excess=0.000e+00
+OK   decode attn D=128 G=4 B=1 lens=[37]                  worst_excess=0.000e+00
+OK   decode attn D=128 G=4 B=1 lens=[4000]                worst_excess=0.000e+00
+OK   decode attn D=128 G=4 B=4 lens=[1, 300, 1024, 2049]  worst_excess=0.000e+00
+OK   decode attn D=128 G=4 B=16 lens=5..3755              worst_excess=0.000e+00
+OK   decode attn D=128 G=3 B=1 lens=[1]                   worst_excess=0.000e+00
+OK   decode attn D=128 G=3 B=1 lens=[37]                  worst_excess=0.000e+00
+OK   decode attn D=128 G=3 B=1 lens=[4000]                worst_excess=0.000e+00
+OK   decode attn D=128 G=3 B=4 lens=[1, 300, 1024, 2049]  worst_excess=0.000e+00
+OK   decode attn D=128 G=3 B=16 lens=5..3755              worst_excess=0.000e+00
+OK   decode attn D=128 G=1 B=1 lens=[1]                   worst_excess=0.000e+00
+OK   decode attn D=128 G=1 B=1 lens=[37]                  worst_excess=0.000e+00
+OK   decode attn D=128 G=1 B=1 lens=[4000]                worst_excess=0.000e+00
+OK   decode attn D=128 G=1 B=4 lens=[1, 300, 1024, 2049]  worst_excess=0.000e+00
+OK   decode attn D=128 G=1 B=16 lens=5..3755              worst_excess=0.000e+00
+OK   decode attn D=128 G=7 B=1 lens=[1]                   worst_excess=0.000e+00
+OK   decode attn D=128 G=7 B=1 lens=[37]                  worst_excess=0.000e+00
+OK   decode attn D=128 G=7 B=1 lens=[4000]                worst_excess=0.000e+00
+OK   decode attn D=128 G=7 B=4 lens=[1, 300, 1024, 2049]  worst_excess=0.000e+00
+OK   decode attn D=128 G=7 B=16 lens=5..3755              worst_excess=0.000e+00
+OK   decode attn D=64 G=7 B=1 lens=[1]                    worst_excess=0.000e+00
+OK   decode attn D=64 G=7 B=1 lens=[37]                   worst_excess=0.000e+00
+OK   decode attn D=64 G=7 B=1 lens=[4000]                 worst_excess=0.000e+00
+OK   decode attn D=64 G=7 B=4 lens=[1, 300, 1024, 2049]   worst_excess=0.000e+00
+OK   decode attn D=64 G=7 B=16 lens=5..3755               worst_excess=0.000e+00
+OK   decode attn D=128 G=8 B=1 lens=[1]                   worst_excess=0.000e+00
+OK   decode attn D=128 G=8 B=1 lens=[37]                  worst_excess=0.000e+00
+OK   decode attn D=128 G=8 B=1 lens=[4000]                worst_excess=0.000e+00
+OK   decode attn D=128 G=8 B=4 lens=[1, 300, 1024, 2049]  worst_excess=0.000e+00
+OK   decode attn D=128 G=8 B=16 lens=5..3755              worst_excess=0.000e+00
+OK   decode attn D=64 G=2 B=1 lens=[1]                    worst_excess=0.000e+00
+OK   decode attn D=64 G=2 B=1 lens=[37]                   worst_excess=0.000e+00
+OK   decode attn D=64 G=2 B=1 lens=[4000]                 worst_excess=0.000e+00
+OK   decode attn D=64 G=2 B=4 lens=[1, 300, 1024, 2049]   worst_excess=0.000e+00
+OK   decode attn D=64 G=2 B=16 lens=5..3755               worst_excess=0.000e+00
+OK   decode attn D=128 G=6 B=1 lens=[1]                   worst_excess=0.000e+00
+OK   decode attn D=128 G=6 B=1 lens=[37]                  worst_excess=0.000e+00
+OK   decode attn D=128 G=6 B=1 lens=[4000]                worst_excess=0.000e+00
+OK   decode attn D=128 G=6 B=4 lens=[1, 300, 1024, 2049]  worst_excess=0.000e+00
+OK   decode attn D=128 G=6 B=16 lens=5..3755              worst_excess=0.000e+00
+OK   decode attn D=64 G=5 B=1 lens=[1]                    worst_excess=0.000e+00
+OK   decode attn D=64 G=5 B=1 lens=[37]                   worst_excess=0.000e+00
+OK   decode attn D=64 G=5 B=1 lens=[4000]                 worst_excess=0.000e+00
+OK   decode attn D=64 G=5 B=4 lens=[1, 300, 1024, 2049]   worst_excess=0.000e+00
+OK   decode attn D=64 G=5 B=16 lens=5..3755               worst_excess=0.000e+00
+
+ALL PASS

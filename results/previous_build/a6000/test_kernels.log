@@ -1,0 +1,133 @@
+NVIDIA RTX A6000
+OK   rmsnorm M=1 H=2048 (vs HF fp16 order)          max_abs_err=0.000e+00
+OK   rmsnorm M=7 H=2048 (vs HF fp16 order)          max_abs_err=0.000e+00
+OK   rmsnorm M=300 H=4096 (vs HF fp16 order)        max_abs_err=3.906e-03
+OK   gemv M=1 N=2560 K=2048                         max_abs_err=9.632e-04
+OK   gemv+rmsnorm M=1                               max_abs_err=9.360e-04
+OK   gemv+residual M=1 K=5632                       max_abs_err=1.221e-04
+OK   gemv+swiglu M=1                                max_abs_err=2.441e-04
+OK   gemv M=3 N=2560 K=2048                         max_abs_err=9.694e-04
+OK   gemv+rmsnorm M=3                               max_abs_err=9.704e-04
+OK   gemv+residual M=3 K=5632                       max_abs_err=9.766e-04
+OK   gemv+swiglu M=3                                max_abs_err=4.883e-04
+OK   gemv M=8 N=2560 K=2048                         max_abs_err=9.751e-04
+OK   gemv+rmsnorm M=8                               max_abs_err=9.770e-04
+OK   gemv+residual M=8 K=5632                       max_abs_err=1.953e-03
+OK   gemv+swiglu M=8                                max_abs_err=1.465e-03
+OK   gemv M=11 N=2560 K=2048                        max_abs_err=1.647e-03
+OK   gemv+rmsnorm M=11                              max_abs_err=1.793e-03
+OK   gemv+residual M=11 K=5632                      max_abs_err=1.953e-03
+OK   gemv+swiglu M=11                               max_abs_err=9.766e-04
+OK   gemm split-K=2 M=9 N=2560                      max_abs_err=9.756e-04
+OK   gemm split-K=2 +residual M=9 K=5632            max_abs_err=3.906e-03
+OK   gemm split-K=2 +swiglu M=9                     max_abs_err=5.859e-03
+OK   gemm split-K=2 M=32 N=2560                     max_abs_err=9.794e-04
+OK   gemm split-K=2 +residual M=32 K=5632           max_abs_err=3.906e-03
+OK   gemm split-K=2 +swiglu M=32                    max_abs_err=3.906e-03
+OK   gemm split-K=2 M=64 N=2560                     max_abs_err=1.829e-03
+OK   gemm split-K=2 +residual M=64 K=5632           max_abs_err=3.906e-03
+OK   gemm split-K=2 +swiglu M=64                    max_abs_err=3.906e-03
+OK   gemm split-K=4 M=9 N=2560                      max_abs_err=1.203e-03
+OK   gemm split-K=4 +residual M=9 K=5632            max_abs_err=3.906e-03
+OK   gemm split-K=4 +swiglu M=9                     max_abs_err=1.953e-03
+OK   gemm split-K=4 M=32 N=2560                     max_abs_err=9.787e-04
+OK   gemm split-K=4 +residual M=32 K=5632           max_abs_err=3.906e-03
+OK   gemm split-K=4 +swiglu M=32                    max_abs_err=3.906e-03
+OK   gemm split-K=4 M=64 N=2560                     max_abs_err=1.535e-03
+OK   gemm split-K=4 +residual M=64 K=5632           max_abs_err=3.906e-03
+OK   gemm split-K=4 +swiglu M=64                    max_abs_err=7.812e-03
+OK   gemm split-K=8 M=9 N=2560                      max_abs_err=9.747e-04
+OK   gemm split-K=8 +residual M=9 K=5632            max_abs_err=3.906e-03
+OK   gemm split-K=8 +swiglu M=9                     max_abs_err=9.766e-04
+OK   gemm split-K=8 M=32 N=2560                     max_abs_err=1.296e-03
+OK   gemm split-K=8 +residual M=32 K=5632           max_abs_err=3.906e-03
+OK   gemm split-K=8 +swiglu M=32                    max_abs_err=1.953e-03
+OK   gemm split-K=8 M=64 N=2560                     max_abs_err=1.834e-03
+OK   gemm split-K=8 +residual M=64 K=5632           max_abs_err=3.906e-03
+OK   gemm split-K=8 +swiglu M=64                    max_abs_err=1.953e-03
+OK   gemm cfg=-1 M=128 N=2560 K=2048                max_abs_err=1.717e-03
+OK   gemm cfg=-1 M=77 N=2048 K=5632                 max_abs_err=1.966e-03
+OK   gemm cfg=-1 M=512 N=32000 K=2048               max_abs_err=1.940e-03
+OK   gemm cfg=-1 M=1000 N=2048 K=2048               max_abs_err=1.967e-03
+OK   gemm+swiglu cfg=-1 M=200                       max_abs_err=5.859e-03
+OK   gemm+residual cfg=-1                           max_abs_err=7.812e-03
+OK   gemm cfg=0 M=128 N=2560 K=2048                 max_abs_err=1.478e-03
+OK   gemm cfg=0 M=77 N=2048 K=5632                  max_abs_err=1.987e-03
+OK   gemm cfg=0 M=512 N=32000 K=2048                max_abs_err=1.968e-03
+OK   gemm cfg=0 M=1000 N=2048 K=2048                max_abs_err=1.753e-03
+OK   gemm+swiglu cfg=0 M=200                        max_abs_err=3.906e-03
+OK   gemm+residual cfg=0                            max_abs_err=7.812e-03
+OK   gemm cfg=1 M=128 N=2560 K=2048                 max_abs_err=1.325e-03
+OK   gemm cfg=1 M=77 N=2048 K=5632                  max_abs_err=2.004e-03
+OK   gemm cfg=1 M=512 N=32000 K=2048                max_abs_err=1.946e-03
+OK   gemm cfg=1 M=1000 N=2048 K=2048                max_abs_err=1.970e-03
+OK   gemm+swiglu cfg=1 M=200                        max_abs_err=5.859e-03
+OK   gemm+residual cfg=1                            max_abs_err=3.906e-03
+OK   gemm cfg=2 M=128 N=2560 K=2048                 max_abs_err=1.670e-03
+OK   gemm cfg=2 M=77 N=2048 K=5632                  max_abs_err=1.993e-03
+OK   gemm cfg=2 M=512 N=32000 K=2048                max_abs_err=1.961e-03
+OK   gemm cfg=2 M=1000 N=2048 K=2048                max_abs_err=1.781e-03
+OK   gemm+swiglu cfg=2 M=200                        max_abs_err=7.812e-03
+OK   gemm+residual cfg=2                            max_abs_err=7.812e-03
+OK   gemm cfg=3 M=128 N=2560 K=2048                 max_abs_err=1.683e-03
+OK   gemm cfg=3 M=77 N=2048 K=5632                  max_abs_err=1.989e-03
+OK   gemm cfg=3 M=512 N=32000 K=2048                max_abs_err=1.909e-03
+OK   gemm cfg=3 M=1000 N=2048 K=2048                max_abs_err=1.883e-03
+OK   gemm+swiglu cfg=3 M=200                        max_abs_err=7.812e-03
+OK   gemm+residual cfg=3                            max_abs_err=7.812e-03
+OK   gemm cfg=4 M=128 N=2560 K=2048                 max_abs_err=1.046e-03
+OK   gemm cfg=4 M=77 N=2048 K=5632                  max_abs_err=2.024e-03
+OK   gemm cfg=4 M=512 N=32000 K=2048                max_abs_err=1.960e-03
+OK   gemm cfg=4 M=1000 N=2048 K=2048                max_abs_err=1.886e-03
+OK   gemm+swiglu cfg=4 M=200                        max_abs_err=7.812e-03
+OK   gemm+residual cfg=4                            max_abs_err=7.812e-03
+OK   gemm cfg=5 M=128 N=2560 K=2048                 max_abs_err=1.179e-03
+OK   gemm cfg=5 M=77 N=2048 K=5632                  max_abs_err=2.001e-03
+OK   gemm cfg=5 M=512 N=32000 K=2048                max_abs_err=1.965e-03
+OK   gemm cfg=5 M=1000 N=2048 K=2048                max_abs_err=1.960e-03
+OK   gemm+swiglu cfg=5 M=200                        max_abs_err=5.859e-03
+OK   gemm+residual cfg=5                            max_abs_err=7.812e-03
+OK   rope q (exact HF fp16 order)                   max_abs_err=0.000e+00
+OK   rope k -> cache                                max_abs_err=0.000e+00
+OK   v -> cache                                     max_abs_err=0.000e+00
+OK   rope decode per-row positions                  max_abs_err=0.000e+00
+OK   fused qkv+rope+cache M=1: q                    max_abs_err=0.000e+00
+OK   fused qkv+rope+cache M=1: k cache              max_abs_err=0.000e+00
+OK   fused qkv+rope+cache M=1: v cache              max_abs_err=0.000e+00
+OK   fused qkv+rope+cache M=3: q                    max_abs_err=0.000e+00
+OK   fused qkv+rope+cache M=3: k cache              max_abs_err=0.000e+00
+OK   fused qkv+rope+cache M=3: v cache              max_abs_err=0.000e+00
+OK   fused qkv+rope+cache M=8: q                    max_abs_err=0.000e+00
+OK   fused qkv+rope+cache M=8: k cache              max_abs_err=0.000e+00
+OK   fused qkv+rope+cache M=8: v cache              max_abs_err=0.000e+00
+OK   flash prefill T=1 p0=0                         max_abs_err=0.000e+00
+OK   flash prefill T=64 p0=0                        max_abs_err=1.081e-03
+OK   flash prefill T=100 p0=0                       max_abs_err=9.964e-04
+OK   flash prefill T=517 p0=0                       max_abs_err=1.037e-03
+OK   flash prefill T=1024 p0=0                      max_abs_err=9.899e-04
+OK   flash prefill T=70 p0=300                      max_abs_err=1.555e-04
+OK   decode attn B=1 b=0 len=1                      max_abs_err=0.000e+00
+OK   decode attn B=1 b=0 len=37                     max_abs_err=2.849e-04
+OK   decode attn B=1 b=0 len=4000                   max_abs_err=3.745e-05
+OK   decode attn B=4 b=0 len=1                      max_abs_err=0.000e+00
+OK   decode attn B=4 b=1 len=300                    max_abs_err=1.208e-04
+OK   decode attn B=4 b=2 len=1024                   max_abs_err=6.628e-05
+OK   decode attn B=4 b=3 len=2049                   max_abs_err=3.435e-05
+OK   decode attn B=16 b=0 len=5                     max_abs_err=9.389e-04
+OK   decode attn B=16 b=1 len=255                   max_abs_err=1.349e-04
+OK   decode attn B=16 b=2 len=505                   max_abs_err=6.385e-05
+OK   decode attn B=16 b=3 len=755                   max_abs_err=8.354e-05
+OK   decode attn B=16 b=4 len=1005                  max_abs_err=6.345e-05
+OK   decode attn B=16 b=5 len=1255                  max_abs_err=5.922e-05
+OK   decode attn B=16 b=6 len=1505                  max_abs_err=6.260e-05
+OK   decode attn B=16 b=7 len=1755                  max_abs_err=5.636e-05
+OK   decode attn B=16 b=8 len=2005                  max_abs_err=4.087e-05
+OK   decode attn B=16 b=9 len=2255                  max_abs_err=5.147e-05
+OK   decode attn B=16 b=10 len=2505                 max_abs_err=4.382e-05
+OK   decode attn B=16 b=11 len=2755                 max_abs_err=3.531e-05
+OK   decode attn B=16 b=12 len=3005                 max_abs_err=3.385e-05
+OK   decode attn B=16 b=13 len=3255                 max_abs_err=3.566e-05
+OK   decode attn B=16 b=14 len=3505                 max_abs_err=3.237e-05
+OK   decode attn B=16 b=15 len=3755                 max_abs_err=3.547e-05
+
+ALL PASS

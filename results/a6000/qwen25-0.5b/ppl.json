@@ -1,0 +1,12 @@
+{
+ "model": "Qwen/Qwen2.5-0.5B",
+ "gpu": "NVIDIA RTX A6000",
+ "seq": 1024,
+ "windows": 16,
+ "tokens": 16352,
+ "ppl_hf": 13.484870259164719,
+ "ppl_hipinfer": 13.484630045326004,
+ "top1_agreement": 0.9973703522504892,
+ "mean_kl_hf_to_hipinfer": 1.5395485468317233e-05,
+ "max_logit_diff": 0.1748046875
+}

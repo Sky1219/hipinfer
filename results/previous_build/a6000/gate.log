@@ -1,0 +1,31 @@
+[transformers] `torch_dtype` is deprecated! Use `dtype` instead!
+Loading weights:   0%|          | 0/201 [00:00<?, ?it/s]Loading weights:  45%|████▌     | 91/201 [00:00<00:00, 888.19it/s]Loading weights:  90%|█████████ | 181/201 [00:00<00:00, 894.45it/s]Loading weights: 100%|██████████| 201/201 [00:00<00:00, 907.60it/s]
+prompt 0 (len 6): prefill logits max |diff| = 0.0156
+  single graph=True: 128/128 tokens identical
+  single graph=False: 128/128 tokens identical
+prompt 1 (len 24): prefill logits max |diff| = 0.0166
+  single graph=True: 128/128 tokens identical
+  single graph=False: 128/128 tokens identical
+prompt 2 (len 18): prefill logits max |diff| = 0.0234
+  single graph=True: 128/128 tokens identical
+  single graph=False: 128/128 tokens identical
+prompt 3 (len 20): prefill logits max |diff| = 0.0156
+  single graph=True: 128/128 tokens identical
+  single graph=False: 128/128 tokens identical
+prompt 4 (len 19): prefill logits max |diff| = 0.0156
+  single graph=True: 128/128 tokens identical
+  single graph=False: 128/128 tokens identical
+prompt 5 (len 16): prefill logits max |diff| = 0.0254
+  single graph=True: 128/128 tokens identical
+  single graph=False: 128/128 tokens identical
+prompt 6 (len 700): prefill logits max |diff| = 0.0195
+  single graph=True: 128/128 tokens identical
+  single graph=False: 128/128 tokens identical
+  batched B=6 slot 0: 128/128 tokens identical
+  batched B=6 slot 1: 128/128 tokens identical
+  batched B=6 slot 2: 128/128 tokens identical
+  batched B=6 slot 3: 128/128 tokens identical
+  batched B=6 slot 4: 128/128 tokens identical
+  batched B=6 slot 5: 128/128 tokens identical
+
+GATE PASS

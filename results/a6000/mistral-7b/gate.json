@@ -1,0 +1,100 @@
+{
+ "model": "mistralai/Mistral-7B-v0.3",
+ "gpu": "NVIDIA RTX A6000",
+ "new_tokens": 128,
+ "pass": true,
+ "identical": 20,
+ "runs": 20,
+ "max_prefill_logit_diff": 0.015625,
+ "prompt_lens": [
+  6,
+  23,
+  18,
+  20,
+  19,
+  16,
+  700
+ ],
+ "log": [
+  {
+   "run": "prompt 0 single graph=True",
+   "identical": true
+  },
+  {
+   "run": "prompt 0 single graph=False",
+   "identical": true
+  },
+  {
+   "run": "prompt 1 single graph=True",
+   "identical": true
+  },
+  {
+   "run": "prompt 1 single graph=False",
+   "identical": true
+  },
+  {
+   "run": "prompt 2 single graph=True",
+   "identical": true
+  },
+  {
+   "run": "prompt 2 single graph=False",
+   "identical": true
+  },
+  {
+   "run": "prompt 3 single graph=True",
+   "identical": true
+  },
+  {
+   "run": "prompt 3 single graph=False",
+   "identical": true
+  },
+  {
+   "run": "prompt 4 single graph=True",
+   "identical": true
+  },
+  {
+   "run": "prompt 4 single graph=False",
+   "identical": true
+  },
+  {
+   "run": "prompt 5 single graph=True",
+   "identical": true
+  },
+  {
+   "run": "prompt 5 single graph=False",
+   "identical": true
+  },
+  {
+   "run": "prompt 6 single graph=True",
+   "identical": true
+  },
+  {
+   "run": "prompt 6 single graph=False",
+   "identical": true
+  },
+  {
+   "run": "batched B=6 slot 0",
+   "identical": true
+  },
+  {
+   "run": "batched B=6 slot 1",
+   "identical": true
+  },
+  {
+   "run": "batched B=6 slot 2",
+   "identical": true
+  },
+  {
+   "run": "batched B=6 slot 3",
+   "identical": true
+  },
+  {
+   "run": "batched B=6 slot 4",
+   "identical": true
+  },
+  {
+   "run": "batched B=6 slot 5",
+   "identical": true
+  }
+ ]
+}

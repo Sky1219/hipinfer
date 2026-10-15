@@ -1,0 +1,32 @@
+Loading weights:   0%|          | 0/291 [00:00<?, ?it/s]Loading weights:   0%|          | 1/291 [00:00<00:54,  5.30it/s]Loading weights:  14%|█▍        | 41/291 [00:00<00:01, 174.49it/s]Loading weights:  23%|██▎       | 68/291 [00:00<00:01, 208.09it/s]Loading weights:  32%|███▏      | 94/291 [00:00<00:00, 218.74it/s]Loading weights:  42%|████▏     | 121/291 [00:00<00:00, 232.68it/s]Loading weights:  51%|█████     | 148/291 [00:00<00:00, 228.83it/s]Loading weights:  60%|██████    | 175/291 [00:00<00:00, 235.27it/s]Loading weights:  69%|██████▉   | 202/291 [00:00<00:00, 239.32it/s]Loading weights:  79%|███████▊  | 229/291 [00:01<00:00, 241.86it/s]Loading weights:  88%|████████▊ | 256/291 [00:01<00:00, 240.79it/s]Loading weights:  97%|█████████▋| 283/291 [00:01<00:00, 243.11it/s]Loading weights: 100%|██████████| 291/291 [00:01<00:00, 226.36it/s]
+unsloth/Meta-Llama-3.1-8B: layers 32 hidden 4096 heads 32/8 head_dim 128 vocab 128256 tied=False qkv_bias=False
+prompt 0 (len 6): prefill logits max |diff| = 0.0156
+  prompt 0 single graph=True: diverges at step 13 (hf gap 0.0000) -> near-tie, OK
+  prompt 0 single graph=False: diverges at step 13 (hf gap 0.0000) -> near-tie, OK
+prompt 1 (len 14): prefill logits max |diff| = 0.0234
+  prompt 1 single graph=True: 128/128 tokens identical
+  prompt 1 single graph=False: 128/128 tokens identical
+prompt 2 (len 18): prefill logits max |diff| = 0.0195
+  prompt 2 single graph=True: 128/128 tokens identical
+  prompt 2 single graph=False: 128/128 tokens identical
+prompt 3 (len 20): prefill logits max |diff| = 0.0181
+  prompt 3 single graph=True: 128/128 tokens identical
+  prompt 3 single graph=False: 128/128 tokens identical
+prompt 4 (len 16): prefill logits max |diff| = 0.0186
+  prompt 4 single graph=True: diverges at step 22 (hf gap 0.0000) -> near-tie, OK
+  prompt 4 single graph=False: diverges at step 22 (hf gap 0.0000) -> near-tie, OK
+prompt 5 (len 13): prefill logits max |diff| = 0.0283
+  prompt 5 single graph=True: 128/128 tokens identical
+  prompt 5 single graph=False: 128/128 tokens identical
+prompt 6 (len 700): prefill logits max |diff| = 0.0215
+  prompt 6 single graph=True: 128/128 tokens identical
+  prompt 6 single graph=False: 128/128 tokens identical
+  batched B=6 slot 0: diverges at step 13 (hf gap 0.0000) -> near-tie, OK
+  batched B=6 slot 1: 128/128 tokens identical
+  batched B=6 slot 2: diverges at step 111 (hf gap 0.0000) -> near-tie, OK
+  batched B=6 slot 3: 128/128 tokens identical
+  batched B=6 slot 4: 128/128 tokens identical
+  batched B=6 slot 5: 128/128 tokens identical
+
+14/20 runs token-identical, max prefill-logit |diff| 0.0283
+GATE PASS

@@ -1,0 +1,260 @@
+{
+ "gpus": [
+  "NVIDIA GeForce RTX 2080 Ti",
+  "NVIDIA GeForce RTX 2080 Ti"
+ ],
+ "peak_bw_GBs": 616.0,
+ "weights": "mistral-7b-v03.bin",
+ "config": {
+  "vocab": 32768,
+  "hidden": 4096,
+  "inter": 14336,
+  "layers": 32,
+  "heads": 32,
+  "kv_heads": 8,
+  "head_dim": 128,
+  "max_pos": 32768,
+  "eps": 9.999999747378752e-06,
+  "tied": false,
+  "qkv_bias": false,
+  "window": 0
+ },
+ "tp": 2,
+ "tp_info": {
+  "world": 2,
+  "p2p": false,
+  "nccl": true,
+  "allreduce": "auto",
+  "oneshot_max_bytes": 524288,
+  "prefill_overlap": true
+ },
+ "allreduce": [
+  {
+   "what": "decode B=1",
+   "bytes": 8192,
+   "oneshot_us": 11.336958885192871,
+   "nccl_us": 14.274560928344727
+  },
+  {
+   "what": "decode B=8",
+   "bytes": 65536,
+   "oneshot_us": 24.16815948486328,
+   "nccl_us": 38.56319808959961
+  },
+  {
+   "what": "decode B=64",
+   "bytes": 524288,
+   "oneshot_us": 107.04895782470703,
+   "nccl_us": 134.2284698486328
+  },
+  {
+   "what": "prefill T=512",
+   "bytes": 4194304,
+   "oneshot_us": 781.1917114257812,
+   "nccl_us": 813.988525390625
+  },
+  {
+   "what": "prefill T=2000",
+   "bytes": 16384000,
+   "oneshot_us": 2961.751220703125,
+   "nccl_us": 3069.092529296875
+  }
+ ],
+ "single": null,
+ "tp_rows": {
+  "decode_b1": [
+   {
+    "engine": "TP x2 auto",
+    "tp": 2,
+    "allreduce": "auto",
+    "ctx": 128,
+    "ms": 13.967293739318848,
+    "bw_floor_ms": 11.569245090909092,
+    "bw_util": 0.8283097145971026
+   },
+   {
+    "engine": "TP x2 auto",
+    "tp": 2,
+    "allreduce": "auto",
+    "ctx": 1024,
+    "ms": 14.155901908874512,
+    "bw_floor_ms": 11.664570181818181,
+    "bw_util": 0.8240075593138658
+   },
+   {
+    "engine": "TP x2 auto",
+    "tp": 2,
+    "allreduce": "auto",
+    "ctx": 4096,
+    "ms": 14.678266525268555,
+    "bw_floor_ms": 11.991399064935067,
+    "bw_util": 0.8169492660657128
+   },
+   {
+    "engine": "TP x2 nccl",
+    "tp": 2,
+    "allreduce": "nccl",
+    "ctx": 128,
+    "ms": 14.235119819641113,
+    "bw_floor_ms": 11.569245090909092,
+    "bw_util": 0.8127255153094152
+   },
+   {
+    "engine": "TP x2 nccl",
+    "tp": 2,
+    "allreduce": "nccl",
+    "ctx": 1024,
+    "ms": 14.417999267578125,
+    "bw_floor_ms": 11.664570181818181,
+    "bw_util": 0.8090283516693192
+   },
+   {
+    "engine": "TP x2 nccl",
+    "tp": 2,
+    "allreduce": "nccl",
+    "ctx": 4096,
+    "ms": 14.981193542480469,
+    "bw_floor_ms": 11.991399064935067,
+    "bw_util": 0.8004301547091304
+   }
+  ],
+  "prefill": [
+   {
+    "engine": "TP x2 auto",
+    "tp": 2,
+    "allreduce": "auto",
+    "overlap": true,
+    "T": 512,
+    "ms": 115.32010301016271,
+    "tok_s": 4439.815666440043
+   },
+   {
+    "engine": "TP x2 auto",
+    "tp": 2,
+    "allreduce": "auto",
+    "overlap": true,
+    "T": 2000,
+    "ms": 421.61476000910625,
+    "tok_s": 4743.6669436259845
+   },
+   {
+    "engine": "TP x2 auto",
+    "tp": 2,
+    "allreduce": "auto",
+    "overlap": false,
+    "T": 512,
+    "ms": 140.0672509917058,
+    "tok_s": 3655.386940022964
+   },
+   {
+    "engine": "TP x2 auto",
+    "tp": 2,
+    "allreduce": "auto",
+    "overlap": false,
+    "T": 2000,
+    "ms": 542.6437620189972,
+    "tok_s": 3685.659248267527
+   },
+   {
+    "engine": "TP x2 nccl",
+    "tp": 2,
+    "allreduce": "nccl",
+    "overlap": true,
+    "T": 512,
+    "ms": 115.57404202176258,
+    "tok_s": 4430.060513965502
+   },
+   {
+    "engine": "TP x2 nccl",
+    "tp": 2,
+    "allreduce": "nccl",
+    "overlap": true,
+    "T": 2000,
+    "ms": 424.85923203639686,
+    "tok_s": 4707.441545788663
+   }
+  ],
+  "decode_batched": [
+   {
+    "engine": "TP x2 auto",
+    "tp": 2,
+    "allreduce": "auto",
+    "B": 1,
+    "ms_per_step": 14.042706489562988,
+    "tok_s": 71.2113438205971
+   },
+   {
+    "engine": "TP x2 auto",
+    "tp": 2,
+    "allreduce": "auto",
+    "B": 4,
+    "ms_per_step": 15.68032455444336,
+    "tok_s": 255.09676066408414
+   },
+   {
+    "engine": "TP x2 auto",
+    "tp": 2,
+    "allreduce": "auto",
+    "B": 8,
+    "ms_per_step": 16.38001251220703,
+    "tok_s": 488.40011532580235
+   },
+   {
+    "engine": "TP x2 auto",
+    "tp": 2,
+    "allreduce": "auto",
+    "B": 16,
+    "ms_per_step": 17.89598846435547,
+    "tok_s": 894.0551136288545
+   },
+   {
+    "engine": "TP x2 auto",
+    "tp": 2,
+    "allreduce": "auto",
+    "B": 32,
+    "ms_per_step": 22.764707565307617,
+    "tok_s": 1405.6846506021693
+   },
+   {
+    "engine": "TP x2 nccl",
+    "tp": 2,
+    "allreduce": "nccl",
+    "B": 1,
+    "ms_per_step": 14.303167343139648,
+    "tok_s": 69.91458437208586
+   },
+   {
+    "engine": "TP x2 nccl",
+    "tp": 2,
+    "allreduce": "nccl",
+    "B": 4,
+    "ms_per_step": 16.206430435180664,
+    "tok_s": 246.8156091496165
+   },
+   {
+    "engine": "TP x2 nccl",
+    "tp": 2,
+    "allreduce": "nccl",
+    "B": 8,
+    "ms_per_step": 17.27491569519043,
+    "tok_s": 463.0992209257095
+   },
+   {
+    "engine": "TP x2 nccl",
+    "tp": 2,
+    "allreduce": "nccl",
+    "B": 16,
+    "ms_per_step": 19.162059783935547,
+    "tok_s": 834.9833045304216
+   },
+   {
+    "engine": "TP x2 nccl",
+    "tp": 2,
+    "allreduce": "nccl",
+    "B": 32,
+    "ms_per_step": 25.094297409057617,
+    "tok_s": 1275.1901150438193
+   }
+  ]
+ }
+}

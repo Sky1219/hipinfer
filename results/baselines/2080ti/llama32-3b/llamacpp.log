@@ -1,0 +1,12 @@
+$ /data/axd200066/llama.cpp/build/bin/llama-bench -m /data/axd200066/gguf/llama32-3b-f16.gguf -ngl 99 -r 5 -o json -p 128,512,2000 -n 0 -fa 0,1 -ub 512,2048 -b 2048
+ggml_cuda_init: found 1 CUDA devices (Total VRAM: 10820 MiB):
+  Device 0: NVIDIA GeForce RTX 2080 Ti, compute capability 7.5, VMM: yes, VRAM: 10820 MiB
+$ /data/axd200066/llama.cpp/build/bin/llama-bench -m /data/axd200066/gguf/llama32-3b-f16.gguf -ngl 99 -r 5 -o json -p 0 -n 256 -d 128,1024 -fa 0,1
+ggml_cuda_init: found 1 CUDA devices (Total VRAM: 10820 MiB):
+  Device 0: NVIDIA GeForce RTX 2080 Ti, compute capability 7.5, VMM: yes, VRAM: 10820 MiB
+llama.cpp prefill T=  128     25.77 ms  (fa=1 ub=512)
+llama.cpp prefill T=  512     65.40 ms  (fa=1 ub=2048)
+llama.cpp prefill T= 2000    261.82 ms  (fa=1 ub=512)
+llama.cpp decode  ctx=  128  12.697 ms/token  (fa=1)
+llama.cpp decode  ctx= 1024  12.923 ms/token  (fa=1)
+wrote results/baselines/2080ti/llama32-3b/llamacpp.json

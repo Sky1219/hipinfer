@@ -1,0 +1,31 @@
+[transformers] Token indices sequence length is longer than the specified maximum sequence length for this model (289076 > 131072). Running this sequence through the model will result in indexing errors
+unsloth/Meta-Llama-3.1-8B: 289076 test tokens, 16 windows of 1024
+Loading weights:   0%|          | 0/291 [00:00<?, ?it/s]Loading weights:   0%|          | 1/291 [00:00<01:18,  3.69it/s]Loading weights:  14%|█▎        | 40/291 [00:00<00:01, 136.31it/s]Loading weights:  23%|██▎       | 67/291 [00:00<00:01, 177.86it/s]Loading weights:  32%|███▏      | 94/291 [00:00<00:00, 197.87it/s]Loading weights:  42%|████▏     | 121/291 [00:00<00:00, 212.44it/s]Loading weights:  51%|█████     | 148/291 [00:00<00:00, 222.57it/s]Loading weights:  60%|██████    | 175/291 [00:00<00:00, 230.01it/s]Loading weights:  69%|██████▉   | 202/291 [00:01<00:00, 227.01it/s]Loading weights:  79%|███████▊  | 229/291 [00:01<00:00, 232.29it/s]Loading weights:  88%|████████▊ | 256/291 [00:01<00:00, 237.58it/s]Loading weights:  97%|█████████▋| 283/291 [00:01<00:00, 236.03it/s]Loading weights: 100%|██████████| 291/291 [00:01<00:00, 210.38it/s]
+window   0: ppl HF 4.5562  hipinfer 4.5561  top-1 agree 99.707%  mean KL 8.15e-06  max |dlogit| 0.199
+window   1: ppl HF 5.6319  hipinfer 5.6311  top-1 agree 99.707%  mean KL 1.18e-05  max |dlogit| 0.199
+window   2: ppl HF 6.7270  hipinfer 6.7259  top-1 agree 99.804%  mean KL 1.14e-05  max |dlogit| 0.199
+window   3: ppl HF 7.5727  hipinfer 7.5722  top-1 agree 99.756%  mean KL 1.12e-05  max |dlogit| 0.199
+window   4: ppl HF 8.4102  hipinfer 8.4099  top-1 agree 99.785%  mean KL 1.07e-05  max |dlogit| 0.199
+window   5: ppl HF 8.4943  hipinfer 8.4940  top-1 agree 99.821%  mean KL 1.06e-05  max |dlogit| 0.199
+window   6: ppl HF 8.4611  hipinfer 8.4610  top-1 agree 99.846%  mean KL 1.05e-05  max |dlogit| 2.405
+window   7: ppl HF 8.1512  hipinfer 8.1511  top-1 agree 99.841%  mean KL 1.03e-05  max |dlogit| 2.405
+window   8: ppl HF 7.9909  hipinfer 7.9907  top-1 agree 99.848%  mean KL 1.02e-05  max |dlogit| 2.405
+window   9: ppl HF 7.7654  hipinfer 7.7656  top-1 agree 99.853%  mean KL 1.02e-05  max |dlogit| 2.405
+window  10: ppl HF 7.5178  hipinfer 7.5180  top-1 agree 99.858%  mean KL 1.03e-05  max |dlogit| 2.405
+window  11: ppl HF 7.0134  hipinfer 7.0136  top-1 agree 99.853%  mean KL 1.04e-05  max |dlogit| 2.405
+window  12: ppl HF 6.6515  hipinfer 6.6517  top-1 agree 99.865%  mean KL 1.05e-05  max |dlogit| 2.405
+window  13: ppl HF 6.5543  hipinfer 6.5544  top-1 agree 99.867%  mean KL 1.05e-05  max |dlogit| 2.405
+window  14: ppl HF 6.5500  hipinfer 6.5500  top-1 agree 99.870%  mean KL 1.05e-05  max |dlogit| 2.405
+window  15: ppl HF 6.5469  hipinfer 6.5469  top-1 agree 99.866%  mean KL 1.06e-05  max |dlogit| 2.405
+{
+ "model": "unsloth/Meta-Llama-3.1-8B",
+ "gpu": "NVIDIA RTX A6000",
+ "seq": 1024,
+ "windows": 16,
+ "tokens": 16368,
+ "ppl_hf": 6.546910622384431,
+ "ppl_hipinfer": 6.546884515802326,
+ "top1_agreement": 0.9986559139784946,
+ "mean_kl_hf_to_hipinfer": 1.0559455244262536e-05,
+ "max_logit_diff": 2.4052734375
+}
