@@ -40,9 +40,23 @@ benchmarks run). Nothing outside `docs/` is touched.
 11. `export.py` does not check the architecture: a model whose tensor names match Llama's but whose math
     differs (other norm, activation, embedding scale, an o-proj or MLP bias) exports without an error.
 
+12. The sibling-session note `baselines.md` gives same-session A6000 hipinfer TinyLlama decode as
+    3.51 / 3.56 ms; the committed `results/baselines/previous_hipinfer/a6000_hipinfer_same_session.json`
+    says 3.409 / 3.472 (the contended rerun says 3.48 / 3.56). The docs cite the committed file.
+13. README's Ampere attention figures (0.90–1.11× / 0.87–1.09× SDPA) are TinyLlama-only; across the
+    partly throttled A6000 runs the ranges are 0.77–1.84× / 0.66–1.40×.
+
 ## Progress
 
 - [x] Survey repo and results; verify numbers (this file)
 - [x] docs/porting-a-model.md
 - [x] docs/profiling.md
-- [ ] docs/claims.md
+- [x] docs/claims.md
+
+## Commits
+
+- 31a389c docs/porting-a-model.md
+- 917d3e7 docs/profiling.md
+- (this commit) docs/claims.md
+
+Nothing was pushed. No file outside `docs/` was changed.
