@@ -217,61 +217,85 @@ def inject_fault(model, layer, step, scale=0.1, seed=1234):
 
 
 # ------------------------------------------------------------------ comparison
+RESID_SCALE = 1 / 16
+
+
+def _prev_residual(name):
+    """The residual-stream point before a branch point (o_proj / down), else None."""
+    if not (name.endswith(".o_proj") or name.endswith(".down")):
+        return None
+    l = int(name.split(".")[1])
+    return f"layers.{l}.o_proj" if name.endswith(".down") else ("embed" if l == 0 else f"layers.{l - 1}.down")
+
+
 def _view(acts, name):
     """The value a point is judged on. o_proj and down are residual-stream values; they are judged
     on their branch (the O / down projection's own output: the point minus the residual before
     it), which a projection bug moves by its full size rather than diluted by the residual."""
-    v = acts[name].double()
-    if name.endswith(".o_proj") or name.endswith(".down"):
-        l = int(name.split(".")[1])
-        prev = f"layers.{l}.o_proj" if name.endswith(".down") else ("embed" if l == 0 else f"layers.{l - 1}.down")
-        if prev in acts:
-            v = v - acts[prev].double()
-    return v
+    v, prev = acts[name].double(), _prev_residual(name)
+    return v - acts[prev].double() if prev in acts else v
 
 
-def _group_rel(d, r, dims, name):
-    """Relative L2 error of every (position, head) block of a head-shaped point, or of every
-    position of the others. Each block is judged against its own reference norm (floored at 5% of
-    the mean block norm), so neither a high-norm row (real models' BOS row carries activations
-    100x the rest) nor a large q part can hide an error confined to a few positions or heads."""
-    T = r.shape[0]
-    n = len(head_labels(dims, name) or [None])
-    dn, rn = d.reshape(T, n, -1).norm(dim=-1), r.reshape(T, n, -1).norm(dim=-1)
-    return dn / rn.clamp_min(0.05 * rn.mean().item() + 1e-30)
+def block_errors(ref, cand, name, dims):
+    """Relative L2 error [T, blocks] of every (position, head) block of a head-shaped point, or of
+    every position of the others, plus the (branch) difference and reference values.
 
-
-def point_error(ref, cand, name, dims):
-    """(worst block relative error, whole-point relative error, branch diff, branch ref)."""
+    Each block is judged against its own reference norm, so neither a high-norm row (real models'
+    BOS row carries activations 100x the rest) nor a large q part can hide an error confined to a
+    few positions or heads. The norm is floored at 5% of the mean block norm and, for a branch
+    point, at RESID_SCALE x the norm of the residual it is added to: an fp16 engine rounds h + o,
+    so where |o| << |h| (the BOS row) the branch is only known to ~ulp(h)."""
     r, c = _view(ref, name), _view(cand, name)
     if c.shape != r.shape:
         raise ValueError(f"{name}: candidate shape {tuple(c.shape)} != reference {tuple(r.shape)}")
     d = c - r
-    return _group_rel(d, r, dims, name).max().item(), (d.norm() / r.norm().clamp_min(1e-30)).item(), d, r
+    T, n = r.shape[0], len(head_labels(dims, name) or [None])
+    dn, rn = d.reshape(T, n, -1).norm(dim=-1), r.reshape(T, n, -1).norm(dim=-1)
+    den = rn.clamp_min(0.05 * rn.mean().item() + 1e-30)
+    prev = _prev_residual(name)
+    if prev in ref:
+        den = torch.maximum(den, RESID_SCALE * ref[prev].double().norm(dim=-1, keepdim=True))
+    return dn / den, d, r
 
 
-def compare(ref, cand, dims, tol=2e-2, floor=None, factor=8.0, min_tol=2e-3):
-    """One row per point present in both: errors and the threshold it is held to. `rel` (the
-    worst position / head block, see _group_rel) decides; `rel_all` is the whole-point error.
+def compare(ref, cand, dims, tol=5e-2, floor=None, factor=8.0, min_tol=2e-3):
+    """One row per point present in both: errors and the threshold it is held to.
 
-    Threshold: `tol`, or with a noise floor ({point: rel} of HF fp16 against the same reference)
-    max(min_tol, factor * floor[point])."""
+    Every block (see block_errors) has a threshold: `tol`, or with a noise floor ({point: [T,
+    blocks] errors of HF fp16 against the same reference}, from noise_floor) max(min_tol, factor x
+    max(that block's floor, the point's median floor)). That is HF fp16's own error there: blocks
+    fp16 inherently computes poorly get room and the rest stay tight (the median keeps a block
+    that fp16 happened to get exactly right from getting a near-zero threshold). A point diverges
+    when any block exceeds its threshold. rel / thr / floor / at describe the block closest to
+    (or furthest over) its threshold; rel_max is the largest block error, rel_all the whole-point
+    error."""
     rows = []
     for name in ref:
         if name not in cand:
             continue
-        rel, rel_all, d, r = point_error(ref, cand, name, dims)
-        cos = torch.nn.functional.cosine_similarity((r + d).reshape(1, -1), r.reshape(1, -1)).item()
-        thr = tol if floor is None else max(min_tol, factor * floor.get(name, tol / factor))
-        rows.append({"point": name, "rel": rel, "rel_all": rel_all, "max_abs": d.abs().max().item(), "cos": cos,
-                     "ref_rms": r.pow(2).mean().sqrt().item(), "thr": thr,
-                     "floor": None if floor is None else floor.get(name), "diverged": not (rel <= thr)})
+        g, d, r = block_errors(ref, cand, name, dims)
+        if floor is not None and name in floor:
+            f = floor[name]
+            thr = torch.clamp(factor * torch.maximum(f, f.median()), min=min_tol)
+        else:
+            f, thr = None, torch.full_like(g, tol)
+        ratio = g / thr
+        i = int(ratio.argmax())
+        t, b = divmod(i, g.shape[1])
+        labels = head_labels(dims, name)
+        rows.append({"point": name, "rel": g.reshape(-1)[i].item(), "thr": thr.reshape(-1)[i].item(),
+                     "floor": None if f is None else f.reshape(-1)[i].item(), "ratio": ratio.reshape(-1)[i].item(),
+                     "at": {"t": t, "head": labels[b] if labels else None},
+                     "rel_max": g.max().item(), "rel_all": (d.norm() / r.norm().clamp_min(1e-30)).item(),
+                     "max_abs": d.abs().max().item(),
+                     "cos": torch.nn.functional.cosine_similarity((r + d).reshape(1, -1), r.reshape(1, -1)).item(),
+                     "ref_rms": r.pow(2).mean().sqrt().item(), "diverged": not (ratio.max().item() <= 1)})
     return rows
 
 
 def noise_floor(ref, other, dims):
-    """{point: rel} of another run (e.g. HF fp16) against the reference, in compare's metric."""
-    return {n: point_error(ref, other, n, dims)[0] for n in ref if n in other}
+    """{point: [T, blocks] errors} of another run (e.g. HF fp16) against the reference."""
+    return {n: block_errors(ref, other, n, dims)[0] for n in ref if n in other}
 
 
 def first_divergence(rows):
@@ -280,8 +304,7 @@ def first_divergence(rows):
 
 def localize(ref, cand, name, dims, top=4):
     """Where inside one point the error sits: worst token positions and (for head-shaped points) heads."""
-    _, _, d, r = point_error(ref, cand, name, dims)
-    g = _group_rel(d, r, dims, name)  # [T, heads or 1]
+    g = block_errors(ref, cand, name, dims)[0]  # [T, heads or 1]
     row = g.max(dim=1).values
     out = {"positions": [(int(i), row[i].item()) for i in row.argsort(descending=True)[:top]],
            "position0_rel": row[0].item()}
@@ -302,16 +325,18 @@ def format_report(rows, ref, cand, dims, title=""):
     by = {r["point"]: r for r in rows}
     first = first_divergence(rows)
     lines = [title] if title else []
-    floor_note = " (threshold = max(min_tol, factor x HF-fp16 noise floor))" if rows and rows[0]["floor"] is not None else ""
-    lines.append("worst relative L2 error over positions (and heads) per point; o_proj / down judged on the projection's "
-                 f"output, without the residual\n'!' over threshold, '*' first divergence{floor_note}")
+    floored = bool(rows) and rows[0]["floor"] is not None
+    lines.append("worst relative L2 error over positions (and heads) per point; o_proj / down are judged on the "
+                 "projection's output, without the residual")
+    lines.append("'!' over threshold, '*' first divergence; threshold per position/head block: "
+                 + ("max(min_tol, factor x HF fp16's own error there)" if floored else "fixed --tol"))
 
     def cell(name):
         r = by.get(name)
         if r is None:
             return "-"
         mark = "*" if first is not None and r["point"] == first["point"] else ("!" if r["diverged"] else " ")
-        return _fmt(r["rel"]) + mark
+        return _fmt(r["rel_max"]) + mark
 
     w = 10
     lines.append("layer " + "".join(s.rjust(w) for s in STEPS))
@@ -320,22 +345,26 @@ def format_report(rows, ref, cand, dims, title=""):
         lines.append(f"{l:5d} " + "".join(cell(f"layers.{l}.{s}").rjust(w) for s in STEPS))
     lines.append(f"final_norm {cell('final_norm')}   logits {cell('logits')}")
     if first is None:
-        worst = max(rows, key=lambda r: r["rel"] / r["thr"]) if rows else None
+        worst = max(rows, key=lambda r: r["ratio"]) if rows else None
         lines.append("no divergence: every point is within its threshold" +
-                     (f" (closest: {worst['point']} rel {_fmt(worst['rel'])} vs {_fmt(worst['thr'])})" if worst else ""))
+                     (f" (closest: {worst['point']} t={worst['at']['t']} rel {_fmt(worst['rel'])} vs "
+                      f"{_fmt(worst['thr'])}, {worst['ratio']:.2f} of it)" if worst else ""))
         return "\n".join(lines)
     n_after = sum(r["diverged"] for r in rows) - 1
     p = first["point"]
     where = f"layer {p.split('.')[1]}, {p.split('.')[2]}" if p.startswith("layers.") else p
     lines.append("")
     lines.append(f"FIRST DIVERGENCE: {where}  ({p})")
-    lines.append(f"  rel {_fmt(first['rel'])} > threshold {_fmt(first['thr'])}"
-                 + (f" (HF fp16 floor {_fmt(first['floor'])})" if first["floor"] is not None else "")
-                 + f"; max |diff| {first['max_abs']:.3g} (ref rms {first['ref_rms']:.3g}); cosine {first['cos']:.6f}")
+    at = f"t={first['at']['t']}" + (f" {first['at']['head']}" if first["at"]["head"] else "")
+    lines.append(f"  at {at}: rel {_fmt(first['rel'])} > threshold {_fmt(first['thr'])} ({first['ratio']:.1f}x)"
+                 + (f", HF fp16 error there {_fmt(first['floor'])}" if first["floor"] is not None else ""))
+    lines.append(f"  whole point: rel {_fmt(first['rel_all'])}, max |diff| {first['max_abs']:.3g} "
+                 f"(ref rms {first['ref_rms']:.3g}), cosine {first['cos']:.6f}")
     idx = [r["point"] for r in rows].index(p)
     if idx > 0:
         prev = rows[idx - 1]
-        lines.append(f"  previous point {prev['point']}: rel {_fmt(prev['rel'])} (threshold {_fmt(prev['thr'])})")
+        lines.append(f"  previous point {prev['point']}: worst rel {_fmt(prev['rel_max'])}, "
+                     f"{prev['ratio']:.2f} of its threshold")
     loc = localize(ref, cand, p, dims)
     lines.append("  worst positions: " + ", ".join(f"t={t} {_fmt(e)}" for t, e in loc["positions"])
                  + f"; position 0: {_fmt(loc['position0_rel'])}")
@@ -416,8 +445,8 @@ def main():
     ap.add_argument("--cand-dtype", choices=DTYPES, default="fp16", help="--candidate hf precision")
     ap.add_argument("--floor", choices=["auto", "on", "off"], default="auto",
                     help="measure the HF fp16 noise floor for per-point thresholds (auto: when --ref-dtype is fp32)")
-    ap.add_argument("--tol", type=float, default=2e-2, help="fixed relative-error threshold (without a noise floor)")
-    ap.add_argument("--factor", type=float, default=8.0, help="threshold = factor x noise floor ...")
+    ap.add_argument("--tol", type=float, default=5e-2, help="fixed relative-error threshold (without a noise floor)")
+    ap.add_argument("--factor", type=float, default=8.0, help="threshold = factor x HF fp16 error ...")
     ap.add_argument("--min-tol", type=float, default=2e-3, help="... but at least this")
     ap.add_argument("--inject", type=parse_inject, action="append", default=[],
                     help="LAYER:STEP[:SCALE] fault in the candidate (--candidate hf only)")

@@ -128,12 +128,12 @@ def test_fp16_not_flagged():
         fp16 = ld.capture_hf(clone(m, torch.float16), IDS)
         rows = ld.compare(ref, fp16, dims)
         check(f"{kind}: fp16 vs fp32 within the fixed tolerance", ld.first_divergence(rows) is None,
-              f"max rel {max(r['rel'] for r in rows):.1e}")
+              f"max rel {max(r['rel_max'] for r in rows):.1e}")
         # a different fp16 implementation (SDPA attention) against the eager fp16 noise floor
         floor = ld.noise_floor(ref, fp16, dims)
         sdpa = ld.capture_hf(clone(m, torch.float16, attn="sdpa"), IDS)
         rows = ld.compare(ref, sdpa, dims, floor=floor)
-        worst = max(rows, key=lambda r: r["rel"] / r["thr"])
+        worst = max(rows, key=lambda r: r["ratio"])
         check(f"{kind}: fp16 SDPA within the measured fp16 noise floor", ld.first_divergence(rows) is None,
               f"closest {worst['point']} {worst['rel']:.1e} vs {worst['thr']:.1e}")
         assert dims["layers"] == 4
@@ -226,6 +226,36 @@ def test_engine_layout():
     back = ld.split_engine_dump(ld.pack_engine_dump(a, dims, T), dims, T)
     err = max((back[n] - a[n].half().float()).abs().max().item() for n in a)
     check("pack -> split round trip", list(back) == list(a) and err == 0)
+
+
+def test_real_model():
+    """Opt in with LAYER_DIFF_REAL_MODEL=<HF id> (e.g. TinyLlama/TinyLlama-1.1B-Chat-v1.0; a few
+    minutes on a CPU): real checkpoints have a BOS row with activations ~100x the rest, which the
+    random models above lack. A second fp16 implementation (SDPA) must stay under the thresholds
+    measured from eager fp16, and 5% faults deep in the model must still be named exactly."""
+    model_id = os.environ.get("LAYER_DIFF_REAL_MODEL")
+    if not model_id:
+        print("SKIP real-model test (set LAYER_DIFF_REAL_MODEL to an HF model id)")
+        return
+    from transformers import AutoTokenizer
+    ids = torch.tensor(AutoTokenizer.from_pretrained(model_id)(ld.DEFAULT_PROMPT).input_ids)
+    ref = ld.hf_run(model_id, "fp32", "cpu", ids)
+    m = ld.load_hf(model_id, "fp16", "cpu")
+    dims = ld.model_dims(m.config)
+    floor = ld.noise_floor(ref, ld.capture_hf(m, ids), dims)
+    L = dims["layers"]
+    for layer, step in [(L // 2, "o_proj"), (L // 4, "down"), (L - 2, "attn"), (L // 3, "qkv"), (L // 2, "gate_up")]:
+        hs = ld.inject_fault(m, layer, step, 0.05)
+        first = ld.first_divergence(ld.compare(ref, ld.capture_hf(m, ids), dims, floor=floor))
+        for h in hs:
+            h.remove()
+        check(f"{model_id}: 5% fault layers.{layer}.{step} found at {first and first['point']}",
+              first is not None and first["point"] == f"layers.{layer}.{step}")
+    m.config._attn_implementation = "sdpa"
+    rows = ld.compare(ref, ld.capture_hf(m, ids), dims, floor=floor)
+    worst = max(rows, key=lambda r: r["ratio"])
+    check(f"{model_id}: fp16 SDPA within the eager-fp16 thresholds", ld.first_divergence(rows) is None,
+          f"closest {worst['point']} at {worst['ratio']:.2f} of its threshold")
 
 
 def test_cli_tiny_random():
