@@ -1,8 +1,9 @@
 # hipinfer
 
 An LLM inference engine I wrote from scratch in HIP. On one RTX 2080 Ti it runs Llama, Qwen and
-TinyLlama models in fp16 **5–47 % faster than llama.cpp at batch-1 decode**, and its outputs match
-Hugging Face transformers (WikiText-2 perplexity within 0.003 %).
+TinyLlama models in fp16 **5–47 % faster than llama.cpp at batch-1 decode** (128-token context;
+3–43 % at 1,024), and its outputs match Hugging Face transformers (WikiText-2 perplexity within
+0.01 %).
 
 The same source tree builds with `hipcc` for AMD GPUs and with plain `nvcc` for NVIDIA GPUs. There
 are no vendor libraries in the hot path: the GEMV, GEMM, RMSNorm, RoPE and FlashAttention-style
@@ -154,15 +155,17 @@ separately on the same machines.
 
 ### What I take from this
 
-- **At batch-1 decode, hipinfer was the fastest engine I measured on every model.** The lead over
-  llama.cpp is 5–16 % on the 1–3B models and 47 % on Qwen2.5-0.5B. It shrinks as models grow,
+- **At batch-1 decode, hipinfer was faster than llama.cpp on every model I measured**, and faster
+  than vLLM and torch.compile on TinyLlama, the one model I ran those on. At a 128-token context
+  the lead over llama.cpp is 5–16 % on the 1–3B models and 47 % on Qwen2.5-0.5B; at 1,024 tokens it
+  is 3.0–14.4 % and 43 %. It shrinks as models grow,
   because everyone converges on the same bandwidth floor. I think the gain comes from fewer kernel
   launches (5 per layer, with norm, RoPE, cache write and SwiGLU fused in) and from the GEMV's
   bandwidth. I haven't profiled llama.cpp, so I can't say exactly where its extra time goes.
 - **Prefill is faster up to ~1.5B parameters (level at Llama-3.2-1B), and slower at 3B.** Prefill on a 3B model
   is bound by the GEMMs, and mine run at 0.92–0.95× cuBLAS. That leaves Llama-3.2-3B 1.04–1.11×
-  behind llama.cpp (isolated run vs full suite), with Llama-3.2-1B level with it. The gap is not
-  closed.
+  behind llama.cpp at 2,000 tokens (isolated run vs full suite) and 1.17× behind at 512 (76.7 vs
+  65.4 ms), with Llama-3.2-1B level with it. The gap is not closed.
 - **Keep the scope in mind.** These are batch-1 latency numbers on small models. vLLM and llama.cpp
   are built for far more: many concurrent requests, quantization, hundreds of architectures. Batch 1
   is just where a small engine can be checked against a hard floor.
@@ -208,7 +211,7 @@ Three things make it work:
   - Each block is an independent channel with its own staging buffers and call counter. So the
     grid can be sized to the message (one block for a 4 KB decode row), and the whole thing can
     live inside a CUDA graph.
-  - It takes 8.5 µs vs NCCL's 12 µs at 4 KB, and 64 vs 85 µs at 256 KB. That's 2–15 % lower batch-1
+  - It takes 8.5 µs vs NCCL's 12 µs at 4 KB, and 64 vs 85 µs at 256 KB. That's 1.5–15.2 % lower batch-1
     decode latency than NCCL alone, and 9–27 % more batched throughput at B=64.
   - By default it handles messages up to 512 KB and NCCL takes the bigger ones. NCCL is optional
     at build time; without it, everything goes one-shot.
@@ -273,15 +276,18 @@ in three ways.
 - **Greedy token gate** ([tests/gate.py](tests/gate.py)): 7 prompts × 128 tokens, single-sequence
   with and without CUDA graphs, plus a batch of 6 sequences at different lengths (20 runs in all).
   Every divergence happens at a step where HF's own top two logits are exactly tied (gap 0) or one
-  fp16 step apart (0.0156). At such a step either token is a correct greedy choice. Llama-3.2-1B
+  fp16 step apart (0.0156); one A6000 Llama-3.2-1B run also diverges at a gap of 0.0313. At such a step either token is a correct greedy choice. Llama-3.2-1B
   hits several of those near-ties in the first 128 tokens of its prompts, which is why it shows 13/20.
 - **Perplexity** ([tests/ppl.py](tests/ppl.py)): WikiText-2 test, 16 windows of 1,024 tokens, both
   engines on the same tokens. This checks the whole distribution at every position, not just the
-  top token.
+  top token. hipinfer's perplexity is within 0.003 % of HF's on the single-GPU 2080 Ti runs above,
+  within 0.0062 % on the A6000 and within 0.0098 % on sharded runs.
 - **Kernel tests** ([tests/test_kernels.py](tests/test_kernels.py)): every kernel against PyTorch
   references at head_dim 64 and 128, every GQA group from 1 to 8, all 27 GEMM configs and their
-  split-K variants, ragged batches, chunked-prefill offsets and 4,000-token contexts. RMSNorm and
-  RoPE are bit-exact against HF's fp16 order of operations.
+  split-K variants, ragged batches, chunked-prefill offsets and 4,000-token contexts. RoPE is
+  bit-exact against HF's fp16 order of operations. RMSNorm is bit-exact at 3 of the 5 tested
+  shapes; at the other two the max error is 2.0e-3 on the 2080 Ti and 3.9e-3 on the A6000, within
+  the test's 2e-3 absolute + 2e-3 relative tolerance.
 
 Llama-3.2-3B doesn't fit next to an HF reference copy on an 11 GB card, so its gate and perplexity
 run HF first and the engine second (`--hf-first`). Llama-3.1-8B and Mistral-7B-v0.3 only fit
@@ -339,8 +345,8 @@ each product explicitly.
   of what's left is each GEMM's last wave: one 256×128 block per SM on 68 SMs.
 - **Prefill GEMM on Ampere: 0.71–0.85× cuBLAS** on the A6000 at the same shapes. The Ampere
   `cp.async` path is less tuned than the Turing one.
-- **Batched decode at 32–64 sequences:** the projections are ~1.15–1.2× slower than cuBLAS at these
-  shapes, and ~1.1× at 16 sequences.
+- **Batched decode at 16–64 sequences:** the projections at these shapes haven't been timed against
+  cuBLAS on the current build, so I have no number for them.
 - **Attention on Ampere is at parity, not ahead:** on the A6000, prefill attention runs at
   0.90–1.11× PyTorch SDPA (its FlashAttention backend) and decode attention at 0.87–1.09×. On the 2080 Ti, where PyTorch has no flash kernel, it's 8–53× faster than
   SDPA.

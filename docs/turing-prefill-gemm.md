@@ -38,8 +38,9 @@ under sustained load: I logged SM clocks of 1.41–1.62 GHz during long runs, ag
 in short bursts. Add autotuner picks that differ slightly between processes, and repeated runs
 landed anywhere between 273 and 285 ms.
 
-A profiler trace shows only about 2.5 ms of GPU idle time between kernels per prefill. The rest is
-inside the GEMMs.
+A profiler trace ([scripts/prof_prefill.py](../scripts/prof_prefill.py)) showed only about 2.5 ms
+of GPU idle time between kernels per prefill, so the rest is inside the GEMMs. That trace isn't
+committed, so treat the 2.5 ms as unverified.
 
 ## What didn't work
 
