@@ -353,6 +353,54 @@ def test_decode_work_reuse():
     report("decode attn, one work buffer for B=8,1,4,16,2", worst)
 
 
+def test_moe():
+    """MoE router + experts (kernels written 2026-10-16 without a GPU; this is their first run)
+    against the MoE math of scripts/ref_engine.py, which matches HF on CPU (tests/test_moe_ref.py).
+    Router: expert indices and order on rows without a near-tie among the top k+1 logits, weights;
+    an exact tie goes to the lower expert index. Experts: both paths (GEMV, grouped GEMM) and auto,
+    given the kernel's own routing, for Granite-, Mixtral- and OLMoE-shaped layers."""
+    from ref_engine import moe_experts, moe_route, r16
+    g = torch.Generator(device=dev).manual_seed(0)
+
+    def rn(*shape, s=1.0):
+        return (torch.randn(*shape, generator=g, device=dev) * s).half()
+
+    for name, E, k, H, I, flags, scale in [("granite-like", 32, 8, 1024, 512, 3, 0.22),
+                                           ("mixtral-like", 8, 2, 512, 1024, 1, 1.0),
+                                           ("olmoe-like", 64, 8, 2048, 1024, 2, 1.0)]:
+        Wr = rn(E, H, s=0.05)
+        wgu, wdown = rn(E, 2 * I, H, s=0.02), rn(E, H, I, s=0.02)
+        for M in [1, 3, 4, 8, 37, 300]:
+            xn, x = rn(M, H), rn(M, H)
+            idx, w = hi.moe_router(xn, Wr, k, flags)
+            logits = r16(xn.float() @ Wr.float().T)
+            ridx, rw = moe_route(logits, k, bool(flags & 1), bool(flags & 2))
+            top = logits.sort(-1, descending=True).values[:, :min(k + 1, E)]
+            clear = (top[:, :-1] - top[:, 1:]).min(-1).values > 1e-2  # rows where fp32 order cannot flip a pick
+            same = (idx.long() == ridx).all(-1)
+            bad = (clear & ~same).sum().item()
+            print(f"{'OK  ' if bad == 0 else 'FAIL'} moe router {name} M={M}: {bad} of {clear.sum().item()} clear rows differ")
+            if bad:
+                FAILS.append(f"moe router {name} M={M}")
+            if same.any():
+                check(f"moe router weights {name} M={M}", w[same], rw[same], 2e-3, 1e-2)
+            ref = r16(x.float() + moe_experts(xn.float(), wgu, wdown, idx.long(), w, bool(flags & 2), scale))
+            for path in (0, 1, 2):
+                out = hi.moe_experts(xn, wgu, wdown, idx, w, x.clone(), flags, scale, path)
+                check(f"moe experts {name} M={M} path={['auto', 'gemv', 'grouped'][path]}", out, ref, 4e-3, 4e-3)
+    # exact tie: experts 2 and 5 have identical router rows and dominate -> [2, 5], weights 1/2 each
+    E, k, H = 8, 2, 256
+    Wr = rn(E, H, s=0.01)
+    Wr[2] = Wr[5] = 0.05
+    xn = (torch.rand(4, H, generator=g, device=dev) + 0.5).half()
+    idx, w = hi.moe_router(xn, Wr, k, 1)
+    ok = (idx.cpu() == torch.tensor([[2, 5]] * 4, dtype=torch.int32)).all().item()
+    print(f"{'OK  ' if ok else 'FAIL'} moe router exact tie -> lower index first: {idx.tolist()}")
+    if not ok:
+        FAILS.append("moe router tie")
+    check("moe router tie weights", w, torch.full_like(w, 0.5), 1e-6)
+
+
 if __name__ == "__main__":
     print(torch.cuda.get_device_name())
     test_rmsnorm()
@@ -366,5 +414,6 @@ if __name__ == "__main__":
     test_flash_prefill()
     test_decode_attn()
     test_decode_work_reuse()
+    test_moe()
     print("\nALL PASS" if not FAILS else f"\n{len(FAILS)} FAILURES: {FAILS}")
     sys.exit(1 if FAILS else 0)

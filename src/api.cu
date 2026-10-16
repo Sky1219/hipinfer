@@ -581,6 +581,78 @@ EXPORT void hi_argmax(const void* logits, int B, int V, int* tok_out, void* s) {
   argmax_kernel<<<B, 1024, 0, ST(s)>>>((const half*)logits, V, tok_out, nullptr, nullptr, 0);
 }
 
+// ------------------------------------------------------------------ mixture of experts
+// UNVERIFIED: written 2026-10-16 without a GPU. It compiles (nvcc 12.0, sm_75, a local check
+// without a GPU) but has never run.
+// docs/moe-design.md has the design; tests/test_kernels.py test_moe() is the first check.
+static int gemv_max();
+
+// Router + top-k for M normalised rows xn: idx[M, k] (int) and routing weights w[M, k] (fp32),
+// in descending order. flags: kMoeNormTopk, kMoeFp16Weights (weight-file moe_flags).
+EXPORT void hi_moe_router(const void* xn, int ldx, const void* Wr, int M, int E, int H, int k, int flags, int* idx, float* w,
+                          void* s) {
+  hi_init();
+  if (E > kMoeMaxE || k > kMoeMaxK || k > E || H % 8) {
+    fprintf(stderr, "hi_moe_router: unsupported E %d / k %d / H %d (E <= %d, k <= %d)\n", E, k, H, kMoeMaxE, kMoeMaxK);
+    exit(1);
+  }
+  moe_router_kernel<<<M, 256, 0, ST(s)>>>((const half*)xn, ldx, (const half*)Wr, E, H, k, flags, idx, w);
+}
+
+// Expert workspace, each piece on a 256-byte boundary: perm, inv [M*k] int, off [E+1] int,
+// rows [M*k, H], y [M*k, H] and act [M*k, I] fp16. The GEMV path uses only act.
+static size_t moe_al(size_t b) { return (b + 255) / 256 * 256; }
+EXPORT size_t hi_moe_work_bytes(int M, int k, int E, int H, int I) {
+  const size_t n = (size_t)M * k;
+  return 2 * moe_al(n * 4) + moe_al((size_t)(E + 1) * 4) + 2 * moe_al(n * H * 2) + moe_al(n * I * 2);
+}
+
+// x[m] += MoE(xn[m]) for M rows, given the routing (idx, w from hi_moe_router): wgu [E][2I, H]
+// (gate/up interleaved per expert), wdown [E][H, I]. path 0 picks the GEMV path for M <= the
+// GEMV limit (HIPINFER_GEMV_MAX), else the grouped GEMM path; 1 / 2 force GEMV / grouped. The
+// grouped path reads the per-expert row counts back to the host (a stream sync), so it cannot
+// run inside graph capture.
+EXPORT void hi_moe_experts(const void* xn, int ldxn, const void* wgu, const void* wdown, const int* idx, const float* w,
+                           int M, int E, int k, int H, int I, int flags, float scale, void* x, int ldx, int path, void* work,
+                           void* s) {
+  hi_init();
+  if (H % 32 || I % 32) { fprintf(stderr, "hi_moe_experts: H %d and I %d must be multiples of 32\n", H, I); exit(1); }
+  const hipStream_t st = ST(s);
+  const size_t n = (size_t)M * k;
+  char* p = (char*)work;
+  int* perm = (int*)p;            p += moe_al(n * 4);
+  int* inv = (int*)p;             p += moe_al(n * 4);
+  int* off = (int*)p;             p += moe_al((size_t)(E + 1) * 4);
+  half* rows = (half*)p;          p += moe_al(n * H * 2);
+  half* y = (half*)p;             p += moe_al(n * H * 2);
+  half* act = (half*)p;
+  const half* Wgu = (const half*)wgu; const half* Wd = (const half*)wdown;
+  if (path == 1 || (path == 0 && M <= gemv_max())) {
+    const int warps = 256 / g_warp;
+    moe_gemv_gu_kernel<<<dim3((I + warps - 1) / warps, (unsigned)n), 256, 0, st>>>((const half*)xn, ldxn, Wgu, idx, k, H, I, act);
+    moe_gemv_down_kernel<<<dim3((H + warps - 1) / warps, M), 256, 0, st>>>(act, Wd, idx, w, k, H, I, flags, scale, (half*)x, ldx);
+    return;
+  }
+  hipStreamCaptureStatus cap;
+  HI_CHECK(hipStreamIsCapturing(st, &cap));
+  if (cap != hipStreamCaptureStatusNone) {
+    fprintf(stderr, "hi_moe_experts: the grouped path (M %d) cannot run inside graph capture\n", M);
+    exit(1);
+  }
+  moe_sort_kernel<<<1, 1024, 0, st>>>(idx, (int)n, E, off, perm, inv);
+  moe_gather_kernel<<<(unsigned)n, 128, 0, st>>>((const half*)xn, ldxn, perm, k, H, rows);
+  std::vector<int> ho(E + 1);
+  HI_CHECK(hipMemcpyAsync(ho.data(), off, (size_t)(E + 1) * 4, hipMemcpyDeviceToHost, st));
+  HI_CHECK(hipStreamSynchronize(st));
+  for (int e = 0; e < E; e++) {
+    const int r0 = ho[e], m = ho[e + 1] - ho[e];
+    if (!m) continue;
+    hi_gemm(rows + (size_t)r0 * H, H, Wgu + (size_t)e * 2 * I * H, nullptr, act + (size_t)r0 * I, I, m, 2 * I, H, 2, s);
+    hi_gemm(act + (size_t)r0 * I, I, Wd + (size_t)e * H * I, nullptr, y + (size_t)r0 * H, H, m, H, I, 0, s);
+  }
+  moe_combine_kernel<<<M, 128, 0, st>>>(y, inv, w, k, H, flags, scale, (half*)x, ldx);
+}
+
 // ------------------------------------------------------------------ tensor parallelism
 // Megatron-style sharding over G GPUs in one process, one worker thread per GPU:
 //   QKV  column-parallel by heads (each rank owns heads/G query and kv heads, and their KV cache)
@@ -735,8 +807,13 @@ struct Config {
   int window;  // sliding-window attention span (0: none); the engine needs max_seq <= window
   float eps, attn_scaling;
   bool tied, qkv_bias;
+  // MoE (weight-file version 3; UNVERIFIED engine path): inter is per expert
+  bool moe = false, qk_norm = false;
+  int n_experts = 0, top_k = 0, moe_flags = 0;
+  float moe_scale = 1.f;
 };
-struct Layer { half *attn_norm, *wqkv, *bqkv, *wo, *mlp_norm, *wgu, *wdown; };
+// Dense layers use wgu / wdown; MoE layers router [E, H], ewgu [E][2I, H], ewdown [E][H, I].
+struct Layer { half *attn_norm, *wqkv, *bqkv, *wo, *mlp_norm, *wgu, *wdown, *router, *ewgu, *ewdown; };
 
 // One engine per GPU. With tensor parallelism each rank holds its shard (hq query heads, hkv kv
 // heads, il intermediate units, vocabulary rows [v0, v0 + vl)); with one GPU those are the
@@ -758,6 +835,9 @@ struct Engine {
   __half2* rope;
   int *d_tok, *d_pos, *d_hist, *d_ptok;
   float* work;
+  int* moe_idx = nullptr;               // MoE: [Mmax, k] routed experts, moe_w their weights
+  float* moe_w = nullptr;
+  void* moe_work = nullptr;             // MoE: hi_moe_experts workspace for Mmax rows
   hipStream_t st;
   hipStream_t cs = nullptr;            // TP: all-reduce stream for the overlapped prefill
   hipEvent_t ev[8];                    // TP: compute <-> comm ordering in the overlapped prefill
@@ -883,9 +963,11 @@ static Engine* load_shard(const char* path, int rank, int world, int maxB, int m
   }
   FILE* f = fopen(path, "rb");
   if (!f) { fprintf(stderr, "cannot open %s\n", path); return nullptr; }
-  int32_t hdr[16];
+  int32_t hdr[32] = {0};
   if (fread(hdr, 4, 16, f) != 16 || hdr[0] != 0x48495046) { fprintf(stderr, "bad weight file\n"); fclose(f); return nullptr; }
-  if (hdr[1] != 2) { fprintf(stderr, "weight file version %d; re-export with scripts/export.py (version 2)\n", hdr[1]); fclose(f); return nullptr; }
+  if (hdr[1] != 2 && hdr[1] != 3) { fprintf(stderr, "weight file version %d; re-export with scripts/export.py (version 2, or 3 for MoE)\n", hdr[1]); fclose(f); return nullptr; }
+  // version 3 (MoE): a 128-byte header, MoE fields at bytes 64..79
+  if (hdr[1] == 3 && fread(hdr + 16, 4, 16, f) != 16) { fprintf(stderr, "bad weight file\n"); fclose(f); return nullptr; }
   Engine* e = new Engine();
   HI_CHECK(hipGetDevice(&e->dev));
   e->rank = rank; e->world = world;
@@ -895,7 +977,23 @@ static Engine* load_shard(const char* path, int rank, int world, int maxB, int m
   memcpy(&c.eps, &hdr[10], 4); memcpy(&c.attn_scaling, &hdr[11], 4);
   c.tied = hdr[12] & 1; c.qkv_bias = (hdr[12] & 2) != 0;
   c.window = hdr[13];  // zero padding in files exported before the field existed
+  c.moe = (hdr[12] & 4) != 0; c.qk_norm = (hdr[12] & 8) != 0;
+  if (c.moe) { c.n_experts = hdr[16]; c.top_k = hdr[17]; c.moe_flags = hdr[18]; memcpy(&c.moe_scale, &hdr[19], 4); }
   auto fail = [&]() -> Engine* { fclose(f); delete e; return nullptr; };
+  if (c.moe != (hdr[1] == 3)) { fprintf(stderr, "hi_load: MoE flag does not match file version %d\n", hdr[1]); return fail(); }
+  if (c.moe) {
+    if (world > 1) {
+      fprintf(stderr, "hi_load: MoE models run on one GPU for now (expert parallelism: docs/moe-design.md)\n");
+      return fail();
+    }
+    if (c.qk_norm) { fprintf(stderr, "hi_load: QK-norm (OLMoE) is not implemented in the engine yet\n"); return fail(); }
+    if (c.n_experts < 1 || c.n_experts > kMoeMaxE || c.top_k < 1 || c.top_k > kMoeMaxK || c.top_k > c.n_experts ||
+        c.hidden % 32 || c.inter % 32) {
+      fprintf(stderr, "hi_load: unsupported MoE shape: %d experts, top-%d, hidden %d, expert inter %d\n", c.n_experts,
+              c.top_k, c.hidden, c.inter);
+      return fail();
+    }
+  }
   if (!head_dim_ok(c.head_dim, "hi_load")) return fail();
   if (c.n_kv < 1 || c.n_heads % c.n_kv || c.n_heads / c.n_kv > 8) {
     fprintf(stderr, "unsupported GQA group %d/%d\n", c.n_heads, c.n_kv);
@@ -924,7 +1022,7 @@ static Engine* load_shard(const char* path, int rank, int world, int maxB, int m
   const int hq = e->hq, hkv = e->hkv, il = e->il;
   e->qkv_dim = (hq + 2 * hkv) * D;
 
-  size_t off = 64;
+  size_t off = hdr[1] == 3 ? 128 : 64;
   auto next = [&](size_t bytes) { const size_t o = off; off += (bytes + 255) / 256 * 256; return o; };
   std::vector<char> hb;
   auto read_at = [&](size_t o, size_t n) -> const char* {
@@ -971,6 +1069,15 @@ static Engine* load_shard(const char* path, int rank, int world, int maxB, int m
       if (c.qkv_bias) { l.bqkv = (half*)walloc(e, (size_t)e->qkv_dim * 2); qkv_rows(l.bqkv, next(QKV * 2), 1); }
       l.wo = columns(next((size_t)H * Hq * D * 2), H, (size_t)Hq * D, (size_t)rank * hq * D, (size_t)hq * D);
       l.mlp_norm = rows(next((size_t)H * 2), H, 0, 1);
+      l.router = l.ewgu = l.ewdown = nullptr;
+      if (c.moe) {  // one GPU (checked above): every expert, stacked as in the file
+        l.wgu = l.wdown = nullptr;
+        const size_t E = c.n_experts;
+        l.router = rows(next(E * H * 2), H, 0, E);
+        l.ewgu = rows(next(E * 2 * I * H * 2), H, 0, E * 2 * I);
+        l.ewdown = rows(next(E * H * I * 2), I, 0, E * H);
+        continue;
+      }
       // gate/up rows are interleaved in groups of 16 units, so a rank's units are a contiguous row range
       l.wgu = rows(next((size_t)2 * I * H * 2), H, (size_t)rank * 2 * il, (size_t)2 * il);
       l.wdown = columns(next((size_t)H * I * 2), H, I, (size_t)rank * il, il);
@@ -999,6 +1106,11 @@ static Engine* load_shard(const char* path, int rank, int world, int maxB, int m
   e->d_hist = (int*)dalloc((size_t)maxB * max_seq * 4);
   e->d_ptok = (int*)dalloc(e->Mmax * 4);
   e->work = (float*)dalloc(decode_work_bytes(maxB, hq, hkv, D));
+  if (c.moe) {
+    e->moe_idx = (int*)dalloc((size_t)e->Mmax * c.top_k * 4);
+    e->moe_w = (float*)dalloc((size_t)e->Mmax * c.top_k * 4);
+    e->moe_work = dalloc(hi_moe_work_bytes(e->Mmax, c.top_k, c.n_experts, H, I));
+  }
 
   // RoPE table exactly as HF computes it: fp32 inv_freq (incl. llama3 / linear scaling, from
   // the export) and fp32 angles; cos/sin times attention_scaling, rounded to fp16.
@@ -1027,7 +1139,7 @@ static void free_shard(Engine* e) {
   for (auto g : e->graphs) if (g) (void)hipGraphExecDestroy(g);
   for (void* p : e->wallocs) (void)hipFree(p);
   void* ps[] = {e->kc, e->vc, e->x, e->xn, e->qkv, e->att, e->act, e->logits, e->keys, e->rope,
-                e->d_tok, e->d_pos, e->d_hist, e->d_ptok, e->work, e->pf_logits};
+                e->d_tok, e->d_pos, e->d_hist, e->d_ptok, e->work, e->pf_logits, e->moe_idx, e->moe_w, e->moe_work};
   for (void* p : ps) if (p) (void)hipFree(p);
   if (e->hstage) (void)hipHostFree(e->hstage);
   (void)hipStreamDestroy(e->st);
@@ -1082,11 +1194,20 @@ EXPORT void hi_config(Engine* e, int* out) {
   memcpy(out, v, sizeof(v));
 }
 
-// Weight bytes one GPU reads per decode step (the roofline numerator; this rank's shard).
+// {n_experts, top_k, moe_flags}: zeros for a dense model
+EXPORT void hi_moe_config(Engine* e, int* out) {
+  const Config& c = e->c;
+  out[0] = c.n_experts; out[1] = c.top_k; out[2] = c.moe_flags;
+}
+
+// Weight bytes one GPU reads per decode step (the roofline numerator; this rank's shard). For MoE:
+// one token's (B = 1) reads, the router plus its top_k experts.
 EXPORT size_t hi_weight_bytes(Engine* e) {
   const Config& c = e->c;
+  const size_t mlp = c.moe ? (size_t)c.n_experts * c.hidden + (size_t)c.top_k * 3 * c.inter * c.hidden
+                           : (size_t)3 * e->il * c.hidden;
   size_t per_layer = (size_t)e->qkv_dim * c.hidden + (size_t)c.hidden * e->hq * c.head_dim +
-                     (size_t)3 * e->il * c.hidden + 2 * (size_t)c.hidden + (c.qkv_bias ? e->qkv_dim : 0);
+                     mlp + 2 * (size_t)c.hidden + (c.qkv_bias ? e->qkv_dim : 0);
   return (per_layer * c.layers + (size_t)e->vl * c.hidden + c.hidden) * 2;
 }
 
@@ -1177,8 +1298,21 @@ static void attn_rows(Engine* e, const Layer& w, half* kc, half* vc, int slot, i
   hi_gemm(e->att + (size_t)r0 * HD, HD, w.wo, nullptr, e->x + (size_t)r0 * H, H, m, H, HD, ep, s);
 }
 
+// MoE block for rows [r0, r0 + m) (UNVERIFIED): norm, router + top-k, experts + combine into
+// e->x. Up to the GEMV limit the experts run as GEMVs (graph-capturable); above it, grouped GEMMs.
+static void moe_rows(Engine* e, const Layer& w, int r0, int m, hipStream_t s) {
+  const Config& c = e->c;
+  const int H = c.hidden;
+  half* xn = e->xn + (size_t)r0 * H;
+  hi_rmsnorm(e->x + (size_t)r0 * H, w.mlp_norm, xn, m, H, c.eps, s);
+  hi_moe_router(xn, H, w.router, m, c.n_experts, H, c.top_k, c.moe_flags, e->moe_idx, e->moe_w, s);
+  hi_moe_experts(xn, H, w.ewgu, w.ewdown, e->moe_idx, e->moe_w, m, c.n_experts, c.top_k, H, c.inter, c.moe_flags,
+                 c.moe_scale, e->x + (size_t)r0 * H, H, 0, e->moe_work, s);
+}
+
 // MLP block for rows [r0, r0 + m): norm, gate/up + SwiGLU, down projection into e->x.
 static void mlp_rows(Engine* e, const Layer& w, int r0, int m, hipStream_t s) {
+  if (e->c.moe) { moe_rows(e, w, r0, m, s); return; }
   const Config& c = e->c;
   const int H = c.hidden, il = e->il, ep = e->rank == 0 ? 1 : 0;
   hi_rmsnorm(e->x + (size_t)r0 * H, w.mlp_norm, e->xn + (size_t)r0 * H, m, H, c.eps, s);
@@ -1343,6 +1477,12 @@ static void decode_step(Engine* e, int B) {
       hi_rope_cache(e->qkv, e->qkv_dim, B, hq, hkv, D, e->rope, e->d_pos, 0, 0, kc, vc, e->max_seq, s);
     }
     hi_decode_attn(e->qkv, e->qkv_dim, kc, vc, e->max_seq, e->d_pos, e->att, HD, B, hq, hkv, D, e->work, s);
+    if (c.moe) {  // UNVERIFIED: one GPU (no all-reduce); GEMV experts for small B, grouped GEMMs above
+      if (small) hi_gemv(e->att, HD, nullptr, 0.f, w.wo, e->x, H, B, H, HD, ep, s);
+      else hi_gemm(e->att, HD, w.wo, nullptr, e->x, H, B, H, HD, ep, s);
+      moe_rows(e, w, 0, B, s);
+      continue;
+    }
     if (small) {
       hi_gemv(e->att, HD, nullptr, 0.f, w.wo, e->x, H, B, H, HD, ep, s);
       tp_allreduce(e, e->x, (size_t)B * H, s);
@@ -1369,6 +1509,8 @@ static void decode_step(Engine* e, int B) {
 
 static float decode_rank(Engine* e, int B, int steps, int use_graph) {
   hipStream_t s = e->st;
+  // MoE above the GEMV limit takes the grouped path, which syncs on the per-expert counts: no graph
+  if (e->c.moe && B > gemv_max()) use_graph = 0;
   if (use_graph && !e->graphs[B]) {
     if (B > gemv_max()) {  // GEMM path: tune the decode shapes now, since tuning can't run inside capture
       const Config& c = e->c;

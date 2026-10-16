@@ -51,6 +51,13 @@ lib.hi_logits.restype = I
 lib.hi_set_state.argtypes = [P, I, IP, IP]
 lib.hi_set_state.restype = I
 lib.hi_sync.argtypes = [P]
+# MoE (UNVERIFIED: the library side compiles but has never run on a GPU)
+lib.hi_moe_config.argtypes = [P, IP]
+lib.hi_moe_router.argtypes = [P, I, P, I, I, I, I, I, P, P, P]
+lib.hi_moe_work_bytes.argtypes = [I, I, I, I, I]
+lib.hi_moe_work_bytes.restype = C.c_size_t
+lib.hi_moe_experts.argtypes = [P, I, P, P, P, P, I, I, I, I, I, I, F, P, I, I, P, P]
+MOE_NORM_TOPK, MOE_FP16_WEIGHTS = 1, 2  # moe_flags bits
 
 
 def _s():
@@ -122,6 +129,27 @@ def decode_attn(q, kc, vc, pos, Hq, Hkv, out=None, work=None):
     return out
 
 
+def moe_router(xn, Wr, k, flags):
+    """Top-k experts of each normalised row xn [M, H] under router Wr [E, H]: (idx [M, k] int32,
+    weights [M, k] fp32), descending."""
+    M, H = xn.shape
+    idx = torch.empty(M, k, dtype=torch.int32, device=xn.device)
+    w = torch.empty(M, k, dtype=torch.float32, device=xn.device)
+    lib.hi_moe_router(_p(xn), xn.stride(0), _p(Wr), M, Wr.shape[0], H, k, flags, _p(idx), _p(w), _s())
+    return idx, w
+
+
+def moe_experts(xn, wgu, wdown, idx, w, x, flags, scale=1.0, path=0):
+    """x += MoE(xn) in place, given the routing: wgu [E, 2I, H] (gate/up interleaved per expert),
+    wdown [E, H, I]. path 0 auto, 1 GEMV, 2 grouped GEMM."""
+    M, H = xn.shape
+    E, I, k = wgu.shape[0], wdown.shape[2], idx.shape[1]
+    work = torch.empty(lib.hi_moe_work_bytes(M, k, E, H, I), dtype=torch.uint8, device=xn.device)
+    lib.hi_moe_experts(_p(xn), xn.stride(0), _p(wgu), _p(wdown), _p(idx), _p(w), M, E, k, H, I, flags, scale, _p(x),
+                       x.stride(0), path, _p(work), _s())
+    return x
+
+
 ALLREDUCE = {"auto": 0, "nccl": 1, "oneshot": 2}
 
 
@@ -168,6 +196,9 @@ class Engine:
         (self.vocab, self.hidden, self.inter, self.layers, self.heads, self.kv_heads, self.head_dim, self.max_pos,
          tied, qkv_bias, self.window) = list(cfg)
         self.tied, self.qkv_bias = bool(tied), bool(qkv_bias)
+        moe = (C.c_int * 3)()
+        lib.hi_moe_config(self.h, moe)
+        self.n_experts, self.top_k, self.moe_flags = list(moe)  # zeros for a dense model
         self.max_seq, self.max_batch, self.max_prefill = max_seq, max_batch, max_prefill
         self.weight_bytes = lib.hi_weight_bytes(self.h)
         self.kv_bytes_per_token = 2 * self.layers * self.kv_heads * self.head_dim * 2  # whole model, all GPUs
