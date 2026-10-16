@@ -18,7 +18,8 @@ benchmarks run). Nothing outside `docs/` is touched.
 ## Findings that differ from, or sharpen, the README
 
 1. RMSNorm is bit-exact against HF's fp16 order at 3 of the 5 tested shapes; at H=4096 (M=300) and
-   H=3072 (M=33) the max error is 1.95e-3 and 9.8e-4 (within the test's 2e-3 tolerance). RoPE is
+   H=3072 (M=33) the max error is 1.95e-3 and 9.8e-4 on the 2080 Ti (3.9e-3 and 2.4e-4 on the A6000), within the
+   test's tolerance of 2e-3 + 2e-3·|ref|. RoPE is
    bit-exact (tolerance 0) at every tested shape. Source: `results/2080ti/test_kernels.log`.
 2. The 5–16 % batch-1 decode lead over llama.cpp is at a 128-token context. At 1,024 tokens it is
    3.0–14.4 % (Qwen2.5-0.5B: 43 %).
