@@ -14,7 +14,10 @@
   "kv_heads": 4,
   "head_dim": 64,
   "max_pos": 2048,
-  "tied": false
+  "eps": 9.999999747378752e-06,
+  "tied": false,
+  "qkv_bias": false,
+  "window": 0
  },
  "tp": 2,
  "tp_info": {
@@ -29,32 +32,32 @@
   {
    "what": "decode B=1",
    "bytes": 4096,
-   "oneshot_us": 8.01807975769043,
-   "nccl_us": 11.878399848937988
+   "oneshot_us": 8.468480110168457,
+   "nccl_us": 12.195839881896973
   },
   {
    "what": "decode B=8",
    "bytes": 32768,
-   "oneshot_us": 16.680320739746094,
-   "nccl_us": 23.838560104370117
+   "oneshot_us": 17.65567970275879,
+   "nccl_us": 24.874879837036133
   },
   {
    "what": "decode B=64",
    "bytes": 262144,
-   "oneshot_us": 58.97200012207031,
-   "nccl_us": 83.51408386230469
+   "oneshot_us": 63.569915771484375,
+   "nccl_us": 85.391357421875
   },
   {
    "what": "prefill T=512",
    "bytes": 2097152,
-   "oneshot_us": 395.107177734375,
-   "nccl_us": 428.20733642578125
+   "oneshot_us": 424.9599914550781,
+   "nccl_us": 425.9993896484375
   },
   {
    "what": "prefill T=2000",
    "bytes": 8192000,
-   "oneshot_us": 1490.1639404296875,
-   "nccl_us": 1588.176513671875
+   "oneshot_us": 1574.4197998046875,
+   "nccl_us": 1554.9285888671875
   }
  ],
  "single": {
@@ -62,90 +65,90 @@
    {
     "engine": "1 GPU",
     "tp": 1,
-    "allreduce": "-",
+    "allreduce": null,
     "ctx": 128,
-    "ms": 4.142027378082275,
+    "ms": 4.14670467376709,
     "bw_floor_ms": 3.365828155844156,
-    "bw_util": 0.8126040338735053
+    "bw_util": 0.8116874532052113
    },
    {
     "engine": "1 GPU",
     "tp": 1,
-    "allreduce": "-",
+    "allreduce": null,
     "ctx": 1024,
-    "ms": 4.226036548614502,
+    "ms": 4.232587814331055,
     "bw_floor_ms": 3.3985961558441558,
-    "bw_util": 0.8042041560095781
+    "bw_util": 0.8029593962201802
    }
   ],
   "prefill": [
    {
     "engine": "1 GPU",
     "tp": 1,
-    "allreduce": "-",
+    "allreduce": null,
     "overlap": false,
     "T": 512,
-    "ms": 29.82596098445356,
-    "tok_s": 17166.25326060321
+    "ms": 27.86363399354741,
+    "tok_s": 18375.205478171574
    },
    {
     "engine": "1 GPU",
     "tp": 1,
-    "allreduce": "-",
+    "allreduce": null,
     "overlap": false,
     "T": 2000,
-    "ms": 117.16116999741644,
-    "tok_s": 17070.50211297909
+    "ms": 105.3406519931741,
+    "tok_s": 18986.022605305276
    }
   ],
   "decode_batched": [
    {
     "engine": "1 GPU",
     "tp": 1,
-    "allreduce": "-",
+    "allreduce": null,
     "B": 1,
-    "ms_per_step": 4.165159702301025,
-    "tok_s": 240.08683255231583
+    "ms_per_step": 4.185452461242676,
+    "tok_s": 238.92279490927402
    },
    {
     "engine": "1 GPU",
     "tp": 1,
-    "allreduce": "-",
+    "allreduce": null,
     "B": 4,
-    "ms_per_step": 4.642489910125732,
-    "tok_s": 861.6066114167749
+    "ms_per_step": 4.667601108551025,
+    "tok_s": 856.9712593203427
    },
    {
     "engine": "1 GPU",
     "tp": 1,
-    "allreduce": "-",
+    "allreduce": null,
     "B": 8,
-    "ms_per_step": 4.847724437713623,
-    "tok_s": 1650.2588178822132
+    "ms_per_step": 4.86961030960083,
+    "tok_s": 1642.8419301288552
    },
    {
     "engine": "1 GPU",
     "tp": 1,
-    "allreduce": "-",
+    "allreduce": null,
     "B": 16,
-    "ms_per_step": 5.1702728271484375,
-    "tok_s": 3094.6142563282265
+    "ms_per_step": 5.200759410858154,
+    "tok_s": 3076.4737870002546
    },
    {
     "engine": "1 GPU",
     "tp": 1,
-    "allreduce": "-",
+    "allreduce": null,
     "B": 32,
-    "ms_per_step": 6.773439407348633,
-    "tok_s": 4724.335463203907
+    "ms_per_step": 6.761747360229492,
+    "tok_s": 4732.504528077182
    },
    {
     "engine": "1 GPU",
     "tp": 1,
-    "allreduce": "-",
+    "allreduce": null,
     "B": 64,
-    "ms_per_step": 8.665763854980469,
-    "tok_s": 7385.3847244195695
+    "ms_per_step": 8.580161094665527,
+    "tok_s": 7459.067410726145
    }
   ]
  },
@@ -156,36 +159,36 @@
     "tp": 2,
     "allreduce": "auto",
     "ctx": 128,
-    "ms": 2.6708364486694336,
+    "ms": 2.7081356048583984,
     "bw_floor_ms": 1.6830636883116883,
-    "bw_util": 0.6301635164332742
+    "bw_util": 0.621484273273565
    },
    {
     "engine": "TP x2 auto",
     "tp": 2,
     "allreduce": "auto",
     "ctx": 1024,
-    "ms": 2.7494957447052,
+    "ms": 2.832721471786499,
     "bw_floor_ms": 1.6994476883116885,
-    "bw_util": 0.6180943147791278
+    "bw_util": 0.5999346230252232
    },
    {
     "engine": "TP x2 nccl",
     "tp": 2,
     "allreduce": "nccl",
     "ctx": 128,
-    "ms": 2.8835294246673584,
+    "ms": 3.0401926040649414,
     "bw_floor_ms": 1.6830636883116883,
-    "bw_util": 0.5836818150402072
+    "bw_util": 0.5536042966690068
    },
    {
     "engine": "TP x2 nccl",
     "tp": 2,
     "allreduce": "nccl",
     "ctx": 1024,
-    "ms": 2.965270757675171,
+    "ms": 3.1158509254455566,
     "bw_floor_ms": 1.6994476883116885,
-    "bw_util": 0.5731172048666774
+    "bw_util": 0.545420088757511
    }
   ],
   "prefill": [
@@ -195,8 +198,8 @@
     "allreduce": "auto",
     "overlap": true,
     "T": 512,
-    "ms": 26.165901974309236,
-    "tok_s": 19567.45081834759
+    "ms": 24.728375021368265,
+    "tok_s": 20704.95936581239
    },
    {
     "engine": "TP x2 auto",
@@ -204,8 +207,8 @@
     "allreduce": "auto",
     "overlap": true,
     "T": 2000,
-    "ms": 87.62739400845021,
-    "tok_s": 22823.912802965853
+    "ms": 83.78167700720951,
+    "tok_s": 23871.568002009528
    },
    {
     "engine": "TP x2 auto",
@@ -213,8 +216,8 @@
     "allreduce": "auto",
     "overlap": false,
     "T": 512,
-    "ms": 32.722520001698285,
-    "tok_s": 15646.716694601375
+    "ms": 33.93612400395796,
+    "tok_s": 15087.167878697215
    },
    {
     "engine": "TP x2 auto",
@@ -222,8 +225,8 @@
     "allreduce": "auto",
     "overlap": false,
     "T": 2000,
-    "ms": 123.92417096998543,
-    "tok_s": 16138.901590751026
+    "ms": 125.46096002915874,
+    "tok_s": 15941.213900604414
    },
    {
     "engine": "TP x2 nccl",
@@ -231,8 +234,8 @@
     "allreduce": "nccl",
     "overlap": true,
     "T": 512,
-    "ms": 26.27317502629012,
-    "tok_s": 19487.557156212366
+    "ms": 24.748385010752827,
+    "tok_s": 20688.21863638953
    },
    {
     "engine": "TP x2 nccl",
@@ -240,8 +243,8 @@
     "allreduce": "nccl",
     "overlap": true,
     "T": 2000,
-    "ms": 87.95439399546012,
-    "tok_s": 22739.057244862972
+    "ms": 82.98122300766408,
+    "tok_s": 24101.8380726358
    }
   ],
   "decode_batched": [
@@ -250,96 +253,96 @@
     "tp": 2,
     "allreduce": "auto",
     "B": 1,
-    "ms_per_step": 2.711552858352661,
-    "tok_s": 368.7923681515565
+    "ms_per_step": 2.807934284210205,
+    "tok_s": 356.13369074314807
    },
    {
     "engine": "TP x2 auto",
     "tp": 2,
     "allreduce": "auto",
     "B": 4,
-    "ms_per_step": 3.2336573600769043,
-    "tok_s": 1236.989437837307
+    "ms_per_step": 3.3870291709899902,
+    "tok_s": 1180.9759520998887
    },
    {
     "engine": "TP x2 auto",
     "tp": 2,
     "allreduce": "auto",
     "B": 8,
-    "ms_per_step": 3.6578924655914307,
-    "tok_s": 2187.051717690807
+    "ms_per_step": 3.771256923675537,
+    "tok_s": 2121.3086676160615
    },
    {
     "engine": "TP x2 auto",
     "tp": 2,
     "allreduce": "auto",
     "B": 16,
-    "ms_per_step": 4.0904035568237305,
-    "tok_s": 3911.594486394462
+    "ms_per_step": 4.184837818145752,
+    "tok_s": 3823.326182587739
    },
    {
     "engine": "TP x2 auto",
     "tp": 2,
     "allreduce": "auto",
     "B": 32,
-    "ms_per_step": 5.48321008682251,
-    "tok_s": 5835.997434587414
+    "ms_per_step": 5.734023094177246,
+    "tok_s": 5580.723947989533
    },
    {
     "engine": "TP x2 auto",
     "tp": 2,
     "allreduce": "auto",
     "B": 64,
-    "ms_per_step": 7.503881454467773,
-    "tok_s": 8528.919385033025
+    "ms_per_step": 7.5609965324401855,
+    "tok_s": 8464.492706141351
    },
    {
     "engine": "TP x2 nccl",
     "tp": 2,
     "allreduce": "nccl",
     "B": 1,
-    "ms_per_step": 2.9373154640197754,
-    "tok_s": 340.4469190488242
+    "ms_per_step": 3.1087746620178223,
+    "tok_s": 321.6701461890219
    },
    {
     "engine": "TP x2 nccl",
     "tp": 2,
     "allreduce": "nccl",
     "B": 4,
-    "ms_per_step": 3.484739065170288,
-    "tok_s": 1147.862128323956
+    "ms_per_step": 3.668397903442383,
+    "tok_s": 1090.3942552814256
    },
    {
     "engine": "TP x2 nccl",
     "tp": 2,
     "allreduce": "nccl",
     "B": 8,
-    "ms_per_step": 4.074857711791992,
-    "tok_s": 1963.2587358447556
+    "ms_per_step": 4.346264839172363,
+    "tok_s": 1840.6609574034608
    },
    {
     "engine": "TP x2 nccl",
     "tp": 2,
     "allreduce": "nccl",
     "B": 16,
-    "ms_per_step": 4.828029632568359,
-    "tok_s": 3313.9813169474073
+    "ms_per_step": 5.125661373138428,
+    "tok_s": 3121.5483886332595
    },
    {
     "engine": "TP x2 nccl",
     "tp": 2,
     "allreduce": "nccl",
     "B": 32,
-    "ms_per_step": 6.449509143829346,
-    "tok_s": 4961.617897792489
+    "ms_per_step": 7.018375396728516,
+    "tok_s": 4559.459731224437
    },
    {
     "engine": "TP x2 nccl",
     "tp": 2,
     "allreduce": "nccl",
     "B": 64,
-    "ms_per_step": 8.669916152954102,
-    "tok_s": 7381.847629309918
+    "ms_per_step": 9.0629243850708,
+    "tok_s": 7061.738273512035
    }
   ]
  }

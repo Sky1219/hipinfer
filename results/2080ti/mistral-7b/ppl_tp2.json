@@ -3,11 +3,11 @@
  "gpu": "NVIDIA GeForce RTX 2080 Ti",
  "tp": 2,
  "seq": 1024,
- "windows": 8,
- "tokens": 8184,
- "ppl_hf": 7.326737041121082,
- "ppl_hipinfer": 7.326880504587219,
- "top1_agreement": 0.9991446725317693,
- "mean_kl_hf_to_hipinfer": 6.651838836321591e-06,
+ "windows": 16,
+ "tokens": 16368,
+ "ppl_hf": 5.777454307467764,
+ "ppl_hipinfer": 5.777349778219487,
+ "top1_agreement": 0.9987781036168133,
+ "mean_kl_hf_to_hipinfer": 6.519130195183989e-06,
  "max_logit_diff": 0.5
 }

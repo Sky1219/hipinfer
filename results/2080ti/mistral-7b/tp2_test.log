@@ -1,0 +1,7 @@
+mistral-7b.bin: tp=2 on ['NVIDIA GeForce RTX 2080 Ti', 'NVIDIA GeForce RTX 2080 Ti']  p2p=False nccl=True
+[oneshot] all-reduce self-test sizes [8, 4096, 32768, 2097152, 3145736]: max err 0.0
+[nccl] all-reduce self-test sizes [8, 4096, 32768, 2097152, 3145736]: max err 0.0
+[auto] all-reduce self-test sizes [8, 4096, 32768, 2097152, 3145736]: max err 0.0
+nccl vs oneshot: bitwise identical logits and tokens
+auto vs oneshot: bitwise identical logits and tokens
+TP TEST PASS

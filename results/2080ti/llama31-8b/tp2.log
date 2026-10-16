@@ -1,0 +1,32 @@
+['NVIDIA GeForce RTX 2080 Ti', 'NVIDIA GeForce RTX 2080 Ti'] | llama31-8b.bin {'vocab': 128256, 'hidden': 4096, 'inter': 14336, 'layers': 32, 'heads': 32, 'kv_heads': 8, 'head_dim': 128, 'max_pos': 131072, 'eps': 9.999999747378752e-06, 'tied': False, 'qkv_bias': False, 'window': 0}
+tp info: {'world': 2, 'p2p': False, 'nccl': True, 'allreduce': 'auto', 'oneshot_max_bytes': 524288, 'prefill_overlap': True}
+
+== all-reduce latency (us), fp16, in place ==
+decode B=1             8 KB  oneshot     11.1  nccl     14.1
+decode B=8            64 KB  oneshot     24.2  nccl     38.5
+decode B=64          512 KB  oneshot    107.4  nccl    135.5
+prefill T=512       4096 KB  oneshot    776.2  nccl    817.7
+prefill T=2000     16000 KB  oneshot   2971.1  nccl   3110.5
+
+== tensor parallel x2 ==
+[TP x2 auto    ] decode B=1 ctx=  128:  14.680 ms/token    83% of the per-GPU BW floor
+[TP x2 auto    ] decode B=1 ctx= 1024:  14.894 ms/token    83% of the per-GPU BW floor
+[TP x2 auto    ] decode B=1 ctx= 4096:  15.431 ms/token    82% of the per-GPU BW floor
+[TP x2 auto    ] prefill T=  512 overlap:   103.18 ms (   4962 tok/s)
+[TP x2 auto    ] prefill T= 2000 overlap:   371.05 ms (   5390 tok/s)
+[TP x2 auto    ] prefill T=  512 no overlap:   131.60 ms (   3890 tok/s)
+[TP x2 auto    ] prefill T= 2000 no overlap:   498.91 ms (   4009 tok/s)
+[TP x2 nccl    ] decode B=1 ctx=  128:  14.955 ms/token    82% of the per-GPU BW floor
+[TP x2 nccl    ] decode B=1 ctx= 1024:  15.151 ms/token    81% of the per-GPU BW floor
+[TP x2 nccl    ] decode B=1 ctx= 4096:  15.705 ms/token    80% of the per-GPU BW floor
+[TP x2 nccl    ] prefill T=  512 overlap:   104.44 ms (   4902 tok/s)
+[TP x2 nccl    ] prefill T= 2000 overlap:   374.97 ms (   5334 tok/s)
+[TP x2 auto    ] batched B=  1:  14.773 ms/step       68 tok/s
+[TP x2 auto    ] batched B=  4:  16.405 ms/step      244 tok/s
+[TP x2 auto    ] batched B=  8:  16.982 ms/step      471 tok/s
+[TP x2 auto    ] batched B= 16:  18.522 ms/step      864 tok/s
+[TP x2 nccl    ] batched B=  1:  15.028 ms/step       67 tok/s
+[TP x2 nccl    ] batched B=  4:  16.958 ms/step      236 tok/s
+[TP x2 nccl    ] batched B=  8:  17.955 ms/step      446 tok/s
+[TP x2 nccl    ] batched B= 16:  19.821 ms/step      807 tok/s
+wrote results/2080ti/llama31-8b/tp2.json

@@ -1,6 +1,6 @@
 [transformers] Token indices sequence length is longer than the specified maximum sequence length for this model (299078 > 131072). Running this sequence through the model will result in indexing errors
 Qwen/Qwen2.5-1.5B: 299078 test tokens, 16 windows of 1024
-Loading weights:   0%|          | 0/338 [00:00<?, ?it/s]Loading weights:  17%|█▋        | 59/338 [00:00<00:00, 572.44it/s]Loading weights:  40%|████      | 136/338 [00:00<00:00, 672.20it/s]Loading weights:  65%|██████▍   | 219/338 [00:00<00:00, 720.67it/s]Loading weights:  90%|████████▉ | 303/338 [00:00<00:00, 745.50it/s]Loading weights: 100%|██████████| 338/338 [00:00<00:00, 739.64it/s]
+Loading weights:   0%|          | 0/338 [00:00<?, ?it/s]Loading weights:  37%|███▋      | 125/338 [00:00<00:00, 1188.86it/s]Loading weights:  79%|███████▉  | 268/338 [00:00<00:00, 1301.61it/s]Loading weights: 100%|██████████| 338/338 [00:00<00:00, 1318.54it/s]
 window   0: ppl HF 6.7118  hipinfer 6.7122  top-1 agree 99.804%  mean KL 1.26e-05  max |dlogit| 0.088
 window   1: ppl HF 8.8740  hipinfer 8.8749  top-1 agree 99.902%  mean KL 1.43e-05  max |dlogit| 0.088
 window   2: ppl HF 9.4153  hipinfer 9.4162  top-1 agree 99.902%  mean KL 1.51e-05  max |dlogit| 0.092
@@ -20,6 +20,7 @@ window  15: ppl HF 9.4535  hipinfer 9.4536  top-1 agree 99.859%  mean KL 1.56e-0
 {
  "model": "Qwen/Qwen2.5-1.5B",
  "gpu": "NVIDIA GeForce RTX 2080 Ti",
+ "tp": 1,
  "seq": 1024,
  "windows": 16,
  "tokens": 16352,

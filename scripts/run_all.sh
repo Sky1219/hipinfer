@@ -44,8 +44,12 @@ if $PY -c "import torch, sys; sys.exit(0 if torch.version.hip else 1)"; then
   GFX=$($PY -c "import torch; print(torch.cuda.get_device_properties(0).gcnArchName.split(':')[0])")
   HIPCC=${HIPCC:-$(command -v hipcc || echo /opt/rocm/bin/hipcc)}
   echo "GPU $GPU ($MEM_GB GB)  $GFX  $($HIPCC --version | grep -m1 'HIP version')"
+  # RCCL (large-message all-reduce backend for multi-GPU) from the ROCm install, when present
+  ROCM=$(dirname "$(dirname "$(readlink -f "$HIPCC")")")
+  RCCL=""
+  ls "$ROCM"/lib/librccl.so* >/dev/null 2>&1 && RCCL=1
   if [ "${SKIP_BUILD:-0}" != 1 ]; then
-    make hip HIPCC="$HIPCC" AMD_ARCH="--offload-arch=$GFX"
+    make hip HIPCC="$HIPCC" AMD_ARCH="--offload-arch=$GFX" RCCL="$RCCL"
     cp build/libhipinfer_amd.so build/libhipinfer.so
   fi
 else
@@ -126,7 +130,7 @@ if [ "$NGPU" -ge "$TP" ] && [ "$TP" -ge 2 ] && [ "${SKIP_TP:-0}" != 1 ]; then
   for m in ${TP_MODELS:-$MODELS}; do
     hf=${HF[$m]:-}
     need1=$(need_engine $m)
-    needtp=$($PY -c "print(${GB[$m]} * 1.15 / $TP + 2.5)")   # shard + replicated embedding + activations
+    needtp=$($PY -c "print(${GB[$m]} / $TP + 1.5)")   # shard (incl. replicated embedding) + KV cache + activations
     if $PY -c "import sys; sys.exit(0 if $MEM_GB < $needtp else 1)"; then
       echo "== $m: needs ~${needtp} GB per GPU at tp=$TP -> skipped"; continue
     fi

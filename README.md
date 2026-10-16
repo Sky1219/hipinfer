@@ -1,7 +1,7 @@
 # hipinfer
 
 An LLM inference engine I wrote from scratch in HIP. On one RTX 2080 Ti it runs Llama, Qwen and
-TinyLlama models in fp16 **6–48 % faster than llama.cpp at batch-1 decode**, and its outputs match
+TinyLlama models in fp16 **5–47 % faster than llama.cpp at batch-1 decode**, and its outputs match
 Hugging Face transformers (WikiText-2 perplexity within 0.003 %).
 
 The same source tree builds with `hipcc` for AMD GPUs and with plain `nvcc` for NVIDIA GPUs. There
@@ -23,11 +23,10 @@ Hardware:
 - **AMD, compile-checked only.** It builds for MI200 (gfx90a), MI300 (gfx942) and RDNA3 (gfx1100)
   with ROCm 7 and rocWMMA, but **it has never run on AMD hardware**.
 
-> **How fresh are the numbers?** On 2026-10-15 I rewrote the Turing prefill GEMM
-> ([write-up](docs/turing-prefill-gemm.md)). Since then I have re-run only the 2080 Ti kernel tests
-> (915 checks, all passing) and Llama-3.2-3B prefill. Every other number here comes from the build
-> before that change. Re-running the rest (other models' benchmarks, the HF token gate,
-> perplexity, multi-GPU, the A6000 and the AMD compile) is next. The A6000 columns are older still:
+> **How fresh are the numbers?** Every RTX 2080 Ti number here (one GPU and two) was re-measured
+> on 2026-10-15 on the current code, after the Turing prefill GEMM rewrite
+> ([write-up](docs/turing-prefill-gemm.md)): kernel tests, HF token gate, perplexity, benchmarks and
+> the multi-GPU suite. The AMD build was re-checked the same day. The A6000 speed columns are older:
 > TinyLlama only, from an earlier build.
 
 ## Quick start
@@ -95,13 +94,15 @@ F16 GGUF (no quantization), best of flash-attention on/off. HF is `transformers`
 
 | model | decode ms/token | % of bandwidth floor | vs llama.cpp | vs HF | prefill 2,000 tok vs llama.cpp | peak batched tok/s |
 |---|---|---|---|---|---|---|
-| Qwen2.5-0.5B | **2.33** | 69 % | **1.48× faster** | 13.9× | **1.46× faster** | 11,800 (B=64) |
-| TinyLlama-1.1B | **4.13** | 82 % | **1.15× faster** | 6.7× | **1.04× faster** | 7,550 (B=64) |
-| Llama-3.2-1B | **4.70** | 86 % | **1.11× faster** | 4.3× | 1.08× slower | 7,470 (B=64) |
-| Qwen2.5-1.5B | **6.17** | 81 % | **1.17× faster** | 6.0× | **1.05× faster** | 4,500 (B=64) |
-| Llama-3.2-3B | **12.02** | 87 % | **1.06× faster** | (HF copy doesn't fit) | 1.04× slower ✱ | 906 (B=16) |
+| Qwen2.5-0.5B | **2.34** | 69 % | **1.47× faster** | 11.5× | **1.56× faster** | 11,900 (B=64) |
+| TinyLlama-1.1B | **4.14** | 81 % | **1.15× faster** | 7.6× | **1.14× faster** | 7,750 (B=64) |
+| Llama-3.2-1B | **4.75** | 85 % | **1.10× faster** | 3.8× | even (101.1 vs 100.9 ms) | 7,320 (B=64) |
+| Qwen2.5-1.5B | **6.21** | 81 % | **1.16× faster** | 6.5× | **1.11× faster** | 4,330 (B=64) |
+| Llama-3.2-3B | **12.11** | 87 % | **1.05× faster** | (HF copy doesn't fit) | 1.11× slower ✱ | 890 (B=16) |
 
-✱ Re-measured after the GEMM change: 273.6 ms against llama.cpp's 261.8 ms. It was 318.5 ms (1.22× slower).
+✱ 289.7 ms against llama.cpp's 261.8 ms inside the full benchmark suite, where the 2080 Ti's 250 W
+power cap holds it at 1.4–1.55 GHz. A short isolated run on a cool GPU gives 273.6 ms (1.04×
+slower). Before the 2026-10-15 GEMM change it was 318.5 ms (1.22× slower).
 
 **Decode is close to the hardware limit.** At batch 1, every token has to read all the weights
 once, so the fastest possible decode is the bytes read per token (weights plus KV cache) divided by
@@ -120,7 +121,7 @@ machine.
 
 | decode ms/token, ctx 128 → 1024 | RTX 2080 Ti | RTX A6000 (older build) |
 |---|---|---|
-| **hipinfer** | **4.13 → 4.21** | **3.41 → 3.47** |
+| **hipinfer** | **4.14 → 4.22** | **3.41 → 3.47** |
 | llama.cpp `a0e6dc7`, F16 GGUF, CUDA, flash-attn | 4.77 → 4.79 | 3.76 → 3.76 |
 | vLLM 0.31 (V1, CUDA graphs) | not run | 3.96 → 3.95 |
 | torch.compile, gpt-fast-style static KV, `reduce-overhead` | 5.24 → 6.84 | 4.23 → 5.47 |
@@ -128,27 +129,26 @@ machine.
 
 | prefill ms, 128 / 512 / 2000 tokens | RTX 2080 Ti | RTX A6000 (older build) |
 |---|---|---|
-| **hipinfer** | **9.3** / **28.6** / **111** | **6.4** / **17.7** / 67 |
+| **hipinfer** | **8.3** / **26.6** / **101** | **6.4** / **17.7** / 67 |
 | llama.cpp (best of flash-attn on/off, ubatch 512/2048) | 11.2 / 29.0 / 115 | 9.1 / 22.8 / 87 |
 | torch.compile (inductor + cuBLAS) | 16.2 / 34.8 / 125 | 8.9 / 19.5 / **60** |
 
 ### What I take from this
 
 - **At batch-1 decode, hipinfer was the fastest engine I measured on every model.** The lead over
-  llama.cpp is 6–17 % on the 1–3B models and 48 % on Qwen2.5-0.5B. It shrinks as models grow,
+  llama.cpp is 5–16 % on the 1–3B models and 47 % on Qwen2.5-0.5B. It shrinks as models grow,
   because everyone converges on the same bandwidth floor. I think the gain comes from fewer kernel
   launches (5 per layer, with norm, RoPE, cache write and SwiGLU fused in) and from the GEMV's
   bandwidth. I haven't profiled llama.cpp, so I can't say exactly where its extra time goes.
-- **Prefill is faster up to ~1.5B parameters, but not at 3B.** Prefill on a 3B model is bound by the
-  GEMMs, and mine run at 0.92–0.95× cuBLAS. That leaves Llama-3.2-3B 12 ms (1.04×) behind
-  llama.cpp, and Llama-3.2-1B is 1.08× behind on the older build. I stopped there, and the gap is
-  not closed.
+- **Prefill is faster up to ~1.5B parameters (level at Llama-3.2-1B), and slower at 3B.** Prefill on a 3B model
+  is bound by the GEMMs, and mine run at 0.92–0.95× cuBLAS. That leaves Llama-3.2-3B 1.04–1.11×
+  behind llama.cpp (isolated run vs full suite), with Llama-3.2-1B level with it. The gap is not
+  closed.
 - **Keep the scope in mind.** These are batch-1 latency numbers on small models. vLLM and llama.cpp
   are built for far more: many concurrent requests, quantization, hundreds of architectures. Batch 1
   is just where a small engine can be checked against a hard floor.
 
-The full tables are in [results/SUMMARY.md](results/SUMMARY.md) (from the build before the GEMM
-change). They cover decode latency vs context length, batched throughput with power draw and energy
+The full tables are in [results/SUMMARY.md](results/SUMMARY.md). They cover decode latency vs context length, batched throughput with power draw and energy
 per token, GEMM vs cuBLAS at every model's shapes, and llama.cpp comparisons for each model.
 
 ## Multi-GPU: tensor parallelism
@@ -170,12 +170,13 @@ GPUs goes through host memory.
 
 | model | decode ms/token, 1 GPU → 2 GPUs | prefill 2,000 tok, ms | batched B=64, tok/s |
 |---|---|---|---|
-| TinyLlama-1.1B | 4.14 → **2.67** (1.55×) | 117 → **88** (1.34×) | 7.4k → **8.5k** |
-| Llama-3.2-1B | 4.71 → **2.79** (1.69×) | 115 → **76** (1.52×) | 7.5k → **9.5k** |
-| Qwen2.5-1.5B | 6.18 → **3.85** (1.61×) | 159 → **110** (1.45×) | 4.5k → **5.4k** |
-| Llama-3.2-3B | 11.99 → **6.84** (1.75×) | 329 → **199** (1.65×) | B=16 max on 1 GPU → **3.2k** at B=64 |
-| Llama-3.1-8B | doesn't fit one card → **14.6** (83 % of the per-GPU floor) | **418** | **858** at B=16 |
-| Mistral-7B-v0.3 | doesn't fit one card → **14.0** (83 %) | **422** | **1,406** at B=32 |
+| Qwen2.5-0.5B | 2.33 → **1.76** (1.33×) | 44 → **42** (1.05×) | 12.0k → **13.2k** |
+| TinyLlama-1.1B | 4.15 → **2.71** (1.53×) | 105 → **84** (1.26×) | 7.5k → **8.5k** |
+| Llama-3.2-1B | 4.72 → **2.81** (1.68×) | 102 → **71** (1.45×) | 7.5k → **9.5k** |
+| Qwen2.5-1.5B | 6.19 → **3.87** (1.60×) | 142 → **102** (1.39×) | 4.5k → **5.7k** |
+| Llama-3.2-3B | 11.99 → **6.89** (1.74×) | 287 → **182** (1.57×) | B=16 max on 1 GPU → **3.3k** at B=64 |
+| Llama-3.1-8B | doesn't fit one card → **14.7** (83 % of the per-GPU floor) | **371** | **864** at B=16 |
+| Mistral-7B-v0.3 | doesn't fit one card → **14.0** (83 %) | **366** | **1,408** at B=32 |
 
 Three things make it work:
 
@@ -188,14 +189,14 @@ Three things make it work:
   - Each block is an independent channel with its own staging buffers and call counter. So the
     grid can be sized to the message (one block for a 4 KB decode row), and the whole thing can
     live inside a CUDA graph.
-  - It takes 8 µs vs NCCL's 12 µs at 4 KB, and 58 vs 85 µs at 256 KB. That's 5–9 % lower batch-1
-    decode latency than NCCL alone, and 10–15 % more batched throughput at B=64.
+  - It takes 8.5 µs vs NCCL's 12 µs at 4 KB, and 64 vs 85 µs at 256 KB. That's 2–15 % lower batch-1
+    decode latency than NCCL alone, and 9–27 % more batched throughput at B=64.
   - By default it handles messages up to 512 KB and NCCL takes the bigger ones. NCCL is optional
     at build time; without it, everything goes one-shot.
 - **Prefill all-reduces overlap compute.** The prompt is split into two halves of rows. One half's
   all-reduce runs on a second stream while the other half computes, and the second half's attention
   reads the KV cache the first half just wrote. Without this, PCIe makes 2-GPU prefill *slower*
-  than one GPU (TinyLlama: 124 ms vs 117); with it, prefill is 1.34–1.65× faster.
+  than one GPU (TinyLlama: 125 ms vs 105); with it, prefill is 1.26–1.57× faster on the 1–3B models.
 - **Per-GPU state is `thread_local`.** That covers autotuned GEMM choices, split-K workspaces and
   kernel attributes, so each worker thread drives its GPU through the unchanged single-GPU code path.
 
@@ -208,12 +209,12 @@ GPU, for every backend:
 - **Backends:** the all-reduce self-test is exact, and the one-shot and NCCL backends give
   bitwise-identical logits and tokens.
 - **The 7–8B models,** which only run sharded, are checked against HF transformers spread over the
-  same two GPUs, on WikiText-2 (8 windows × 1,024 tokens):
+  same two GPUs, on WikiText-2 (16 windows × 1,024 tokens):
 
 | model (sharded ×2) | PPL hipinfer | PPL HF | top-1 agreement | mean KL(HF, hipinfer) |
 |---|---|---|---|---|
-| Llama-3.1-8B | 8.1505 | 8.1511 | 99.89 % | 1.2e-5 |
-| Mistral-7B-v0.3 | 7.3269 | 7.3267 | 99.91 % | 6.7e-6 |
+| Llama-3.1-8B | 6.5467 | 6.5471 | 99.87 % | 1.2e-5 |
+| Mistral-7B-v0.3 | 5.7773 | 5.7775 | 99.88 % | 6.5e-6 |
 
 Testing TP also turned up a real single-GPU bug. The decode attention's split counters sat at an
 offset that depended on the batch size. So a decode step at a *smaller* batch, right after a larger
@@ -224,7 +225,8 @@ covers it.
 **Limits:**
 
 - **Small models gain least.** On the 7–8B models, sharded decode reaches 83 % of the per-GPU
-  bandwidth floor, the same as one GPU on the 1–3B models. On the 1–3B models sharded it's 63–77 %:
+  bandwidth floor, the same as one GPU on the 1–3B models. On the 1–3B models sharded it's 62–76 %
+  (46 % on Qwen2.5-0.5B):
   each GPU's matrices are half the size, but the launches, the replicated norms and the two
   all-reduces per layer aren't.
 - **Untested paths:** the P2P staging path is written but has never run, because neither of my
@@ -245,20 +247,21 @@ python scripts/bench_tp.py --weights llama31-8b.bin --tp 2 --no-single --out tp2
 ## Correctness
 
 Fast is only interesting if the answers are right, so every model is checked against HF transformers
-in three ways. These results are from the build before the GEMM change.
+in three ways, on the current build (2026-10-15).
 
 | model | greedy runs token-identical | PPL hipinfer | PPL HF | top-1 agreement | mean KL(HF, hipinfer) |
 |---|---|---|---|---|---|
 | TinyLlama-1.1B | 20/20 | 8.5149 | 8.5151 | 99.90 % | 6.6e-6 |
 | Qwen2.5-0.5B | 18/20 | 13.4851 | 13.4851 | 99.79 % | 1.6e-5 |
-| Llama-3.2-1B | 9/20 | 10.4633 | 10.4631 | 99.81 % | 1.3e-5 |
+| Llama-3.2-1B | 13/20 | 10.4633 | 10.4631 | 99.81 % | 1.3e-5 |
 | Qwen2.5-1.5B | 17/20 | 9.4536 | 9.4535 | 99.86 % | 1.6e-5 |
+| Llama-3.2-3B | 20/20 | 8.2767 | 8.2768 | 99.82 % | 9.5e-6 |
 
 - **Greedy token gate** ([tests/gate.py](tests/gate.py)): 7 prompts × 128 tokens, single-sequence
   with and without CUDA graphs, plus a batch of 6 sequences at different lengths (20 runs in all).
   Every divergence happens at a step where HF's own top two logits are exactly tied (gap 0) or one
   fp16 step apart (0.0156). At such a step either token is a correct greedy choice. Llama-3.2-1B
-  hits three of those near-ties in the first 128 tokens of its prompts, which is why it shows 9/20.
+  hits several of those near-ties in the first 128 tokens of its prompts, which is why it shows 13/20.
 - **Perplexity** ([tests/ppl.py](tests/ppl.py)): WikiText-2 test, 16 windows of 1,024 tokens, both
   engines on the same tokens. This checks the whole distribution at every position, not just the
   top token.
@@ -267,9 +270,10 @@ in three ways. These results are from the build before the GEMM change.
   split-K variants, ragged batches, chunked-prefill offsets and 4,000-token contexts. RMSNorm and
   RoPE are bit-exact against HF's fp16 order of operations.
 
-Llama-3.2-3B, Mistral-7B and Llama-3.1-8B don't fit next to an HF reference copy on an 11 GB card.
-In development runs, Llama-3.2-3B passed the gate 20/20, and Llama-3.1-8B passed it on the A6000.
-Their recorded results will come with the A6000 run.
+Llama-3.2-3B doesn't fit next to an HF reference copy on an 11 GB card, so its gate and perplexity
+run HF first and the engine second (`--hf-first`). Llama-3.1-8B and Mistral-7B-v0.3 only fit
+sharded; their perplexity is in the multi-GPU section above. On a 48 GB A6000 they also pass the
+token gate with HF alongside ([results/a6000/](results/a6000/)).
 
 ## How it works
 
@@ -319,9 +323,8 @@ each product explicitly.
 
 - **Prefill GEMM on Turing: 0.92–0.95× cuBLAS** at 2,048 rows on Llama-3.2-3B's shapes. That's up
   from 0.79–0.81× before the 2026-10-15 change and 0.70× in the WMMA-only build. This decides
-  prefill on 3B-and-up models, and it's why Llama-3.2-3B is still 1.04× behind llama.cpp. Most of
-  what's left is each GEMM's last wave: one 256×128 block per SM on 68 SMs. The other models'
-  ratios in SUMMARY.md are from before the change.
+  prefill on 3B-and-up models, and it's why Llama-3.2-3B is still 1.04–1.11× behind llama.cpp. Most
+  of what's left is each GEMM's last wave: one 256×128 block per SM on 68 SMs.
 - **Prefill GEMM on Ampere: 0.71–0.85× cuBLAS** on the A6000 at the same shapes (measured
   2026-10-15). The Ampere `cp.async` path wasn't part of the Turing work.
 - **Batched decode at 32–64 sequences:** the projections are ~1.15–1.2× slower than cuBLAS at these

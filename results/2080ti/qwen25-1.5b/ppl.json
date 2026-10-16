@@ -1,6 +1,7 @@
 {
  "model": "Qwen/Qwen2.5-1.5B",
  "gpu": "NVIDIA GeForce RTX 2080 Ti",
+ "tp": 1,
  "seq": 1024,
  "windows": 16,
  "tokens": 16352,

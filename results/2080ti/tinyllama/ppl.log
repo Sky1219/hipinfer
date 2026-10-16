@@ -1,9 +1,9 @@
 [transformers] Token indices sequence length is longer than the specified maximum sequence length for this model (341468 > 2048). Running this sequence through the model will result in indexing errors
 TinyLlama/TinyLlama-1.1B-Chat-v1.0: 341468 test tokens, 16 windows of 1024
-Loading weights:   0%|          | 0/201 [00:00<?, ?it/s]Loading weights:  27%|██▋       | 55/201 [00:00<00:00, 546.27it/s]Loading weights:  60%|██████    | 121/201 [00:00<00:00, 596.53it/s]Loading weights:  93%|█████████▎| 186/201 [00:00<00:00, 612.45it/s]Loading weights: 100%|██████████| 201/201 [00:00<00:00, 618.30it/s]
+Loading weights:   0%|          | 0/201 [00:00<?, ?it/s]Loading weights:  51%|█████     | 103/201 [00:00<00:00, 1006.25it/s]Loading weights: 100%|██████████| 201/201 [00:00<00:00, 1012.77it/s]
 window   0: ppl HF 5.0282  hipinfer 5.0283  top-1 agree 99.804%  mean KL 5.65e-06  max |dlogit| 0.098
 window   1: ppl HF 7.2870  hipinfer 7.2868  top-1 agree 99.853%  mean KL 6.06e-06  max |dlogit| 0.098
-window   2: ppl HF 8.1303  hipinfer 8.1302  top-1 agree 99.837%  mean KL 6.10e-06  max |dlogit| 0.098
+window   2: ppl HF 8.1303  hipinfer 8.1301  top-1 agree 99.837%  mean KL 6.10e-06  max |dlogit| 0.098
 window   3: ppl HF 8.7579  hipinfer 8.7577  top-1 agree 99.829%  mean KL 6.02e-06  max |dlogit| 0.098
 window   4: ppl HF 9.5212  hipinfer 9.5212  top-1 agree 99.844%  mean KL 6.03e-06  max |dlogit| 0.098
 window   5: ppl HF 10.2285  hipinfer 10.2282  top-1 agree 99.837%  mean KL 6.02e-06  max |dlogit| 0.098
@@ -20,12 +20,13 @@ window  15: ppl HF 8.5151  hipinfer 8.5149  top-1 agree 99.902%  mean KL 6.55e-0
 {
  "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
  "gpu": "NVIDIA GeForce RTX 2080 Ti",
+ "tp": 1,
  "seq": 1024,
  "windows": 16,
  "tokens": 16368,
- "ppl_hf": 8.515104753034855,
- "ppl_hipinfer": 8.514877409994321,
+ "ppl_hf": 8.515104633963936,
+ "ppl_hipinfer": 8.514877368320615,
  "top1_agreement": 0.9990224828934506,
- "mean_kl_hf_to_hipinfer": 6.5539881381281775e-06,
+ "mean_kl_hf_to_hipinfer": 6.553986669423146e-06,
  "max_logit_diff": 0.193359375
 }

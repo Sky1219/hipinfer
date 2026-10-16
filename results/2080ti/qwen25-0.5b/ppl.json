@@ -1,12 +1,13 @@
 {
  "model": "Qwen/Qwen2.5-0.5B",
  "gpu": "NVIDIA GeForce RTX 2080 Ti",
+ "tp": 1,
  "seq": 1024,
  "windows": 16,
  "tokens": 16352,
- "ppl_hf": 13.485075652311172,
- "ppl_hipinfer": 13.485113100956154,
+ "ppl_hf": 13.48507550760055,
+ "ppl_hipinfer": 13.485112704573785,
  "top1_agreement": 0.9979207436399217,
- "mean_kl_hf_to_hipinfer": 1.5530987905152508e-05,
+ "mean_kl_hf_to_hipinfer": 1.553099205572324e-05,
  "max_logit_diff": 0.12890625
 }

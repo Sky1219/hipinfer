@@ -1,0 +1,52 @@
+qwen25-1.5b.bin: tp=2 on ['NVIDIA GeForce RTX 2080 Ti', 'NVIDIA GeForce RTX 2080 Ti']  p2p=False nccl=True
+[oneshot] all-reduce self-test sizes [8, 1536, 12288, 786432, 3145736]: max err 0.0
+[oneshot] prefill logits vs 1 GPU: max |diff| 1.1523, top-1 agreement 98.91% of 640 positions
+[oneshot]   single prompt 0 (len 7): identical
+[oneshot]   single prompt 1 (len 33): identical
+[oneshot]   single prompt 2 (len 200): identical
+[oneshot]   single prompt 3 (len 400): identical
+[oneshot]   single prompt 4 (len 700): identical
+[oneshot]   batched B=8 slot 0: identical
+[oneshot]   batched B=8 slot 1: identical
+[oneshot]   batched B=8 slot 2: identical
+[oneshot]   batched B=8 slot 3: identical
+[oneshot]   batched B=8 slot 4: identical
+[oneshot]   batched B=8 slot 5: identical
+[oneshot]   batched B=8 slot 6: identical
+[oneshot]   batched B=8 slot 7: identical
+[oneshot] 13/13 runs token-identical to 1 GPU
+[nccl] all-reduce self-test sizes [8, 1536, 12288, 786432, 3145736]: max err 0.0
+[nccl] prefill logits vs 1 GPU: max |diff| 1.1523, top-1 agreement 98.91% of 640 positions
+[nccl]   single prompt 0 (len 7): identical
+[nccl]   single prompt 1 (len 33): identical
+[nccl]   single prompt 2 (len 200): identical
+[nccl]   single prompt 3 (len 400): identical
+[nccl]   single prompt 4 (len 700): identical
+[nccl]   batched B=8 slot 0: identical
+[nccl]   batched B=8 slot 1: identical
+[nccl]   batched B=8 slot 2: identical
+[nccl]   batched B=8 slot 3: identical
+[nccl]   batched B=8 slot 4: identical
+[nccl]   batched B=8 slot 5: identical
+[nccl]   batched B=8 slot 6: identical
+[nccl]   batched B=8 slot 7: identical
+[nccl] 13/13 runs token-identical to 1 GPU
+[auto] all-reduce self-test sizes [8, 1536, 12288, 786432, 3145736]: max err 0.0
+[auto] prefill logits vs 1 GPU: max |diff| 1.1523, top-1 agreement 98.91% of 640 positions
+[auto]   single prompt 0 (len 7): identical
+[auto]   single prompt 1 (len 33): identical
+[auto]   single prompt 2 (len 200): identical
+[auto]   single prompt 3 (len 400): identical
+[auto]   single prompt 4 (len 700): identical
+[auto]   batched B=8 slot 0: identical
+[auto]   batched B=8 slot 1: identical
+[auto]   batched B=8 slot 2: identical
+[auto]   batched B=8 slot 3: identical
+[auto]   batched B=8 slot 4: identical
+[auto]   batched B=8 slot 5: identical
+[auto]   batched B=8 slot 6: identical
+[auto]   batched B=8 slot 7: identical
+[auto] 13/13 runs token-identical to 1 GPU
+nccl vs oneshot: bitwise identical logits and tokens
+auto vs oneshot: bitwise identical logits and tokens
+TP TEST PASS

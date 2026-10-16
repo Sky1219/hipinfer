@@ -277,8 +277,9 @@ is the bytes read per token divided by the GPU's peak bandwidth, the fastest any
 <details><summary>Data table</summary>%%CTX_TBL%%</details></div>
 
 <h2>Prefill</h2>
-<p>Processing a 2,000-token prompt is compute-bound, so it measures the GEMMs and attention. These were measured before
-the 2026-10-15 Turing GEMM change; since then Llama-3.2-3B takes 273.6 ms (was 318.5) against llama.cpp's 261.8.</p>
+<p>Processing a 2,000-token prompt is compute-bound, so it measures the GEMMs and attention. Measured inside the full
+benchmark suite, where the 2080 Ti's power cap holds it at 1.4–1.55 GHz; a short isolated run of Llama-3.2-3B gives
+273.6 ms instead of 289.7.</p>
 <div class="card"><div class="ctitle">Prefill time for 2,000 tokens (lower is better)</div>
 <div class="csub">ms, %%GPU%%</div>
 <div class="legend"><span><i class="sw" style="background:var(--s1)"></i>hipinfer</span>
@@ -312,7 +313,6 @@ logits are tied or one fp16 step apart. <b>Perplexity</b>: WikiText-2, 1,024-tok
 and thermally throttled (93 °C, SM clock at 210 of 2,100 MHz).</li>
 <li><b>AMD.</b> The code compiles for MI200, MI300 and RDNA3, but it hasn't run on AMD hardware.</li>
 <li><b>Peer-to-peer multi-GPU.</b> The P2P all-reduce path is implemented but untested; only two GPUs have been tested.</li>
-<li><b>After the 2026-10-15 Turing GEMM change</b>, only Llama-3.2-3B prefill was re-measured. The other numbers here predate it.</li>
 </ul></div>
 
 <footer>Generated from <a href="%%REPO%%/tree/%%SHA%%/results">results/ at %%SHA%%</a> (%%DATE%%) by scripts/build_site.py.

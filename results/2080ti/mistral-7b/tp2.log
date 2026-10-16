@@ -1,0 +1,34 @@
+['NVIDIA GeForce RTX 2080 Ti', 'NVIDIA GeForce RTX 2080 Ti'] | mistral-7b.bin {'vocab': 32768, 'hidden': 4096, 'inter': 14336, 'layers': 32, 'heads': 32, 'kv_heads': 8, 'head_dim': 128, 'max_pos': 32768, 'eps': 9.999999747378752e-06, 'tied': False, 'qkv_bias': False, 'window': 0}
+tp info: {'world': 2, 'p2p': False, 'nccl': True, 'allreduce': 'auto', 'oneshot_max_bytes': 524288, 'prefill_overlap': True}
+
+== all-reduce latency (us), fp16, in place ==
+decode B=1             8 KB  oneshot     11.7  nccl     14.2
+decode B=8            64 KB  oneshot     23.7  nccl     38.0
+decode B=64          512 KB  oneshot    104.9  nccl    133.2
+prefill T=512       4096 KB  oneshot    762.1  nccl    805.1
+prefill T=2000     16000 KB  oneshot   2894.0  nccl   3037.9
+
+== tensor parallel x2 ==
+[TP x2 auto    ] decode B=1 ctx=  128:  13.992 ms/token    83% of the per-GPU BW floor
+[TP x2 auto    ] decode B=1 ctx= 1024:  14.183 ms/token    82% of the per-GPU BW floor
+[TP x2 auto    ] decode B=1 ctx= 4096:  14.717 ms/token    81% of the per-GPU BW floor
+[TP x2 auto    ] prefill T=  512 overlap:   101.01 ms (   5069 tok/s)
+[TP x2 auto    ] prefill T= 2000 overlap:   366.09 ms (   5463 tok/s)
+[TP x2 auto    ] prefill T=  512 no overlap:   129.53 ms (   3953 tok/s)
+[TP x2 auto    ] prefill T= 2000 no overlap:   493.44 ms (   4053 tok/s)
+[TP x2 nccl    ] decode B=1 ctx=  128:  14.235 ms/token    81% of the per-GPU BW floor
+[TP x2 nccl    ] decode B=1 ctx= 1024:  14.407 ms/token    81% of the per-GPU BW floor
+[TP x2 nccl    ] decode B=1 ctx= 4096:  14.974 ms/token    80% of the per-GPU BW floor
+[TP x2 nccl    ] prefill T=  512 overlap:   102.91 ms (   4975 tok/s)
+[TP x2 nccl    ] prefill T= 2000 overlap:   371.51 ms (   5383 tok/s)
+[TP x2 auto    ] batched B=  1:  14.070 ms/step       71 tok/s
+[TP x2 auto    ] batched B=  4:  15.686 ms/step      255 tok/s
+[TP x2 auto    ] batched B=  8:  16.272 ms/step      492 tok/s
+[TP x2 auto    ] batched B= 16:  17.742 ms/step      902 tok/s
+[TP x2 auto    ] batched B= 32:  22.727 ms/step     1408 tok/s
+[TP x2 nccl    ] batched B=  1:  14.316 ms/step       70 tok/s
+[TP x2 nccl    ] batched B=  4:  16.261 ms/step      246 tok/s
+[TP x2 nccl    ] batched B=  8:  17.259 ms/step      464 tok/s
+[TP x2 nccl    ] batched B= 16:  19.331 ms/step      828 tok/s
+[TP x2 nccl    ] batched B= 32:  25.257 ms/step     1267 tok/s
+wrote results/2080ti/mistral-7b/tp2.json

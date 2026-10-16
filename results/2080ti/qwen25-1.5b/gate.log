@@ -1,4 +1,9 @@
-Loading weights:   0%|          | 0/338 [00:00<?, ?it/s]Loading weights:  23%|██▎       | 77/338 [00:00<00:00, 739.84it/s]Loading weights:  47%|████▋     | 160/338 [00:00<00:00, 790.62it/s]Loading weights:  71%|███████   | 240/338 [00:00<00:00, 748.48it/s]Loading weights:  93%|█████████▎| 316/338 [00:00<00:00, 748.40it/s]Loading weights: 100%|██████████| 338/338 [00:00<00:00, 759.51it/s]
+Loading weights:   0%|          | 0/338 [00:00<?, ?it/s]Loading weights:  37%|███▋      | 124/338 [00:00<00:00, 1194.69it/s]Loading weights:  76%|███████▌  | 256/338 [00:00<00:00, 1253.85it/s]Loading weights: 100%|██████████| 338/338 [00:00<00:00, 1290.76it/s]
+hi_prefill: p0 1020 + T 5 exceeds max_seq 1024
+hi_prefill: slot 8 outside [0, max_batch 8)
+hi_prefill: token 151936 at 0 outside vocab 151936
+hi_decode: B 9 outside [1, max_batch 8]
+hi_decode: slot 0 at position 1023 + 2 steps exceeds max_seq 1024
 Qwen/Qwen2.5-1.5B: layers 28 hidden 1536 heads 12/2 head_dim 128 vocab 151936 tied=True qkv_bias=True
 prompt 0 (len 5): prefill logits max |diff| = 0.0234
   prompt 0 single graph=True: 128/128 tokens identical
@@ -6,10 +11,10 @@ prompt 0 (len 5): prefill logits max |diff| = 0.0234
 prompt 1 (len 13): prefill logits max |diff| = 0.0234
   prompt 1 single graph=True: 128/128 tokens identical
   prompt 1 single graph=False: 128/128 tokens identical
-prompt 2 (len 17): prefill logits max |diff| = 0.0254
+prompt 2 (len 17): prefill logits max |diff| = 0.0371
   prompt 2 single graph=True: 128/128 tokens identical
   prompt 2 single graph=False: 128/128 tokens identical
-prompt 3 (len 19): prefill logits max |diff| = 0.0312
+prompt 3 (len 19): prefill logits max |diff| = 0.0215
   prompt 3 single graph=True: diverges at step 48 (hf gap 0.0156) -> near-tie, OK
   prompt 3 single graph=False: diverges at step 48 (hf gap 0.0156) -> near-tie, OK
 prompt 4 (len 15): prefill logits max |diff| = 0.0234
@@ -18,7 +23,7 @@ prompt 4 (len 15): prefill logits max |diff| = 0.0234
 prompt 5 (len 14): prefill logits max |diff| = 0.0361
   prompt 5 single graph=True: 128/128 tokens identical
   prompt 5 single graph=False: 128/128 tokens identical
-prompt 6 (len 700): prefill logits max |diff| = 0.0244
+prompt 6 (len 700): prefill logits max |diff| = 0.0312
   prompt 6 single graph=True: 128/128 tokens identical
   prompt 6 single graph=False: 128/128 tokens identical
   batched B=6 slot 0: 128/128 tokens identical
@@ -27,6 +32,11 @@ prompt 6 (len 700): prefill logits max |diff| = 0.0244
   batched B=6 slot 3: diverges at step 48 (hf gap 0.0156) -> near-tie, OK
   batched B=6 slot 4: 128/128 tokens identical
   batched B=6 slot 5: 128/128 tokens identical
+  prefill past max_seq: rejected
+  prefill slot >= max_batch: rejected
+  token outside vocab: rejected
+  decode B > max_batch: rejected
+  decode past max_seq: rejected
 
-17/20 runs token-identical, max prefill-logit |diff| 0.0361
+17/20 runs token-identical, max prefill-logit |diff| 0.0371
 GATE PASS

@@ -13,26 +13,31 @@
    "runs": [
     {
      "run": "single prompt 0 (len 7)",
+     "kind": "single",
      "identical": true,
      "accepted": true
     },
     {
      "run": "single prompt 1 (len 33)",
+     "kind": "single",
      "identical": true,
      "accepted": true
     },
     {
      "run": "single prompt 2 (len 200)",
+     "kind": "single",
      "identical": true,
      "accepted": true
     },
     {
      "run": "single prompt 3 (len 400)",
+     "kind": "single",
      "identical": true,
      "accepted": true
     },
     {
      "run": "single prompt 4 (len 700)",
+     "kind": "single",
      "identical": false,
      "step": 0,
      "ref_gap": 0.0078125,
@@ -40,26 +45,31 @@
     },
     {
      "run": "batched B=8 slot 0",
+     "kind": "batched",
      "identical": true,
      "accepted": true
     },
     {
      "run": "batched B=8 slot 1",
+     "kind": "batched",
      "identical": true,
      "accepted": true
     },
     {
      "run": "batched B=8 slot 2",
+     "kind": "batched",
      "identical": true,
      "accepted": true
     },
     {
      "run": "batched B=8 slot 3",
+     "kind": "batched",
      "identical": true,
      "accepted": true
     },
     {
      "run": "batched B=8 slot 4",
+     "kind": "batched",
      "identical": false,
      "step": 0,
      "ref_gap": 0.0078125,
@@ -67,16 +77,19 @@
     },
     {
      "run": "batched B=8 slot 5",
+     "kind": "batched",
      "identical": true,
      "accepted": true
     },
     {
      "run": "batched B=8 slot 6",
+     "kind": "batched",
      "identical": true,
      "accepted": true
     },
     {
      "run": "batched B=8 slot 7",
+     "kind": "batched",
      "identical": true,
      "accepted": true
     }
@@ -90,26 +103,31 @@
    "runs": [
     {
      "run": "single prompt 0 (len 7)",
+     "kind": "single",
      "identical": true,
      "accepted": true
     },
     {
      "run": "single prompt 1 (len 33)",
+     "kind": "single",
      "identical": true,
      "accepted": true
     },
     {
      "run": "single prompt 2 (len 200)",
+     "kind": "single",
      "identical": true,
      "accepted": true
     },
     {
      "run": "single prompt 3 (len 400)",
+     "kind": "single",
      "identical": true,
      "accepted": true
     },
     {
      "run": "single prompt 4 (len 700)",
+     "kind": "single",
      "identical": false,
      "step": 0,
      "ref_gap": 0.0078125,
@@ -117,26 +135,31 @@
     },
     {
      "run": "batched B=8 slot 0",
+     "kind": "batched",
      "identical": true,
      "accepted": true
     },
     {
      "run": "batched B=8 slot 1",
+     "kind": "batched",
      "identical": true,
      "accepted": true
     },
     {
      "run": "batched B=8 slot 2",
+     "kind": "batched",
      "identical": true,
      "accepted": true
     },
     {
      "run": "batched B=8 slot 3",
+     "kind": "batched",
      "identical": true,
      "accepted": true
     },
     {
      "run": "batched B=8 slot 4",
+     "kind": "batched",
      "identical": false,
      "step": 0,
      "ref_gap": 0.0078125,
@@ -144,16 +167,19 @@
     },
     {
      "run": "batched B=8 slot 5",
+     "kind": "batched",
      "identical": true,
      "accepted": true
     },
     {
      "run": "batched B=8 slot 6",
+     "kind": "batched",
      "identical": true,
      "accepted": true
     },
     {
      "run": "batched B=8 slot 7",
+     "kind": "batched",
      "identical": true,
      "accepted": true
     }
@@ -168,26 +194,31 @@
    "runs": [
     {
      "run": "single prompt 0 (len 7)",
+     "kind": "single",
      "identical": true,
      "accepted": true
     },
     {
      "run": "single prompt 1 (len 33)",
+     "kind": "single",
      "identical": true,
      "accepted": true
     },
     {
      "run": "single prompt 2 (len 200)",
+     "kind": "single",
      "identical": true,
      "accepted": true
     },
     {
      "run": "single prompt 3 (len 400)",
+     "kind": "single",
      "identical": true,
      "accepted": true
     },
     {
      "run": "single prompt 4 (len 700)",
+     "kind": "single",
      "identical": false,
      "step": 0,
      "ref_gap": 0.0078125,
@@ -195,26 +226,31 @@
     },
     {
      "run": "batched B=8 slot 0",
+     "kind": "batched",
      "identical": true,
      "accepted": true
     },
     {
      "run": "batched B=8 slot 1",
+     "kind": "batched",
      "identical": true,
      "accepted": true
     },
     {
      "run": "batched B=8 slot 2",
+     "kind": "batched",
      "identical": true,
      "accepted": true
     },
     {
      "run": "batched B=8 slot 3",
+     "kind": "batched",
      "identical": true,
      "accepted": true
     },
     {
      "run": "batched B=8 slot 4",
+     "kind": "batched",
      "identical": false,
      "step": 0,
      "ref_gap": 0.0078125,
@@ -222,16 +258,19 @@
     },
     {
      "run": "batched B=8 slot 5",
+     "kind": "batched",
      "identical": true,
      "accepted": true
     },
     {
      "run": "batched B=8 slot 6",
+     "kind": "batched",
      "identical": true,
      "accepted": true
     },
     {
      "run": "batched B=8 slot 7",
+     "kind": "batched",
      "identical": true,
      "accepted": true
     }

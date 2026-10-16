@@ -1,0 +1,49 @@
+['NVIDIA GeForce RTX 2080 Ti', 'NVIDIA GeForce RTX 2080 Ti'] | qwen25-0.5b.bin {'vocab': 151936, 'hidden': 896, 'inter': 4864, 'layers': 24, 'heads': 14, 'kv_heads': 2, 'head_dim': 64, 'max_pos': 32768, 'eps': 9.999999974752427e-07, 'tied': True, 'qkv_bias': True, 'window': 0}
+tp info: {'world': 2, 'p2p': False, 'nccl': True, 'allreduce': 'auto', 'oneshot_max_bytes': 524288, 'prefill_overlap': True}
+
+== all-reduce latency (us), fp16, in place ==
+decode B=1             2 KB  oneshot      7.9  nccl     13.5
+decode B=8            14 KB  oneshot     13.3  nccl     20.3
+decode B=64          112 KB  oneshot     33.2  nccl     54.0
+prefill T=512        896 KB  oneshot    185.2  nccl    209.5
+prefill T=2000      3500 KB  oneshot    678.5  nccl    718.1
+
+== 1 GPU ==
+[1 GPU         ] decode B=1 ctx=  128:   2.331 ms/token    69% of the per-GPU BW floor
+[1 GPU         ] decode B=1 ctx= 1024:   2.415 ms/token    67% of the per-GPU BW floor
+[1 GPU         ] decode B=1 ctx= 4096:   2.634 ms/token    64% of the per-GPU BW floor
+[1 GPU         ] prefill T=  512:    12.24 ms (  41830 tok/s)
+[1 GPU         ] prefill T= 2000:    43.77 ms (  45689 tok/s)
+[1 GPU         ] batched B=  1:   2.373 ms/step      421 tok/s
+[1 GPU         ] batched B=  4:   2.756 ms/step     1451 tok/s
+[1 GPU         ] batched B=  8:   3.300 ms/step     2424 tok/s
+[1 GPU         ] batched B= 16:   3.486 ms/step     4589 tok/s
+[1 GPU         ] batched B= 32:   4.387 ms/step     7294 tok/s
+[1 GPU         ] batched B= 64:   5.336 ms/step    11994 tok/s
+
+== tensor parallel x2 ==
+[TP x2 auto    ] decode B=1 ctx=  128:   1.756 ms/token    46% of the per-GPU BW floor
+[TP x2 auto    ] decode B=1 ctx= 1024:   1.795 ms/token    45% of the per-GPU BW floor
+[TP x2 auto    ] decode B=1 ctx= 4096:   1.982 ms/token    43% of the per-GPU BW floor
+[TP x2 auto    ] prefill T=  512 overlap:    16.31 ms (  31396 tok/s)
+[TP x2 auto    ] prefill T= 2000 overlap:    41.56 ms (  48122 tok/s)
+[TP x2 auto    ] prefill T=  512 no overlap:    16.36 ms (  31293 tok/s)
+[TP x2 auto    ] prefill T= 2000 no overlap:    57.49 ms (  34788 tok/s)
+[TP x2 nccl    ] decode B=1 ctx=  128:   2.065 ms/token    39% of the per-GPU BW floor
+[TP x2 nccl    ] decode B=1 ctx= 1024:   2.115 ms/token    38% of the per-GPU BW floor
+[TP x2 nccl    ] decode B=1 ctx= 4096:   2.327 ms/token    36% of the per-GPU BW floor
+[TP x2 nccl    ] prefill T=  512 overlap:    14.27 ms (  35878 tok/s)
+[TP x2 nccl    ] prefill T= 2000 overlap:    41.11 ms (  48646 tok/s)
+[TP x2 auto    ] batched B=  1:   1.771 ms/step      565 tok/s
+[TP x2 auto    ] batched B=  4:   2.198 ms/step     1819 tok/s
+[TP x2 auto    ] batched B=  8:   2.937 ms/step     2724 tok/s
+[TP x2 auto    ] batched B= 16:   3.255 ms/step     4915 tok/s
+[TP x2 auto    ] batched B= 32:   3.871 ms/step     8266 tok/s
+[TP x2 auto    ] batched B= 64:   4.833 ms/step    13242 tok/s
+[TP x2 nccl    ] batched B=  1:   2.097 ms/step      477 tok/s
+[TP x2 nccl    ] batched B=  4:   2.591 ms/step     1544 tok/s
+[TP x2 nccl    ] batched B=  8:   3.562 ms/step     2246 tok/s
+[TP x2 nccl    ] batched B= 16:   3.877 ms/step     4127 tok/s
+[TP x2 nccl    ] batched B= 32:   4.856 ms/step     6590 tok/s
+[TP x2 nccl    ] batched B= 64:   6.141 ms/step    10422 tok/s
+wrote results/2080ti/qwen25-0.5b/tp2.json

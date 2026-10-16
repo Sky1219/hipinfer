@@ -1,5 +1,5 @@
 {
- "weights": "mistral-7b-v03.bin",
+ "weights": "mistral-7b.bin",
  "tp": 2,
  "gpus": [
   "NVIDIA GeForce RTX 2080 Ti",

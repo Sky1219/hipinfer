@@ -3,7 +3,7 @@
  "gpu": "NVIDIA GeForce RTX 2080 Ti",
  "new_tokens": 128,
  "pass": true,
- "identical": 9,
+ "identical": 13,
  "runs": 20,
  "max_prefill_logit_diff": 0.023681640625,
  "prompt_lens": [
@@ -18,17 +18,11 @@
  "log": [
   {
    "run": "prompt 0 single graph=True",
-   "identical": false,
-   "step": 79,
-   "hf_gap": 0.0,
-   "accepted": true
+   "identical": true
   },
   {
    "run": "prompt 0 single graph=False",
-   "identical": false,
-   "step": 79,
-   "hf_gap": 0.0,
-   "accepted": true
+   "identical": true
   },
   {
    "run": "prompt 1 single graph=True",
@@ -40,29 +34,23 @@
   },
   {
    "run": "prompt 2 single graph=True",
-   "identical": false,
-   "step": 27,
-   "hf_gap": 0.0,
-   "accepted": true
+   "identical": true
   },
   {
    "run": "prompt 2 single graph=False",
-   "identical": false,
-   "step": 27,
-   "hf_gap": 0.0,
-   "accepted": true
+   "identical": true
   },
   {
    "run": "prompt 3 single graph=True",
    "identical": false,
-   "step": 115,
+   "step": 74,
    "hf_gap": 0.015625,
    "accepted": true
   },
   {
    "run": "prompt 3 single graph=False",
    "identical": false,
-   "step": 115,
+   "step": 74,
    "hf_gap": 0.015625,
    "accepted": true
   },
@@ -99,7 +87,7 @@
   {
    "run": "batched B=6 slot 0",
    "identical": false,
-   "step": 79,
+   "step": 49,
    "hf_gap": 0.0,
    "accepted": true
   },
