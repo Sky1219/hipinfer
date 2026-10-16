@@ -44,5 +44,5 @@ benchmarks run). Nothing outside `docs/` is touched.
 
 - [x] Survey repo and results; verify numbers (this file)
 - [x] docs/porting-a-model.md
-- [ ] docs/profiling.md
+- [x] docs/profiling.md
 - [ ] docs/claims.md
