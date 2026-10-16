@@ -1,0 +1,158 @@
+{
+ "pass": true,
+ "fails": [],
+ "models": {
+  "tiny-mixtral": {
+   "model": "hf-internal-testing/tiny-random-MixtralForCausalLM",
+   "fp32": {
+    "max_rel_logit_diff": 3.2294479145759353e-07,
+    "top1_agree": 1.0,
+    "routing_mismatch": 0,
+    "routing_checked": 130
+   },
+   "fp16": {
+    "runs": [
+     {
+      "prompt": 0,
+      "identical": true,
+      "step": null,
+      "hf_gap": null
+     },
+     {
+      "prompt": 1,
+      "identical": true,
+      "step": null,
+      "hf_gap": null
+     },
+     {
+      "prompt": 2,
+      "identical": true,
+      "step": null,
+      "hf_gap": null
+     },
+     {
+      "prompt": 3,
+      "identical": true,
+      "step": null,
+      "hf_gap": null
+     }
+    ],
+    "max_rel_prefill_logit_diff": 0.0007358351729212656
+   }
+  },
+  "tiny-olmoe": {
+   "model": "synthetic tiny-olmoe",
+   "fp32": {
+    "max_rel_logit_diff": 4.4349401781153853e-07,
+    "top1_agree": 1.0,
+    "routing_mismatch": 0,
+    "routing_checked": 122
+   },
+   "fp16": {
+    "runs": [
+     {
+      "prompt": 0,
+      "identical": true,
+      "step": null,
+      "hf_gap": null
+     },
+     {
+      "prompt": 1,
+      "identical": true,
+      "step": null,
+      "hf_gap": null
+     },
+     {
+      "prompt": 2,
+      "identical": true,
+      "step": null,
+      "hf_gap": null
+     },
+     {
+      "prompt": 3,
+      "identical": true,
+      "step": null,
+      "hf_gap": null
+     }
+    ],
+    "max_rel_prefill_logit_diff": 0.0008298755186721991
+   }
+  },
+  "tiny-granitemoe": {
+   "model": "synthetic tiny-granitemoe",
+   "fp32": {
+    "max_rel_logit_diff": 0.0001530117245890577,
+    "top1_agree": 1.0,
+    "routing_mismatch": 0,
+    "routing_checked": 122
+   },
+   "fp16": {
+    "runs": [
+     {
+      "prompt": 0,
+      "identical": true,
+      "step": null,
+      "hf_gap": null
+     },
+     {
+      "prompt": 1,
+      "identical": true,
+      "step": null,
+      "hf_gap": null
+     },
+     {
+      "prompt": 2,
+      "identical": true,
+      "step": null,
+      "hf_gap": null
+     },
+     {
+      "prompt": 3,
+      "identical": true,
+      "step": null,
+      "hf_gap": null
+     }
+    ],
+    "max_rel_prefill_logit_diff": 0.0009182736455463728
+   }
+  },
+  "granite-moe-1b": {
+   "model": "ibm-granite/granite-3.1-1b-a400m-base",
+   "fp32": {
+    "max_rel_logit_diff": 0.0004337872977495957,
+    "top1_agree": 1.0,
+    "routing_mismatch": 0,
+    "routing_checked": 1440
+   },
+   "fp16": {
+    "runs": [
+     {
+      "prompt": 0,
+      "identical": true,
+      "step": null,
+      "hf_gap": null
+     },
+     {
+      "prompt": 1,
+      "identical": true,
+      "step": null,
+      "hf_gap": null
+     },
+     {
+      "prompt": 2,
+      "identical": true,
+      "step": null,
+      "hf_gap": null
+     },
+     {
+      "prompt": 3,
+      "identical": true,
+      "step": null,
+      "hf_gap": null
+     }
+    ],
+    "max_rel_prefill_logit_diff": 0.0065632458233890216
+   }
+  }
+ }
+}
