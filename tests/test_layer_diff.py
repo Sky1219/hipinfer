@@ -228,6 +228,51 @@ def test_engine_layout():
     check("pack -> split round trip", list(back) == list(a) and err == 0)
 
 
+def test_engine_path_with_fake_engine():
+    """layer_diff's engine path (config check, flat dump split, compare) against a stand-in for
+    scripts/hipinfer.py whose prefill_debug returns an HF fp16 capture packed in the C layout,
+    optionally with one plane corrupted, as a dump bug would."""
+    import types
+    m = tiny("qwen")
+    dims = ld.model_dims(m.config)
+    ref = ld.capture_hf(m, IDS)
+    fp16 = ld.capture_hf(clone(m, torch.float16), IDS)
+    floor = ld.noise_floor(ref, fp16, dims)
+    sdpa = ld.capture_hf(clone(m, torch.float16, attn="sdpa"), IDS)  # stands in for the engine's own fp16 numerics
+    corrupt = {}
+
+    class FakeEngine:
+        def __init__(self, path, max_batch, max_seq, max_prefill):
+            assert max_prefill >= len(IDS) and max_seq > len(IDS)
+            self.__dict__.update(dims)
+
+        def prefill_debug(self, slot, tokens):
+            flat = ld.pack_engine_dump(sdpa, dims, len(tokens))
+            for name, (lo, hi) in corrupt.items():
+                off, w = next((o, w) for n, o, w in ld.engine_layout(dims, len(tokens)) if n == name)
+                flat[off + lo * w:off + hi * w] = 0
+            return flat
+
+        def close(self):
+            pass
+    saved = sys.modules.get("hipinfer")
+    sys.modules["hipinfer"] = types.SimpleNamespace(Engine=FakeEngine)
+    try:
+        cand = ld.engine_run("fake.bin", IDS.tolist(), dims)
+        first = ld.first_divergence(ld.compare(ref, cand, dims, floor=floor))
+        check("engine path: clean fp16 dump, no divergence", first is None, first and first["point"])
+        corrupt["layers.1.rope"] = (5, 6)  # one row never written
+        cand = ld.engine_run("fake.bin", IDS.tolist(), dims)
+        first = ld.first_divergence(ld.compare(ref, cand, dims, floor=floor))
+        check("engine path: an unwritten row of layers.1.rope is named", first is not None and
+              first["point"] == "layers.1.rope" and first["at"]["t"] == 5, first and (first["point"], first["at"]))
+    finally:
+        if saved is None:
+            sys.modules.pop("hipinfer", None)
+        else:
+            sys.modules["hipinfer"] = saved
+
+
 def test_real_model():
     """Opt in with LAYER_DIFF_REAL_MODEL=<HF id> (e.g. TinyLlama/TinyLlama-1.1B-Chat-v1.0; a few
     minutes on a CPU): real checkpoints have a BOS row with activations ~100x the rest, which the

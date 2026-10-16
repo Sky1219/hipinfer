@@ -371,7 +371,7 @@ def format_report(rows, ref, cand, dims, title=""):
     if "heads" in loc:
         lines.append("  worst heads: " + ", ".join(f"{h} {_fmt(e)}" for h, e in loc["heads"])
                      + f" ({loc['heads_over_half_worst']} of {loc['n_heads']} heads within 2x of the worst)")
-    if p.endswith(".rope") and loc["position0_rel"] < 0.1 * first["thr"]:
+    if p.endswith(".rope") and len(loc["positions"]) > 1 and loc["position0_rel"] < 0.05 * loc["positions"][0][1]:
         lines.append("  position 0 matches (cos 1, sin 0 there): the RoPE angles / sign / frequencies, not the inputs")
     lines.append(f"  {n_after} later point(s) also over threshold (errors propagate downstream)")
     return "\n".join(lines)
