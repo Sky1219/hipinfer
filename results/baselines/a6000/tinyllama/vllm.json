@@ -1,0 +1,44 @@
+{
+ "engine": "vLLM",
+ "gpu": "NVIDIA RTX A6000",
+ "decode_b1": [
+  {
+   "ctx": 128,
+   "ms": 3.9759134606356383,
+   "all_ms": [
+    4.017876527086628,
+    3.9759134606356383,
+    3.987050441082829
+   ],
+   "method": "(generate 257 tok - generate 1 tok) / 256"
+  },
+  {
+   "ctx": 1024,
+   "ms": 3.978166183514986,
+   "all_ms": [
+    3.983331222570996,
+    3.9937388200996793,
+    3.978166183514986
+   ],
+   "method": "(generate 257 tok - generate 1 tok) / 256"
+  }
+ ],
+ "prefill": [
+  {
+   "T": 128,
+   "ms": 14.708784059621394,
+   "note": "end-to-end generate() with 1 output token"
+  },
+  {
+   "T": 512,
+   "ms": 22.659488022327423,
+   "note": "end-to-end generate() with 1 output token"
+  },
+  {
+   "T": 2000,
+   "ms": 64.53768303617835,
+   "note": "end-to-end generate() with 1 output token"
+  }
+ ],
+ "vllm": "0.31.0"
+}

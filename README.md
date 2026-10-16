@@ -40,9 +40,12 @@ All affected runtimes are listed below.
   | Qwen2.5-1.5B | 31 % | 1,410 / 1,590 MHz | 91 °C |
   | Llama-3.2-3B | 67 % | 420 / 1,410 MHz | 93 °C |
   | Mistral-7B-v0.3 | 78 % | 210 / 450 MHz | 93 °C |
+  | Llama-3.1-8B | 84 % | 210 / 368 MHz | 93 °C |
 
   TinyLlama-1.1B and Qwen2.5-0.5B ran without throttling. The token gate and perplexity results don't
-  depend on clock speed and are valid for every model.
+  depend on clock speed and are valid for every model. The engine comparisons (llama.cpp, vLLM) are
+  only fair when every engine ran unthrottled, which on the A6000 holds only for TinyLlama; the other
+  models' comparison runs are listed in THERMAL.md and not used anywhere.
 - **RTX 2080 Ti.** These didn't overheat, but under sustained load their 250 W power cap held the
   clock at 1.4–1.55 GHz. That affects Llama-3.2-3B prefill in the full suite: 289.7 ms against
   273.6 ms in a short isolated run (marked ✱ in the results table).
@@ -131,20 +134,22 @@ synchronization overhead start to show.
 
 ### Against other engines on TinyLlama
 
-Same GPU, fp16 weights, batch 1. The other engines were measured separately on the same machines.
+Same GPU, fp16 weights, batch 1. On the A6000, hipinfer, llama.cpp and vLLM ran back to back in one
+session, all unthrottled; torch.compile and HF transformers, and the 2080 Ti's engines, were measured
+separately on the same machines.
 
 | decode ms/token, ctx 128 → 1024 | RTX 2080 Ti | RTX A6000 |
 |---|---|---|
-| **hipinfer** | **4.14 → 4.22** | **3.43 → 3.50** |
-| llama.cpp `a0e6dc7`, F16 GGUF, CUDA, flash-attn | 4.77 → 4.79 | 3.76 → 3.76 |
-| vLLM 0.31 (V1, CUDA graphs) | not run | 3.96 → 3.95 |
+| **hipinfer** | **4.14 → 4.22** | **3.42 → 3.49** |
+| llama.cpp `a0e6dc7`, F16 GGUF, CUDA, flash-attn | 4.77 → 4.79 | 3.78 → 3.79 |
+| vLLM 0.31 (V1, CUDA graphs) | not run | 3.98 → 3.98 |
 | torch.compile, gpt-fast-style static KV, `reduce-overhead` | 5.24 → 6.84 | 4.23 → 5.47 |
 | HF transformers `StaticCache` + `torch.compile` | 5.51 → 7.09 | 4.34 → 5.56 |
 
 | prefill ms, 128 / 512 / 2000 tokens | RTX 2080 Ti | RTX A6000 |
 |---|---|---|
-| **hipinfer** | **8.3** / **26.6** / **101** | **6.3** / **16.7** / **59.6** |
-| llama.cpp (best of flash-attn on/off, ubatch 512/2048) | 11.2 / 29.0 / 115 | 9.1 / 22.8 / 87 |
+| **hipinfer** | **8.3** / **26.6** / **101** | **6.3** / **16.7** / **57.9** |
+| llama.cpp (best of flash-attn on/off, ubatch 512/2048) | 11.2 / 29.0 / 115 | 9.8 / 24.5 / 89.7 |
 | torch.compile (inductor + cuBLAS) | 16.2 / 34.8 / 125 | 8.9 / 19.5 / 60 |
 
 ### What I take from this

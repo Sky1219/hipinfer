@@ -8,6 +8,7 @@
 | Qwen2.5-1.5B | 3.09 | 28 | 1536 | 12/2 | 128 | 151936 | tied embeddings, QKV bias, GQA group 6 |
 | Llama-3.2-3B | 6.43 | 28 | 3072 | 24/8 | 128 | 128256 | tied embeddings, GQA group 3 |
 | Mistral-7B-v0.3 | 14.23 | 32 | 4096 | 32/8 | 128 | 32768 | GQA group 4 |
+| Llama-3.1-8B | 15.01 | 32 | 4096 | 32/8 | 128 | 128256 | GQA group 4 |
 
 ## Correctness vs HF transformers (fp16)
 
@@ -27,7 +28,7 @@ Greedy gate: 7 prompts x 128 tokens, single-sequence with and without CUDA graph
 | Llama-3.2-3B | RTX A6000 | PASS | 20/20 | 8.2770 | 8.2765 | 99.88% | 9.8e-06 | 1.320 |
 | Mistral-7B-v0.3 | RTX A6000 | PASS | 20/20 | 5.7774 | 5.7774 | 99.91% | 4.6e-06 | 1.939 |
 | Mistral-7B-v0.1 (window ignored) | RTX A6000 | PASS | 20/20 | 5.6893 | 5.6893 | 99.84% | 4.6e-06 | 0.506 |
-| Llama-3.1-8B | RTX A6000 | PASS | 14/20 | 6.5469 | 6.5469 | 99.87% | 1.1e-05 | 2.405 |
+| Llama-3.1-8B | RTX A6000 | PASS | 14/20 | 6.5467 | 6.5469 | 99.89% | 1.1e-05 | 3.141 |
 
 ## Decode, batch 1 (ms/token, greedy, 256 new tokens after a 128-token prompt)
 
@@ -44,6 +45,7 @@ Floor = (weight bytes + KV bytes read) / peak DRAM bandwidth. HF = transformers 
 | Qwen2.5-1.5B | **6.21** (81% BW; HF 40.6, 6.5x) | **5.14** (78% BW; HF 34.9, 6.8x) ⚠ |
 | Llama-3.2-3B | **12.11** (87% BW; HF copy does not fit) | **9.97** (84% BW; HF 33.2, 3.3x) ⚠ |
 | Mistral-7B-v0.3 | - | **21.36** (87% BW; HF 37.1, 1.7x) ⚠ |
+| Llama-3.1-8B | - | **24.87** (79% BW; HF 37.0, 1.5x) ⚠ |
 
 ## Decode throughput, batched (tok/s; ctx 512 + 128 new tokens; largest batch that fits)
 
@@ -55,6 +57,7 @@ Floor = (weight bytes + KV bytes read) / peak DRAM bandwidth. HF = transformers 
 | Qwen2.5-1.5B | B=8: 866; B=64: **4332** (14.8 ms/step, 51 mJ/tok at 219 W) | B=8: 1350; B=64: **7439** (8.6 ms/step, 38 mJ/tok at 284 W) ⚠ |
 | Llama-3.2-3B | B=8: 479; B=16: **888** (18.0 ms/step, 249 mJ/tok at 221 W) | B=8: 674; B=64: **1920** (33.3 ms/step, 93 mJ/tok at 179 W) ⚠ |
 | Mistral-7B-v0.3 | - | B=8: 181; B=64: **1082** (59.2 ms/step, 168 mJ/tok at 182 W) ⚠ |
+| Llama-3.1-8B | - | B=8: 189; B=64: **908** (70.5 ms/step, 198 mJ/tok at 180 W) ⚠ |
 
 ## Prefill (prompt tokens/s; ms in parentheses; HF = transformers eager, SDPA attention)
 
@@ -89,6 +92,11 @@ Floor = (weight bytes + KV bytes read) / peak DRAM bandwidth. HF = transformers 
 | Mistral-7B-v0.3 | 1024 | - | 5168 (198.1 ms; HF 171.1 ms, 0.86x) ⚠ |
 | Mistral-7B-v0.3 | 2000 | - | 5158 (387.8 ms; HF 331.7 ms, 0.86x) ⚠ |
 | Mistral-7B-v0.3 | 4096 | - | 5073 (807.4 ms; HF 673.3 ms, 0.83x) ⚠ |
+| Llama-3.1-8B | 128 | - | 3635 (35.2 ms; HF 39.3 ms, 1.12x) ⚠ |
+| Llama-3.1-8B | 512 | - | 4899 (104.5 ms; HF 91.6 ms, 0.88x) ⚠ |
+| Llama-3.1-8B | 1024 | - | 4983 (205.5 ms; HF 174.7 ms, 0.85x) ⚠ |
+| Llama-3.1-8B | 2000 | - | 5041 (396.8 ms; HF 339.9 ms, 0.86x) ⚠ |
+| Llama-3.1-8B | 4096 | - | 2494 (1642.2 ms; HF 718.9 ms, 0.44x) ⚠ |
 
 ## Decode latency vs context length (batch 1, ms/token; % of the bandwidth floor incl. KV reads)
 
@@ -127,6 +135,12 @@ Floor = (weight bytes + KV bytes read) / peak DRAM bandwidth. HF = transformers 
 | Mistral-7B-v0.3 | 2048 | - | 22.85 (83%) ⚠ |
 | Mistral-7B-v0.3 | 4096 | - | 22.42 (86%) ⚠ |
 | Mistral-7B-v0.3 | 8192 | - | 23.66 (84%) ⚠ |
+| Llama-3.1-8B | 128 | - | 43.77 (45%) ⚠ |
+| Llama-3.1-8B | 512 | - | 43.83 (45%) ⚠ |
+| Llama-3.1-8B | 1024 | - | 36.45 (54%) ⚠ |
+| Llama-3.1-8B | 2048 | - | 33.46 (59%) ⚠ |
+| Llama-3.1-8B | 4096 | - | 33.90 (60%) ⚠ |
+| Llama-3.1-8B | 8192 | - | 29.48 (71%) ⚠ |
 
 ## Kernels vs PyTorch (speedup = torch time / hipinfer time; graph-replayed; TinyLlama shapes)
 
@@ -180,6 +194,11 @@ Floor = (weight bytes + KV bytes read) / peak DRAM bandwidth. HF = transformers 
 | Mistral-7B-v0.3 | gate_up | - | 87 / 116 (0.75) ⚠ |
 | Mistral-7B-v0.3 | down | - | 75 / 103 (0.73) ⚠ |
 | Mistral-7B-v0.3 | lm_head | - | 86 / 116 (0.75) ⚠ |
+| Llama-3.1-8B | qkv | - | 80 / 107 (0.75) ⚠ |
+| Llama-3.1-8B | o | - | 77 / 102 (0.76) ⚠ |
+| Llama-3.1-8B | gate_up | - | 87 / 116 (0.75) ⚠ |
+| Llama-3.1-8B | down | - | 75 / 103 (0.73) ⚠ |
+| Llama-3.1-8B | lm_head | - | 87 / 115 (0.76) ⚠ |
 
 ## hipinfer vs other engines (fp16 weights, batch 1, same GPU)
 
@@ -190,28 +209,28 @@ Decode: 256 greedy tokens after a ctx-token prompt, ms/token (% BW = weight+KV b
 
 | | RTX 2080 Ti | RTX A6000 |
 |---|---|---|
-| decode ms/token, decode 128: **hipinfer** | 4.14 ms, 81% BW | 3.43 ms, 79% BW |
-| decode ms/token, decode 128: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 4.77 ms, 71% BW (hipinfer 1.15x faster) | 3.76 ms, 72% BW (hipinfer 1.10x faster) |
-| decode ms/token, decode 128: torch.compile, gpt-fast style (reduce-overhead + static KV) | 5.24 ms, 64% BW (hipinfer 1.27x faster) | 4.23 ms, 64% BW (hipinfer 1.23x faster) |
+| decode ms/token, decode 128: **hipinfer** | 4.14 ms, 81% BW | 3.42 ms, 79% BW |
+| decode ms/token, decode 128: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 4.77 ms, 71% BW (hipinfer 1.15x faster) | 3.78 ms, 72% BW (hipinfer 1.10x faster) |
+| decode ms/token, decode 128: torch.compile, gpt-fast style (reduce-overhead + static KV) | 5.24 ms, 64% BW (hipinfer 1.27x faster) | 4.23 ms, 64% BW (hipinfer 1.24x faster) |
 | decode ms/token, decode 128: HF transformers, StaticCache + torch.compile | 5.51 ms, 61% BW (hipinfer 1.33x faster) | 4.34 ms, 62% BW (hipinfer 1.27x faster) |
-| decode ms/token, decode 128: vLLM (V1 engine, CUDA graphs) | - | 3.96 ms, 68% BW (hipinfer 1.15x faster) |
-| decode ms/token, decode 1024: **hipinfer** | 4.22 ms, 81% BW | 3.50 ms, 78% BW |
-| decode ms/token, decode 1024: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 4.79 ms, 71% BW (hipinfer 1.14x faster) | 3.76 ms, 72% BW (hipinfer 1.08x faster) |
+| decode ms/token, decode 128: vLLM (V1 engine, CUDA graphs) | - | 3.98 ms, 68% BW (hipinfer 1.16x faster) |
+| decode ms/token, decode 1024: **hipinfer** | 4.22 ms, 81% BW | 3.49 ms, 78% BW |
+| decode ms/token, decode 1024: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 4.79 ms, 71% BW (hipinfer 1.14x faster) | 3.79 ms, 72% BW (hipinfer 1.09x faster) |
 | decode ms/token, decode 1024: torch.compile, gpt-fast style (reduce-overhead + static KV) | 6.84 ms, 50% BW (hipinfer 1.62x faster) | 5.47 ms, 50% BW (hipinfer 1.57x faster) |
 | decode ms/token, decode 1024: HF transformers, StaticCache + torch.compile | 7.09 ms, 48% BW (hipinfer 1.68x faster) | 5.56 ms, 49% BW (hipinfer 1.59x faster) |
-| decode ms/token, decode 1024: vLLM (V1 engine, CUDA graphs) | - | 3.95 ms, 69% BW (hipinfer 1.13x faster) |
+| decode ms/token, decode 1024: vLLM (V1 engine, CUDA graphs) | - | 3.98 ms, 69% BW (hipinfer 1.14x faster) |
 
 | | RTX 2080 Ti | RTX A6000 |
 |---|---|---|
 | prefill ms, prefill 128: **hipinfer** | 8.3 ms | 6.3 ms |
-| prefill ms, prefill 128: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 11.2 ms (hipinfer 1.34x faster) | 9.1 ms (hipinfer 1.44x faster) |
-| prefill ms, prefill 128: torch.compile, gpt-fast style (reduce-overhead + static KV) | 16.2 ms (hipinfer 1.94x faster) | 8.9 ms (hipinfer 1.41x faster) |
+| prefill ms, prefill 128: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 11.2 ms (hipinfer 1.34x faster) | 9.8 ms (hipinfer 1.56x faster) |
+| prefill ms, prefill 128: torch.compile, gpt-fast style (reduce-overhead + static KV) | 16.2 ms (hipinfer 1.94x faster) | 8.9 ms (hipinfer 1.42x faster) |
 | prefill ms, prefill 512: **hipinfer** | 26.6 ms | 16.7 ms |
-| prefill ms, prefill 512: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 29.0 ms (hipinfer 1.09x faster) | 22.8 ms (hipinfer 1.37x faster) |
-| prefill ms, prefill 512: torch.compile, gpt-fast style (reduce-overhead + static KV) | 34.8 ms (hipinfer 1.31x faster) | 19.5 ms (hipinfer 1.17x faster) |
-| prefill ms, prefill 2000: **hipinfer** | 100.5 ms | 59.6 ms |
-| prefill ms, prefill 2000: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 114.8 ms (hipinfer 1.14x faster) | 87.3 ms (hipinfer 1.46x faster) |
-| prefill ms, prefill 2000: torch.compile, gpt-fast style (reduce-overhead + static KV) | 125.4 ms (hipinfer 1.25x faster) | 59.6 ms (hipinfer 1.00x faster) |
+| prefill ms, prefill 512: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 29.0 ms (hipinfer 1.09x faster) | 24.5 ms (hipinfer 1.46x faster) |
+| prefill ms, prefill 512: torch.compile, gpt-fast style (reduce-overhead + static KV) | 34.8 ms (hipinfer 1.31x faster) | 19.5 ms (hipinfer 1.16x faster) |
+| prefill ms, prefill 2000: **hipinfer** | 100.5 ms | 57.9 ms |
+| prefill ms, prefill 2000: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 114.8 ms (hipinfer 1.14x faster) | 89.7 ms (hipinfer 1.55x faster) |
+| prefill ms, prefill 2000: torch.compile, gpt-fast style (reduce-overhead + static KV) | 125.4 ms (hipinfer 1.25x faster) | 59.6 ms (hipinfer 1.03x faster) |
 
 
 ### Qwen2.5-0.5B

@@ -52,5 +52,161 @@
   "sm_median_mhz": 450,
   "peak_c": 93,
   "verdict": "THROTTLED"
+ },
+ "llama31-8b": {
+  "window": "00:43:22-00:51:49",
+  "loaded_samples": 86,
+  "throttled_pct": 84,
+  "sm_min_mhz": 210,
+  "sm_median_mhz": 368,
+  "peak_c": 93,
+  "verdict": "THROTTLED"
+ },
+ "baselines": {
+  "tinyllama": {
+   "hipinfer": {
+    "window": "00:56:22-00:57:11",
+    "loaded_samples": 5,
+    "throttled_pct": 0,
+    "sm_min_mhz": 1530,
+    "sm_median_mhz": 1905,
+    "peak_c": 75,
+    "verdict": "clean"
+   },
+   "llamacpp": {
+    "window": "00:57:11-00:58:09",
+    "loaded_samples": 1,
+    "throttled_pct": 0,
+    "sm_min_mhz": 1845,
+    "sm_median_mhz": 1845,
+    "peak_c": 75,
+    "verdict": "clean"
+   },
+   "vllm": {
+    "window": "00:58:09-00:58:59",
+    "loaded_samples": 1,
+    "throttled_pct": 0,
+    "sm_min_mhz": 1875,
+    "sm_median_mhz": 1875,
+    "peak_c": 80,
+    "verdict": "clean"
+   }
+  },
+  "llama32-1b": {
+   "hipinfer": {
+    "window": "01:01:43-01:02:48",
+    "loaded_samples": 7,
+    "throttled_pct": 0,
+    "sm_min_mhz": 1515,
+    "sm_median_mhz": 1860,
+    "peak_c": 82,
+    "verdict": "clean"
+   },
+   "llamacpp": {
+    "window": "01:02:48-01:03:46",
+    "loaded_samples": 4,
+    "throttled_pct": 50,
+    "sm_min_mhz": 1710,
+    "sm_median_mhz": 1792,
+    "peak_c": 86,
+    "verdict": "THROTTLED"
+   },
+   "vllm": {
+    "window": "01:03:46-01:04:41",
+    "loaded_samples": 1,
+    "throttled_pct": 100,
+    "sm_min_mhz": 1800,
+    "sm_median_mhz": 1800,
+    "peak_c": 85,
+    "verdict": "THROTTLED"
+   }
+  },
+  "qwen25-1.5b": {
+   "hipinfer": {
+    "window": "01:07:44-01:09:06",
+    "loaded_samples": 11,
+    "throttled_pct": 0,
+    "sm_min_mhz": 1500,
+    "sm_median_mhz": 1860,
+    "peak_c": 86,
+    "verdict": "clean"
+   },
+   "llamacpp": {
+    "window": "01:09:06-01:10:14",
+    "loaded_samples": 5,
+    "throttled_pct": 80,
+    "sm_min_mhz": 1560,
+    "sm_median_mhz": 1590,
+    "peak_c": 91,
+    "verdict": "THROTTLED"
+   },
+   "vllm": {
+    "window": "01:10:14-01:11:07",
+    "loaded_samples": 2,
+    "throttled_pct": 100,
+    "sm_min_mhz": 1575,
+    "sm_median_mhz": 1620,
+    "peak_c": 89,
+    "verdict": "THROTTLED"
+   }
+  },
+  "llama32-3b": {
+   "hipinfer": {
+    "window": "01:14:19-01:16:57",
+    "loaded_samples": 23,
+    "throttled_pct": 65,
+    "sm_min_mhz": 390,
+    "sm_median_mhz": 1515,
+    "peak_c": 93,
+    "verdict": "THROTTLED"
+   },
+   "llamacpp": {
+    "window": "01:16:57-01:20:00",
+    "loaded_samples": 22,
+    "throttled_pct": 100,
+    "sm_min_mhz": 210,
+    "sm_median_mhz": 210,
+    "peak_c": 95,
+    "verdict": "THROTTLED"
+   },
+   "vllm": {
+    "window": "01:20:00-01:21:14",
+    "loaded_samples": 5,
+    "throttled_pct": 80,
+    "sm_min_mhz": 360,
+    "sm_median_mhz": 1275,
+    "peak_c": 93,
+    "verdict": "THROTTLED"
+   }
+  },
+  "llama31-8b": {
+   "hipinfer": {
+    "window": "01:25:08-01:32:04",
+    "loaded_samples": 69,
+    "throttled_pct": 84,
+    "sm_min_mhz": 210,
+    "sm_median_mhz": 360,
+    "peak_c": 93,
+    "verdict": "THROTTLED"
+   },
+   "llamacpp": {
+    "window": "01:32:04-01:37:14",
+    "loaded_samples": 42,
+    "throttled_pct": 100,
+    "sm_min_mhz": 210,
+    "sm_median_mhz": 210,
+    "peak_c": 94,
+    "verdict": "THROTTLED"
+   },
+   "vllm": {
+    "window": "01:37:14-01:39:02",
+    "loaded_samples": 10,
+    "throttled_pct": 100,
+    "sm_min_mhz": 330,
+    "sm_median_mhz": 450,
+    "peak_c": 93,
+    "verdict": "THROTTLED"
+   }
+  }
  }
 }
