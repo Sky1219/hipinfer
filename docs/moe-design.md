@@ -1,7 +1,7 @@
 # Mixture-of-Experts in hipinfer: design
 
 Status (2026-10-16): export and a CPU reference engine are written and checked against HF on CPU.
-The GPU kernels and engine integration are drafted but **not yet compiled**. See
+The GPU kernels and engine integration compile (nvcc 12.0, sm_75 to sm_89) but have **never run**. See
 [overnight-moe-log.md](overnight-moe-log.md) for what is verified and the commands for the GPU server.
 
 ## Target models
@@ -85,7 +85,7 @@ at `offset + e * bytes_per_expert`, and an expert-parallel rank reads its expert
 
 ## Kernels
 
-All new kernels are in `src/kernels.cuh`, marked `UNVERIFIED (not compiled yet)`.
+All new kernels are in `src/kernels.cuh`, marked `UNVERIFIED` (compiled, never run).
 
 1. **Router + top-k** (`moe_router_kernel`): one block per token. Reads the normalised hidden row
    (fp16), computes the E router logits with one warp per expert (fp32 accumulate, rounded to fp16
