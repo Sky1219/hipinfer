@@ -23,19 +23,12 @@ Hardware:
 - **AMD, compile-checked only.** It builds for MI200 (gfx90a), MI300 (gfx942) and RDNA3 (gfx1100)
   with ROCm 7 and rocWMMA, but **it has never run on AMD hardware**.
 
-> **How fresh are the numbers?** Every RTX 2080 Ti number here (one GPU and two) was re-measured
-> on 2026-10-15 on the current code, after the Turing prefill GEMM rewrite
-> ([write-up](docs/turing-prefill-gemm.md)): kernel tests, HF token gate, perplexity, benchmarks and
-> the multi-GPU suite. The AMD build was re-checked the same day. The A6000 was re-run the same day
-> for six models (kernel tests, token gate, perplexity, benchmarks; in [results/SUMMARY.md](results/SUMMARY.md));
-> the A6000 columns in this README are older, TinyLlama only, from an earlier build.
-
 ### Thermal throttling
 
 Due to resource constraints and degrading GPUs, runs were at times throttled due to overheating.
 All affected runtimes are listed below.
 
-- **RTX A6000, 2026-10-15 run.** This card holds its 300 W limit for about a minute, then reaches
+- **RTX A6000.** This card holds its 300 W limit for about a minute, then reaches
   90–93 °C with the fan at 90–100 % and throttles its SM clock (normally 1,800–1,920 MHz) to as low as
   210 MHz. Every benchmark started on an idle card below 60 °C, and each one's time window was checked
   against the GPU's temperature log ([results/a6000/THERMAL.md](results/a6000/THERMAL.md)). Affected
@@ -127,7 +120,7 @@ F16 GGUF (no quantization), best of flash-attention on/off. HF is `transformers`
 
 ✱ 289.7 ms against llama.cpp's 261.8 ms inside the full benchmark suite, where the 2080 Ti's 250 W
 power cap holds it at 1.4–1.55 GHz. A short isolated run on a cool GPU gives 273.6 ms (1.04×
-slower). Before the 2026-10-15 GEMM change it was 318.5 ms (1.22× slower).
+slower).
 
 **Decode is close to the hardware limit.** At batch 1, every token has to read all the weights
 once, so the fastest possible decode is the bytes read per token (weights plus KV cache) divided by
@@ -136,27 +129,23 @@ holds it out to 8k-token contexts (86 % at 8,192 tokens on Llama-3.2-3B). llama.
 on the same models. Qwen2.5-0.5B is lower, at 69 %: its matrices are small enough that launch and
 synchronization overhead start to show.
 
-(An earlier version of this README counted the whole embedding table in the floor, even though
-decode never reads it. By that definition TinyLlama was "87 %" at the same 4.1 ms.)
-
 ### Against other engines on TinyLlama
 
-Same GPU, fp16 weights, batch 1. The other engines were measured in an earlier session on the same
-machine.
+Same GPU, fp16 weights, batch 1. The other engines were measured separately on the same machines.
 
-| decode ms/token, ctx 128 → 1024 | RTX 2080 Ti | RTX A6000 (older build) |
+| decode ms/token, ctx 128 → 1024 | RTX 2080 Ti | RTX A6000 |
 |---|---|---|
-| **hipinfer** | **4.14 → 4.22** | **3.41 → 3.47** |
+| **hipinfer** | **4.14 → 4.22** | **3.43 → 3.50** |
 | llama.cpp `a0e6dc7`, F16 GGUF, CUDA, flash-attn | 4.77 → 4.79 | 3.76 → 3.76 |
 | vLLM 0.31 (V1, CUDA graphs) | not run | 3.96 → 3.95 |
 | torch.compile, gpt-fast-style static KV, `reduce-overhead` | 5.24 → 6.84 | 4.23 → 5.47 |
 | HF transformers `StaticCache` + `torch.compile` | 5.51 → 7.09 | 4.34 → 5.56 |
 
-| prefill ms, 128 / 512 / 2000 tokens | RTX 2080 Ti | RTX A6000 (older build) |
+| prefill ms, 128 / 512 / 2000 tokens | RTX 2080 Ti | RTX A6000 |
 |---|---|---|
-| **hipinfer** | **8.3** / **26.6** / **101** | **6.4** / **17.7** / 67 |
+| **hipinfer** | **8.3** / **26.6** / **101** | **6.3** / **16.7** / **59.6** |
 | llama.cpp (best of flash-attn on/off, ubatch 512/2048) | 11.2 / 29.0 / 115 | 9.1 / 22.8 / 87 |
-| torch.compile (inductor + cuBLAS) | 16.2 / 34.8 / 125 | 8.9 / 19.5 / **60** |
+| torch.compile (inductor + cuBLAS) | 16.2 / 34.8 / 125 | 8.9 / 19.5 / 60 |
 
 ### What I take from this
 
@@ -223,7 +212,7 @@ Three things make it work:
   reads the KV cache the first half just wrote. Without this, PCIe makes 2-GPU prefill *slower*
   than one GPU (TinyLlama: 125 ms vs 105); with it, prefill is 1.26–1.57× faster on the 1–3B models.
 - **Per-GPU state is `thread_local`.** That covers autotuned GEMM choices, split-K workspaces and
-  kernel attributes, so each worker thread drives its GPU through the unchanged single-GPU code path.
+  kernel attributes, so each worker thread drives its GPU through the same code path as a single GPU.
 
 **Is it correct?** [tests/test_tp.py](tests/test_tp.py) runs 2 GPUs against the same weights on one
 GPU, for every backend:
@@ -240,12 +229,6 @@ GPU, for every backend:
 |---|---|---|---|---|
 | Llama-3.1-8B | 6.5467 | 6.5471 | 99.87 % | 1.2e-5 |
 | Mistral-7B-v0.3 | 5.7773 | 5.7775 | 99.88 % | 6.5e-6 |
-
-Testing TP also turned up a real single-GPU bug. The decode attention's split counters sat at an
-offset that depended on the batch size. So a decode step at a *smaller* batch, right after a larger
-one, could read the larger step's partial sums as counters. TP halves the KV heads per GPU, which
-means more splits per launch, and that's what exposed it. It's fixed, and `test_decode_work_reuse`
-covers it.
 
 **Limits:**
 
@@ -272,7 +255,7 @@ python scripts/bench_tp.py --weights llama31-8b.bin --tp 2 --no-single --out tp2
 ## Correctness
 
 Fast is only interesting if the answers are right, so every model is checked against HF transformers
-in three ways, on the current build (2026-10-15).
+in three ways.
 
 | model | greedy runs token-identical | PPL hipinfer | PPL HF | top-1 agreement | mean KL(HF, hipinfer) |
 |---|---|---|---|---|---|
@@ -346,16 +329,15 @@ each product explicitly.
 
 ## Where it's not fast (yet)
 
-- **Prefill GEMM on Turing: 0.92–0.95× cuBLAS** at 2,048 rows on Llama-3.2-3B's shapes. That's up
-  from 0.79–0.81× before the 2026-10-15 change and 0.70× in the WMMA-only build. This decides
+- **Prefill GEMM on Turing: 0.92–0.95× cuBLAS** at 2,048 rows on Llama-3.2-3B's shapes. This decides
   prefill on 3B-and-up models, and it's why Llama-3.2-3B is still 1.04–1.11× behind llama.cpp. Most
   of what's left is each GEMM's last wave: one 256×128 block per SM on 68 SMs.
-- **Prefill GEMM on Ampere: 0.71–0.85× cuBLAS** on the A6000 at the same shapes (measured
-  2026-10-15). The Ampere `cp.async` path wasn't part of the Turing work.
+- **Prefill GEMM on Ampere: 0.71–0.85× cuBLAS** on the A6000 at the same shapes. The Ampere
+  `cp.async` path is less tuned than the Turing one.
 - **Batched decode at 32–64 sequences:** the projections are ~1.15–1.2× slower than cuBLAS at these
   shapes, and ~1.1× at 16 sequences.
-- **Attention on Ampere is at parity, not ahead** (older build: prefill 0.91–1.10× FlashAttention-2,
-  decode 0.92–1.15× SDPA). On the 2080 Ti, where PyTorch has no flash kernel, it's 8–53× faster than
+- **Attention on Ampere is at parity, not ahead:** on the A6000, prefill attention runs at
+  0.90–1.11× PyTorch SDPA (its FlashAttention backend) and decode attention at 0.87–1.09×. On the 2080 Ti, where PyTorch has no flash kernel, it's 8–53× faster than
   SDPA.
 - **AMD runs only the portable kernels** (WMMA GEMM and attention, scalar decode attention). MFMA
   versions of the register-resident kernels aren't written yet, and nothing has run on AMD hardware.

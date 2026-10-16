@@ -307,10 +307,13 @@ CUDA graphs plus a batch of 6, compared token for token with HF transformers; an
 logits are tied or one fp16 step apart. <b>Perplexity</b>: WikiText-2, 1,024-token windows, both engines on the same tokens.</p>
 <div class="card">%%COR_TBL%%</div>
 
-<h2>Not measured yet</h2>
+<h2>Limits of these measurements</h2>
 <div class="note"><ul>
-<li><b>RTX A6000 speed.</b> Its correctness results are above. Its speed run was discarded: the GPU was shared with another job
-and thermally throttled (93 °C, SM clock at 210 of 2,100 MHz).</li>
+<li><b>Thermal throttling.</b> Due to resource constraints and degrading GPUs, runs were at times throttled due to
+overheating. The RTX A6000 reaches 90–93 °C under sustained load and throttles its SM clock to as low as 210 MHz: its
+Llama-3.2-1B, Qwen2.5-1.5B, Llama-3.2-3B and Mistral-7B-v0.3 benchmarks ran partly throttled (listed in the
+<a href="%%REPO%%#thermal-throttling">README</a> and <a href="%%REPO%%/blob/main/results/a6000/THERMAL.md">THERMAL.md</a>),
+so the charts here use the RTX 2080 Ti. Correctness results are unaffected.</li>
 <li><b>AMD.</b> The code compiles for MI200, MI300 and RDNA3, but it hasn't run on AMD hardware.</li>
 <li><b>Peer-to-peer multi-GPU.</b> The P2P all-reduce path is implemented but untested; only two GPUs have been tested.</li>
 </ul></div>
