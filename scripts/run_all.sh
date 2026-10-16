@@ -103,7 +103,7 @@ for m in $SINGLE_MODELS; do
   W=$WEIGHTS_DIR/$m.bin
   MO=$OUT/$m
   mkdir -p "$MO"
-  ensure_weights $m
+  ensure_weights $m || { echo "== $m: weight export failed (gated or unreachable checkpoint?) -> skipped"; FAILED+=("$m export"); continue; }
   echo "== $m ($hf): HF token gate ${NOHF:+(HF first, then engine)}"
   $PY tests/gate.py --model "$hf" --weights "$W" ${NOHF:+--hf-first} --out "$MO/gate.json" > "$MO/gate.log" 2>&1 || FAILED+=("$m gate")
   grep -E "runs token-identical|GATE|Error" "$MO/gate.log" || tail -3 "$MO/gate.log"
@@ -139,7 +139,7 @@ if [ "$NGPU" -ge "$TP" ] && [ "$TP" -ge 2 ] && [ "${SKIP_TP:-0}" != 1 ]; then
     W=$WEIGHTS_DIR/$m.bin
     MO=$OUT/$m
     mkdir -p "$MO"
-    ensure_weights $m
+    ensure_weights $m || { echo "== $m: weight export failed -> skipped"; FAILED+=("$m export"); continue; }
     echo "== $m: tensor parallel x$TP vs 1 GPU ${REF:+(sharded only: no 1-GPU reference)}"
     $PY tests/test_tp.py --weights "$W" --tp $TP $REF --out "$MO/tp${TP}_test.json" > "$MO/tp${TP}_test.log" 2>&1       || FAILED+=("$m tp$TP test")
     grep -E "self-test|prefill logits|runs token-identical|bitwise|TP TEST|Error" "$MO/tp${TP}_test.log" || tail -3 "$MO/tp${TP}_test.log"

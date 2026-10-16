@@ -23,11 +23,16 @@ export TMPDIR=${TMPDIR:-$SCRATCH} TORCHINDUCTOR_CACHE_DIR=${TORCHINDUCTOR_CACHE_
 ONLY=${ONLY:-hipinfer llamacpp torch_compile hf_static vllm}   # subset to (re)run
 want() { [[ " $ONLY " == *" $1 "* ]]; }
 
-# llama.cpp: CUDA build (gcc-11 host compiler for CUDA 12.4) + F16 GGUF, no quantization
+# llama.cpp: CUDA build + F16 GGUF, no quantization. Host compiler gcc-11 when present (CUDA 12.4
+# rejects newer gcc), else the default; Ninja when installed. CUDA_ARCHS narrows the build to the
+# GPU at hand (e.g. "80" on an A100), which is several times faster than the default list.
 if want llamacpp && [ ! -x "$LLAMA_CPP/build/bin/llama-bench" ]; then
   [ -d "$LLAMA_CPP" ] || git clone --depth 1 https://github.com/ggml-org/llama.cpp.git "$LLAMA_CPP"
-  cmake -S "$LLAMA_CPP" -B "$LLAMA_CPP/build" -G Ninja -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES="75;80;86;89" \
-    -DCMAKE_C_COMPILER=${CC:-gcc-11} -DCMAKE_CXX_COMPILER=${CXX:-g++-11} -DCMAKE_CUDA_HOST_COMPILER=${CXX:-g++-11} \
+  HOST_CC=${CC:-$(command -v gcc-11 || command -v gcc)}
+  HOST_CXX=${CXX:-$(command -v g++-11 || command -v g++)}
+  GEN=(); command -v ninja >/dev/null && GEN=(-G Ninja)
+  cmake -S "$LLAMA_CPP" -B "$LLAMA_CPP/build" "${GEN[@]}" -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES="${CUDA_ARCHS:-75;80;86;89}" \
+    -DCMAKE_C_COMPILER="$HOST_CC" -DCMAKE_CXX_COMPILER="$HOST_CXX" -DCMAKE_CUDA_HOST_COMPILER="$HOST_CXX" \
     -DLLAMA_CURL=OFF -DCMAKE_BUILD_TYPE=Release
   cmake --build "$LLAMA_CPP/build" -j --target llama-bench
 fi
