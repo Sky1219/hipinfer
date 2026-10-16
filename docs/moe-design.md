@@ -7,11 +7,22 @@ Status: runs on one GPU, checked on an RTX 2080 Ti against HF transformers on Gr
 | check | result |
 |---|---|
 | `tests/test_kernels.py` `test_moe()`: router, top-k, GEMV and grouped expert paths vs PyTorch | all pass |
-| token gate (`tests/gate.py`): 7 prompts with and without CUDA graphs, plus batched B=6 | pass: 12/20 runs token-identical; the other 8 diverge where HF's own top-2 gap is at most 0.05 |
+| token gate (`tests/gate.py`): 7 prompts with and without CUDA graphs, plus batched B=6 | **passes in 3 of 5 runs.** Those three give 12/20 token-identical, with every divergence at an HF top-2 gap of at most 0.05. In the other two, one prompt diverges at a gap of 0.0625 or 0.1094 (a fail). Which happens depends on the GEMM configs the autotuner picks (see below) |
 | WikiText-2 perplexity (`tests/ppl.py`, 16 windows) | 7.7292 vs HF's 7.7294, top-1 agreement 99.4 % |
 | dense models unchanged (TinyLlama token gate) | 20/20 token-identical |
 | decode, B=1, ctx 128 | 2.26 ms/token, 30× HF; **63 % of the weight-read floor** (dense models: 81–87 %) |
 | prefill, 2,000 tokens | 70 ms, 3.9× HF |
+
+**The gate result depends on GEMM configs.** The autotuner times every tile config on first use,
+so two runs can pick different configs, which sum in different orders and round differently. The
+dense models pass the gate either way; Granite MoE does not. With the configs held fixed, its
+results are bit-identical between runs and builds, so this is rounding, not a race. Five runs
+on the 2080 Ti ([`gate_runs/`](../results/2080ti/granite-moe-1b/gate_runs/), plus `gate.log`):
+three autotuned runs pass (all three picked the same configs), one autotuned run and one with
+autotuning off (`HIPINFER_GEMM_AUTOTUNE=0`) fail on a single prompt. Perplexity is the same in
+every run. My guess, not yet checked, is that a small rounding change flips a near-tie in a
+router's top-8, and a different expert moves the logits more than rounding in a dense layer can.
+Logging the router's top-8 margins along the diverging prompt would confirm or rule it out.
 
 Not done yet: tensor or expert parallelism with MoE (rejected at load), OLMoE (needs the QK-norm
 kernel), Mixtral on a GPU (too big for the GPUs tested), and AMD.

@@ -275,16 +275,18 @@ in three ways.
 | Llama-3.2-1B | 13/20 | 10.4633 | 10.4631 | 99.81 % | 1.3e-5 |
 | Qwen2.5-1.5B | 17/20 | 9.4536 | 9.4535 | 99.86 % | 1.6e-5 |
 | Llama-3.2-3B | 20/20 | 8.2767 | 8.2768 | 99.82 % | 9.5e-6 |
-| Granite-3.1-1B-A400M (MoE) | 12/20 | 7.7292 | 7.7294 | 99.41 % | 2.6e-4 |
+| Granite-3.1-1B-A400M (MoE) | 12/20 ✝ | 7.7292 | 7.7294 | 99.41 % | 2.6e-4 |
 
 - **Greedy token gate** ([tests/gate.py](tests/gate.py)): 7 prompts × 128 tokens, single-sequence
   with and without CUDA graphs, plus a batch of 6 sequences at different lengths (20 runs in all).
   Every divergence happens at a step where HF's own top two logits are exactly tied (gap 0) or one
   fp16 step apart (0.0156); one A6000 Llama-3.2-1B run also diverges at a gap of 0.0313. At such a step either token is a correct greedy choice. Llama-3.2-1B
   hits several of those near-ties in the first 128 tokens of its prompts, which is why it shows 13/20.
-  The MoE model diverges at gaps of up to 0.0469 and its KL is more than 10× the dense models'.
-  My guess, not yet checked, is router near-ties: a different expert choice moves the logits more
-  than fp16 rounding in a dense layer does.
+  ✝ The MoE model is the exception: it passes in 3 of 5 runs. The result depends on which GEMM
+  configs the autotuner picks, and in the other two runs one prompt diverges at a gap of 0.06–0.11.
+  Its KL is also more than 10× the dense models'. My guess, not yet checked, is router near-ties: a
+  different expert choice moves the logits more than rounding in a dense layer does
+  ([details](docs/moe-design.md)).
 - **Perplexity** ([tests/ppl.py](tests/ppl.py)): WikiText-2 test, 16 windows of 1,024 tokens, both
   engines on the same tokens. This checks the whole distribution at every position, not just the
   top token. hipinfer's perplexity is within 0.003 % of HF's on the single-GPU 2080 Ti runs above,
