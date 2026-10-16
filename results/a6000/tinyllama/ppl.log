@@ -1,6 +1,6 @@
 [transformers] Token indices sequence length is longer than the specified maximum sequence length for this model (341468 > 2048). Running this sequence through the model will result in indexing errors
 TinyLlama/TinyLlama-1.1B-Chat-v1.0: 341468 test tokens, 16 windows of 1024
-Loading weights:   0%|          | 0/201 [00:00<?, ?it/s]Loading weights:  47%|████▋     | 95/201 [00:00<00:00, 934.71it/s]Loading weights:  96%|█████████▌| 193/201 [00:00<00:00, 934.57it/s]Loading weights: 100%|██████████| 201/201 [00:00<00:00, 965.76it/s]
+Loading weights:   0%|          | 0/201 [00:00<?, ?it/s]Loading weights:  42%|████▏     | 85/201 [00:00<00:00, 846.17it/s]Loading weights:  91%|█████████ | 183/201 [00:00<00:00, 899.44it/s]Loading weights: 100%|██████████| 201/201 [00:00<00:00, 905.30it/s]
 window   0: ppl HF 5.0281  hipinfer 5.0283  top-1 agree 99.902%  mean KL 5.40e-06  max |dlogit| 0.059
 window   1: ppl HF 7.2867  hipinfer 7.2868  top-1 agree 99.902%  mean KL 6.14e-06  max |dlogit| 0.102
 window   2: ppl HF 8.1305  hipinfer 8.1301  top-1 agree 99.902%  mean KL 6.11e-06  max |dlogit| 0.111
@@ -20,6 +20,7 @@ window  15: ppl HF 8.5150  hipinfer 8.5149  top-1 agree 99.878%  mean KL 6.56e-0
 {
  "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
  "gpu": "NVIDIA RTX A6000",
+ "tp": 1,
  "seq": 1024,
  "windows": 16,
  "tokens": 16368,

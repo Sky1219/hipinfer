@@ -7,6 +7,7 @@
 | Llama-3.2-1B | 2.47 | 16 | 2048 | 32/8 | 64 | 128256 | tied embeddings, GQA group 4 |
 | Qwen2.5-1.5B | 3.09 | 28 | 1536 | 12/2 | 128 | 151936 | tied embeddings, QKV bias, GQA group 6 |
 | Llama-3.2-3B | 6.43 | 28 | 3072 | 24/8 | 128 | 128256 | tied embeddings, GQA group 3 |
+| Mistral-7B-v0.3 | 14.23 | 32 | 4096 | 32/8 | 128 | 32768 | GQA group 4 |
 
 ## Correctness vs HF transformers (fp16)
 
@@ -19,11 +20,12 @@ Greedy gate: 7 prompts x 128 tokens, single-sequence with and without CUDA graph
 | Qwen2.5-0.5B | RTX 2080 Ti | PASS | 18/20 | 13.4851 | 13.4851 | 99.79% | 1.6e-05 | 0.129 |
 | Qwen2.5-0.5B | RTX A6000 | PASS | 19/20 | 13.4846 | 13.4849 | 99.74% | 1.5e-05 | 0.175 |
 | Llama-3.2-1B | RTX 2080 Ti | PASS | 13/20 | 10.4633 | 10.4631 | 99.81% | 1.3e-05 | 0.131 |
+| Llama-3.2-1B | RTX A6000 | PASS | 11/20 | 10.4631 | 10.4633 | 99.86% | 1.3e-05 | 0.129 |
 | Qwen2.5-1.5B | RTX 2080 Ti | PASS | 17/20 | 9.4536 | 9.4535 | 99.86% | 1.6e-05 | 0.188 |
-| Qwen2.5-1.5B | RTX A6000 | PASS | 17/20 | 9.4542 | 9.4539 | 99.85% | 1.6e-05 | 0.348 |
+| Qwen2.5-1.5B | RTX A6000 | PASS | 17/20 | 9.4534 | 9.4539 | 99.77% | 1.6e-05 | 0.285 |
 | Llama-3.2-3B | RTX 2080 Ti | PASS | 20/20 | 8.2767 | 8.2768 | 99.82% | 9.5e-06 | 0.367 |
-| Llama-3.2-3B | RTX A6000 | PASS | 20/20 | 8.2765 | 8.2765 | 99.87% | 9.8e-06 | 1.219 |
-| Mistral-7B-v0.3 | RTX A6000 | PASS | 20/20 | 5.7775 | 5.7774 | 99.88% | 4.4e-06 | 1.047 |
+| Llama-3.2-3B | RTX A6000 | PASS | 20/20 | 8.2770 | 8.2765 | 99.88% | 9.8e-06 | 1.320 |
+| Mistral-7B-v0.3 | RTX A6000 | PASS | 20/20 | 5.7774 | 5.7774 | 99.91% | 4.6e-06 | 1.939 |
 | Mistral-7B-v0.1 (window ignored) | RTX A6000 | PASS | 20/20 | 5.6893 | 5.6893 | 99.84% | 4.6e-06 | 0.506 |
 | Llama-3.1-8B | RTX A6000 | PASS | 14/20 | 6.5469 | 6.5469 | 99.87% | 1.1e-05 | 2.405 |
 
@@ -31,133 +33,153 @@ Greedy gate: 7 prompts x 128 tokens, single-sequence with and without CUDA graph
 
 Floor = (weight bytes + KV bytes read) / peak DRAM bandwidth. HF = transformers eager with a DynamicCache.
 
+⚠ = RTX A6000 benchmark ran partly thermally throttled; this and every speed table below flags it. Details: results/a6000/THERMAL.md.
+
 | model | RTX 2080 Ti | RTX A6000 |
 |---|---|---|
-| peak DRAM BW (GB/s) | 616 | - |
-| TinyLlama-1.1B | **4.14** (81% BW; HF 31.3, 7.6x) | - |
-| Qwen2.5-0.5B | **2.34** (69% BW; HF 27.0, 11.5x) | - |
-| Llama-3.2-1B | **4.75** (85% BW; HF 18.2, 3.8x) | - |
-| Qwen2.5-1.5B | **6.21** (81% BW; HF 40.6, 6.5x) | - |
-| Llama-3.2-3B | **12.11** (87% BW; HF copy does not fit) | - |
+| peak DRAM BW (GB/s) | 616 | 768 |
+| TinyLlama-1.1B | **4.14** (81% BW; HF 31.3, 7.6x) | **3.43** (79% BW; HF 19.3, 5.6x) |
+| Qwen2.5-0.5B | **2.34** (69% BW; HF 27.0, 11.5x) | **1.92** (67% BW; HF 21.2, 11.1x) |
+| Llama-3.2-1B | **4.75** (85% BW; HF 18.2, 3.8x) | **3.95** (82% BW; HF 14.6, 3.7x) ⚠ |
+| Qwen2.5-1.5B | **6.21** (81% BW; HF 40.6, 6.5x) | **5.14** (78% BW; HF 34.9, 6.8x) ⚠ |
+| Llama-3.2-3B | **12.11** (87% BW; HF copy does not fit) | **9.97** (84% BW; HF 33.2, 3.3x) ⚠ |
+| Mistral-7B-v0.3 | - | **21.36** (87% BW; HF 37.1, 1.7x) ⚠ |
 
 ## Decode throughput, batched (tok/s; ctx 512 + 128 new tokens; largest batch that fits)
 
 | model | RTX 2080 Ti | RTX A6000 |
 |---|---|---|
-| TinyLlama-1.1B | B=8: 1639; B=64: **7745** (8.3 ms/step, 32 mJ/tok at 248 W) | - |
-| Qwen2.5-0.5B | B=8: 2421; B=64: **11.9k** (5.4 ms/step, 20 mJ/tok at 244 W) | - |
-| Llama-3.2-1B | B=8: 1493; B=64: **7322** (8.7 ms/step, 31 mJ/tok at 228 W) | - |
-| Qwen2.5-1.5B | B=8: 866; B=64: **4332** (14.8 ms/step, 51 mJ/tok at 219 W) | - |
-| Llama-3.2-3B | B=8: 479; B=16: **888** (18.0 ms/step, 249 mJ/tok at 221 W) | - |
+| TinyLlama-1.1B | B=8: 1639; B=64: **7745** (8.3 ms/step, 32 mJ/tok at 248 W) | B=8: 1991; B=64: **9996** (6.4 ms/step, 30 mJ/tok at 299 W) |
+| Qwen2.5-0.5B | B=8: 2421; B=64: **11.9k** (5.4 ms/step, 20 mJ/tok at 244 W) | B=8: 3354; B=64: **18.0k** (3.5 ms/step, 16 mJ/tok at 289 W) |
+| Llama-3.2-1B | B=8: 1493; B=64: **7322** (8.7 ms/step, 31 mJ/tok at 228 W) | B=8: 1786; B=64: **9422** (6.8 ms/step, 30 mJ/tok at 278 W) ⚠ |
+| Qwen2.5-1.5B | B=8: 866; B=64: **4332** (14.8 ms/step, 51 mJ/tok at 219 W) | B=8: 1350; B=64: **7439** (8.6 ms/step, 38 mJ/tok at 284 W) ⚠ |
+| Llama-3.2-3B | B=8: 479; B=16: **888** (18.0 ms/step, 249 mJ/tok at 221 W) | B=8: 674; B=64: **1920** (33.3 ms/step, 93 mJ/tok at 179 W) ⚠ |
+| Mistral-7B-v0.3 | - | B=8: 181; B=64: **1082** (59.2 ms/step, 168 mJ/tok at 182 W) ⚠ |
 
 ## Prefill (prompt tokens/s; ms in parentheses; HF = transformers eager, SDPA attention)
 
 | model | T | RTX 2080 Ti | RTX A6000 |
 |---|---|---|---|
-| TinyLlama-1.1B | 128 | 15.4k (8.3 ms; HF 34.0 ms, 4.07x) | - |
-| TinyLlama-1.1B | 512 | 19.2k (26.6 ms; HF 51.6 ms, 1.94x) | - |
-| TinyLlama-1.1B | 1024 | 20.2k (50.6 ms; HF 138.5 ms, 2.74x) | - |
-| TinyLlama-1.1B | 2000 | 19.9k (100.5 ms; HF 426.6 ms, 4.24x) | - |
-| Qwen2.5-0.5B | 128 | 24.9k (5.1 ms; HF 29.9 ms, 5.81x) | - |
-| Qwen2.5-0.5B | 512 | 42.3k (12.1 ms; HF 31.4 ms, 2.60x) | - |
-| Qwen2.5-0.5B | 1024 | 44.1k (23.2 ms; HF 64.5 ms, 2.77x) | - |
-| Qwen2.5-0.5B | 2000 | 46.4k (43.1 ms; HF 201.4 ms, 4.68x) | - |
-| Qwen2.5-0.5B | 4096 | 43.1k (95.0 ms; HF 684.8 ms, 7.21x) | - |
-| Llama-3.2-1B | 128 | 14.9k (8.6 ms; HF 20.6 ms, 2.40x) | - |
-| Llama-3.2-1B | 512 | 19.6k (26.1 ms; HF 42.2 ms, 1.62x) | - |
-| Llama-3.2-1B | 1024 | 20.5k (49.9 ms; HF 115.2 ms, 2.31x) | - |
-| Llama-3.2-1B | 2000 | 19.8k (101.1 ms; HF 335.4 ms, 3.32x) | - |
-| Llama-3.2-1B | 4096 | 19.0k (215.8 ms; HF 1094.8 ms, 5.07x) | - |
-| Qwen2.5-1.5B | 128 | 9575 (13.4 ms; HF 44.5 ms, 3.33x) | - |
-| Qwen2.5-1.5B | 512 | 13.6k (37.8 ms; HF 56.3 ms, 1.49x) | - |
-| Qwen2.5-1.5B | 1024 | 14.6k (70.0 ms; HF 132.0 ms, 1.88x) | - |
-| Qwen2.5-1.5B | 2000 | 14.2k (140.9 ms; HF 337.0 ms, 2.39x) | - |
-| Qwen2.5-1.5B | 4096 | 14.1k (291.5 ms; HF 985.6 ms, 3.38x) | - |
-| Llama-3.2-3B | 128 | 5273 (24.3 ms) | - |
-| Llama-3.2-3B | 512 | 6673 (76.7 ms) | - |
-| Llama-3.2-3B | 1024 | 6863 (149.2 ms) | - |
-| Llama-3.2-3B | 2000 | 6905 (289.7 ms) | - |
-| Llama-3.2-3B | 4096 | 6459 (634.1 ms) | - |
+| TinyLlama-1.1B | 128 | 15.4k (8.3 ms; HF 34.0 ms, 4.07x) | 20.4k (6.3 ms; HF 19.2 ms, 3.06x) |
+| TinyLlama-1.1B | 512 | 19.2k (26.6 ms; HF 51.6 ms, 1.94x) | 30.7k (16.7 ms; HF 20.5 ms, 1.23x) |
+| TinyLlama-1.1B | 1024 | 20.2k (50.6 ms; HF 138.5 ms, 2.74x) | 36.4k (28.2 ms; HF 33.2 ms, 1.18x) |
+| TinyLlama-1.1B | 2000 | 19.9k (100.5 ms; HF 426.6 ms, 4.24x) | 33.5k (59.6 ms; HF 61.4 ms, 1.03x) |
+| Qwen2.5-0.5B | 128 | 24.9k (5.1 ms; HF 29.9 ms, 5.81x) | 38.1k (3.4 ms; HF 22.2 ms, 6.62x) |
+| Qwen2.5-0.5B | 512 | 42.3k (12.1 ms; HF 31.4 ms, 2.60x) | 70.6k (7.3 ms; HF 22.4 ms, 3.09x) |
+| Qwen2.5-0.5B | 1024 | 44.1k (23.2 ms; HF 64.5 ms, 2.77x) | 75.7k (13.5 ms; HF 23.2 ms, 1.72x) |
+| Qwen2.5-0.5B | 2000 | 46.4k (43.1 ms; HF 201.4 ms, 4.68x) | 80.3k (24.9 ms; HF 30.2 ms, 1.21x) |
+| Qwen2.5-0.5B | 4096 | 43.1k (95.0 ms; HF 684.8 ms, 7.21x) | 78.5k (52.2 ms; HF 61.5 ms, 1.18x) |
+| Llama-3.2-1B | 128 | 14.9k (8.6 ms; HF 20.6 ms, 2.40x) | 20.1k (6.4 ms; HF 15.5 ms, 2.44x) ⚠ |
+| Llama-3.2-1B | 512 | 19.6k (26.1 ms; HF 42.2 ms, 1.62x) | 30.9k (16.6 ms; HF 17.3 ms, 1.04x) ⚠ |
+| Llama-3.2-1B | 1024 | 20.5k (49.9 ms; HF 115.2 ms, 2.31x) | 34.1k (30.0 ms; HF 30.3 ms, 1.01x) ⚠ |
+| Llama-3.2-1B | 2000 | 19.8k (101.1 ms; HF 335.4 ms, 3.32x) | 33.7k (59.3 ms; HF 56.9 ms, 0.96x) ⚠ |
+| Llama-3.2-1B | 4096 | 19.0k (215.8 ms; HF 1094.8 ms, 5.07x) | 34.0k (120.5 ms; HF 119.6 ms, 0.99x) ⚠ |
+| Qwen2.5-1.5B | 128 | 9575 (13.4 ms; HF 44.5 ms, 3.33x) | 14.2k (9.0 ms; HF 34.0 ms, 3.78x) ⚠ |
+| Qwen2.5-1.5B | 512 | 13.6k (37.8 ms; HF 56.3 ms, 1.49x) | 22.5k (22.8 ms; HF 35.0 ms, 1.54x) ⚠ |
+| Qwen2.5-1.5B | 1024 | 14.6k (70.0 ms; HF 132.0 ms, 1.88x) | 24.9k (41.1 ms; HF 41.4 ms, 1.01x) ⚠ |
+| Qwen2.5-1.5B | 2000 | 14.2k (140.9 ms; HF 337.0 ms, 2.39x) | 24.6k (81.4 ms; HF 77.1 ms, 0.95x) ⚠ |
+| Qwen2.5-1.5B | 4096 | 14.1k (291.5 ms; HF 985.6 ms, 3.38x) | 24.2k (169.6 ms; HF 158.7 ms, 0.94x) ⚠ |
+| Llama-3.2-3B | 128 | 5273 (24.3 ms) | 7777 (16.5 ms; HF 33.4 ms, 2.03x) ⚠ |
+| Llama-3.2-3B | 512 | 6673 (76.7 ms) | 10.9k (46.9 ms; HF 42.6 ms, 0.91x) ⚠ |
+| Llama-3.2-3B | 1024 | 6863 (149.2 ms) | 12.1k (84.9 ms; HF 81.8 ms, 0.96x) ⚠ |
+| Llama-3.2-3B | 2000 | 6905 (289.7 ms) | 12.3k (163.2 ms; HF 151.7 ms, 0.93x) ⚠ |
+| Llama-3.2-3B | 4096 | 6459 (634.1 ms) | 11.8k (345.8 ms; HF 315.0 ms, 0.91x) ⚠ |
+| Mistral-7B-v0.3 | 128 | - | 3818 (33.5 ms; HF 36.7 ms, 1.10x) ⚠ |
+| Mistral-7B-v0.3 | 512 | - | 5046 (101.5 ms; HF 89.1 ms, 0.88x) ⚠ |
+| Mistral-7B-v0.3 | 1024 | - | 5168 (198.1 ms; HF 171.1 ms, 0.86x) ⚠ |
+| Mistral-7B-v0.3 | 2000 | - | 5158 (387.8 ms; HF 331.7 ms, 0.86x) ⚠ |
+| Mistral-7B-v0.3 | 4096 | - | 5073 (807.4 ms; HF 673.3 ms, 0.83x) ⚠ |
 
 ## Decode latency vs context length (batch 1, ms/token; % of the bandwidth floor incl. KV reads)
 
 | model | ctx | RTX 2080 Ti | RTX A6000 |
 |---|---|---|---|
-| TinyLlama-1.1B | 128 | 4.13 (81%) | - |
-| TinyLlama-1.1B | 512 | 4.17 (81%) | - |
-| TinyLlama-1.1B | 1024 | 4.22 (81%) | - |
-| Qwen2.5-0.5B | 128 | 2.33 (69%) | - |
-| Qwen2.5-0.5B | 512 | 2.38 (68%) | - |
-| Qwen2.5-0.5B | 1024 | 2.42 (67%) | - |
-| Qwen2.5-0.5B | 2048 | 2.50 (66%) | - |
-| Qwen2.5-0.5B | 4096 | 2.64 (64%) | - |
-| Qwen2.5-0.5B | 8192 | 2.73 (65%) | - |
-| Llama-3.2-1B | 128 | 4.77 (84%) | - |
-| Llama-3.2-1B | 512 | 4.80 (84%) | - |
-| Llama-3.2-1B | 1024 | 4.84 (84%) | - |
-| Llama-3.2-1B | 2048 | 4.90 (84%) | - |
-| Llama-3.2-1B | 4096 | 5.02 (84%) | - |
-| Llama-3.2-1B | 8192 | 5.26 (85%) | - |
-| Qwen2.5-1.5B | 128 | 6.22 (81%) | - |
-| Qwen2.5-1.5B | 512 | 6.27 (80%) | - |
-| Qwen2.5-1.5B | 1024 | 6.32 (80%) | - |
-| Qwen2.5-1.5B | 2048 | 6.48 (79%) | - |
-| Qwen2.5-1.5B | 4096 | 6.90 (75%) | - |
-| Qwen2.5-1.5B | 8192 | 7.11 (76%) | - |
-| Llama-3.2-3B | 128 | 12.11 (86%) | - |
-| Llama-3.2-3B | 512 | 12.29 (86%) | - |
-| Llama-3.2-3B | 1024 | 12.53 (85%) | - |
-| Llama-3.2-3B | 2048 | 12.68 (85%) | - |
-| Llama-3.2-3B | 4096 | 13.13 (85%) | - |
-| Llama-3.2-3B | 8192 | 13.99 (86%) | - |
+| TinyLlama-1.1B | 128 | 4.13 (81%) | 3.43 (79%) |
+| TinyLlama-1.1B | 512 | 4.17 (81%) | 3.45 (79%) |
+| TinyLlama-1.1B | 1024 | 4.22 (81%) | 3.49 (78%) |
+| Qwen2.5-0.5B | 128 | 2.33 (69%) | 1.91 (67%) |
+| Qwen2.5-0.5B | 512 | 2.38 (68%) | 1.93 (67%) |
+| Qwen2.5-0.5B | 1024 | 2.42 (67%) | 1.96 (66%) |
+| Qwen2.5-0.5B | 2048 | 2.50 (66%) | 2.05 (64%) |
+| Qwen2.5-0.5B | 4096 | 2.64 (64%) | 2.18 (62%) |
+| Qwen2.5-0.5B | 8192 | 2.73 (65%) | 2.26 (63%) |
+| Llama-3.2-1B | 128 | 4.77 (84%) | 3.95 (82%) ⚠ |
+| Llama-3.2-1B | 512 | 4.80 (84%) | 3.97 (82%) ⚠ |
+| Llama-3.2-1B | 1024 | 4.84 (84%) | 4.01 (81%) ⚠ |
+| Llama-3.2-1B | 2048 | 4.90 (84%) | 4.07 (81%) ⚠ |
+| Llama-3.2-1B | 4096 | 5.02 (84%) | 4.17 (81%) ⚠ |
+| Llama-3.2-1B | 8192 | 5.26 (85%) | 4.37 (82%) ⚠ |
+| Qwen2.5-1.5B | 128 | 6.22 (81%) | 5.15 (78%) ⚠ |
+| Qwen2.5-1.5B | 512 | 6.27 (80%) | 5.18 (78%) ⚠ |
+| Qwen2.5-1.5B | 1024 | 6.32 (80%) | 5.23 (78%) ⚠ |
+| Qwen2.5-1.5B | 2048 | 6.48 (79%) | 5.39 (76%) ⚠ |
+| Qwen2.5-1.5B | 4096 | 6.90 (75%) | 5.63 (74%) ⚠ |
+| Qwen2.5-1.5B | 8192 | 7.11 (76%) | 5.81 (74%) ⚠ |
+| Llama-3.2-3B | 128 | 12.11 (86%) | 10.10 (83%) ⚠ |
+| Llama-3.2-3B | 512 | 12.29 (86%) | 10.23 (83%) ⚠ |
+| Llama-3.2-3B | 1024 | 12.53 (85%) | 10.33 (83%) ⚠ |
+| Llama-3.2-3B | 2048 | 12.68 (85%) | 10.56 (82%) ⚠ |
+| Llama-3.2-3B | 4096 | 13.13 (85%) | 11.06 (81%) ⚠ |
+| Llama-3.2-3B | 8192 | 13.99 (86%) | 11.95 (80%) ⚠ |
+| Mistral-7B-v0.3 | 128 | - | 32.94 (56%) ⚠ |
+| Mistral-7B-v0.3 | 512 | - | 33.09 (56%) ⚠ |
+| Mistral-7B-v0.3 | 1024 | - | 28.41 (66%) ⚠ |
+| Mistral-7B-v0.3 | 2048 | - | 22.85 (83%) ⚠ |
+| Mistral-7B-v0.3 | 4096 | - | 22.42 (86%) ⚠ |
+| Mistral-7B-v0.3 | 8192 | - | 23.66 (84%) ⚠ |
 
 ## Kernels vs PyTorch (speedup = torch time / hipinfer time; graph-replayed; TinyLlama shapes)
 
 | | RTX 2080 Ti | RTX A6000 |
 |---|---|---|
-| GEMM qkv M=2048 vs cuBLAS | 0.84x (41 TF) | - |
-| GEMM gate_up M=2048 vs cuBLAS | 0.92x (47 TF) | - |
-| GEMM down M=512 vs cuBLAS | 0.94x (44 TF) | - |
-| GEMM o M=128 vs cuBLAS | 0.87x (26 TF) | - |
-| GEMV norm+gate_up+SwiGLU, M=1 | 1.40x (556 GB/s) | - |
-| GEMV down+residual, M=1 | 0.99x (519 GB/s) | - |
-| GEMV norm+lm_head, M=8 | 1.03x (520 GB/s) | - |
-| RMSNorm 4096 rows vs F.rms_norm | 1.07x (519 GB/s) | - |
-| RoPE+KV write, 512 tok vs HF | 11.02x | - |
-| causal attention T=1024 vs SDPA | 29.23x (32 TF) | - |
-| causal attention T=2048 vs SDPA | 27.71x (33 TF) | - |
-| decode attention B=1 L=4096 vs SDPA | 29.69x (273 GB/s) | - |
-| decode attention B=8 L=4096 vs SDPA | 44.15x (435 GB/s) | - |
+| GEMM qkv M=2048 vs cuBLAS | 0.84x (41 TF) | 0.79x (86 TF) |
+| GEMM gate_up M=2048 vs cuBLAS | 0.92x (47 TF) | 0.79x (85 TF) |
+| GEMM down M=512 vs cuBLAS | 0.94x (44 TF) | 0.94x (63 TF) |
+| GEMM o M=128 vs cuBLAS | 0.87x (26 TF) | 0.54x (33 TF) |
+| GEMV norm+gate_up+SwiGLU, M=1 | 1.40x (556 GB/s) | 1.40x (672 GB/s) |
+| GEMV down+residual, M=1 | 0.99x (519 GB/s) | 1.04x (563 GB/s) |
+| GEMV norm+lm_head, M=8 | 1.03x (520 GB/s) | 1.13x (654 GB/s) |
+| RMSNorm 4096 rows vs F.rms_norm | 1.07x (519 GB/s) | 1.23x (619 GB/s) |
+| RoPE+KV write, 512 tok vs HF | 11.02x | 9.05x |
+| causal attention T=1024 vs SDPA | 29.23x (32 TF) | 0.90x (57 TF) |
+| causal attention T=2048 vs SDPA | 27.71x (33 TF) | 0.92x (69 TF) |
+| decode attention B=1 L=4096 vs SDPA | 29.69x (273 GB/s) | 0.87x (273 GB/s) |
+| decode attention B=8 L=4096 vs SDPA | 44.15x (435 GB/s) | 1.01x (590 GB/s) |
 
 ## GEMM vs cuBLAS at every model's shapes (TFLOPs, M=2048 prefill rows; ratio = hipinfer / cuBLAS)
 
 | model | shape | RTX 2080 Ti | RTX A6000 |
 |---|---|---|---|
-| TinyLlama-1.1B | qkv | 41 / 49 (0.84) | - |
-| TinyLlama-1.1B | o | 47 / 51 (0.93) | - |
-| TinyLlama-1.1B | gate_up | 47 / 51 (0.92) | - |
-| TinyLlama-1.1B | down | 48 / 51 (0.95) | - |
-| TinyLlama-1.1B | lm_head | 48 / 52 (0.93) | - |
-| Qwen2.5-0.5B | qkv | 37 / 27 (1.40) | - |
-| Qwen2.5-0.5B | o | 39 / 42 (0.91) | - |
-| Qwen2.5-0.5B | gate_up | 44 / 48 (0.90) | - |
-| Qwen2.5-0.5B | down | 42 / 45 (0.95) | - |
-| Qwen2.5-0.5B | lm_head | 44 / 49 (0.90) | - |
-| Llama-3.2-1B | qkv | 45 / 49 (0.93) | - |
-| Llama-3.2-1B | o | 46 / 48 (0.95) | - |
-| Llama-3.2-1B | gate_up | 46 / 49 (0.93) | - |
-| Llama-3.2-1B | down | 47 / 50 (0.95) | - |
-| Llama-3.2-1B | lm_head | 47 / 50 (0.94) | - |
-| Qwen2.5-1.5B | qkv | 45 / 48 (0.93) | - |
-| Qwen2.5-1.5B | o | 40 / 46 (0.86) | - |
-| Qwen2.5-1.5B | gate_up | 45 / 50 (0.91) | - |
-| Qwen2.5-1.5B | down | 42 / 40 (1.03) | - |
-| Qwen2.5-1.5B | lm_head | 45 / 49 (0.92) | - |
-| Llama-3.2-3B | qkv | 45 / 48 (0.94) | - |
-| Llama-3.2-3B | o | 45 / 48 (0.93) | - |
-| Llama-3.2-3B | gate_up | 45 / 49 (0.93) | - |
-| Llama-3.2-3B | down | 46 / 49 (0.94) | - |
-| Llama-3.2-3B | lm_head | 45 / 48 (0.94) | - |
+| TinyLlama-1.1B | qkv | 41 / 49 (0.84) | 86 / 110 (0.79) |
+| TinyLlama-1.1B | o | 47 / 51 (0.93) | 70 / 101 (0.69) |
+| TinyLlama-1.1B | gate_up | 47 / 51 (0.92) | 85 / 108 (0.79) |
+| TinyLlama-1.1B | down | 48 / 51 (0.95) | 66 / 103 (0.64) |
+| TinyLlama-1.1B | lm_head | 48 / 52 (0.93) | 85 / 115 (0.74) |
+| Qwen2.5-0.5B | qkv | 37 / 27 (1.40) | 76 / 106 (0.72) |
+| Qwen2.5-0.5B | o | 39 / 42 (0.91) | 69 / 83 (0.83) |
+| Qwen2.5-0.5B | gate_up | 44 / 48 (0.90) | 81 / 102 (0.79) |
+| Qwen2.5-0.5B | down | 42 / 45 (0.95) | 67 / 110 (0.61) |
+| Qwen2.5-0.5B | lm_head | 44 / 49 (0.90) | 83 / 108 (0.77) |
+| Llama-3.2-1B | qkv | 45 / 49 (0.93) | 79 / 107 (0.74) ⚠ |
+| Llama-3.2-1B | o | 46 / 48 (0.95) | 70 / 100 (0.70) ⚠ |
+| Llama-3.2-1B | gate_up | 46 / 49 (0.93) | 84 / 111 (0.76) ⚠ |
+| Llama-3.2-1B | down | 47 / 50 (0.95) | 67 / 104 (0.64) ⚠ |
+| Llama-3.2-1B | lm_head | 47 / 50 (0.94) | 86 / 114 (0.76) ⚠ |
+| Qwen2.5-1.5B | qkv | 45 / 48 (0.93) | 73 / 97 (0.75) ⚠ |
+| Qwen2.5-1.5B | o | 40 / 46 (0.86) | 73 / 100 (0.73) ⚠ |
+| Qwen2.5-1.5B | gate_up | 45 / 50 (0.91) | 82 / 108 (0.76) ⚠ |
+| Qwen2.5-1.5B | down | 42 / 40 (1.03) | 68 / 113 (0.61) ⚠ |
+| Qwen2.5-1.5B | lm_head | 45 / 49 (0.92) | 83 / 111 (0.74) ⚠ |
+| Llama-3.2-3B | qkv | 45 / 48 (0.94) | 81 / 95 (0.85) ⚠ |
+| Llama-3.2-3B | o | 45 / 48 (0.93) | 77 / 106 (0.73) ⚠ |
+| Llama-3.2-3B | gate_up | 45 / 49 (0.93) | 83 / 108 (0.77) ⚠ |
+| Llama-3.2-3B | down | 46 / 49 (0.94) | 80 / 111 (0.72) ⚠ |
+| Llama-3.2-3B | lm_head | 45 / 48 (0.94) | 85 / 116 (0.73) ⚠ |
+| Mistral-7B-v0.3 | qkv | - | 81 / 107 (0.76) ⚠ |
+| Mistral-7B-v0.3 | o | - | 78 / 102 (0.76) ⚠ |
+| Mistral-7B-v0.3 | gate_up | - | 87 / 116 (0.75) ⚠ |
+| Mistral-7B-v0.3 | down | - | 75 / 103 (0.73) ⚠ |
+| Mistral-7B-v0.3 | lm_head | - | 86 / 116 (0.75) ⚠ |
 
 ## hipinfer vs other engines (fp16 weights, batch 1, same GPU)
 
@@ -168,28 +190,28 @@ Decode: 256 greedy tokens after a ctx-token prompt, ms/token (% BW = weight+KV b
 
 | | RTX 2080 Ti | RTX A6000 |
 |---|---|---|
-| decode ms/token, decode 128: **hipinfer** | 4.14 ms, 81% BW | - |
-| decode ms/token, decode 128: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 4.77 ms, 71% BW (hipinfer 1.15x faster) | 3.76 ms |
-| decode ms/token, decode 128: torch.compile, gpt-fast style (reduce-overhead + static KV) | 5.24 ms, 64% BW (hipinfer 1.27x faster) | 4.23 ms |
-| decode ms/token, decode 128: HF transformers, StaticCache + torch.compile | 5.51 ms, 61% BW (hipinfer 1.33x faster) | 4.34 ms |
-| decode ms/token, decode 128: vLLM (V1 engine, CUDA graphs) | - | 3.96 ms |
-| decode ms/token, decode 1024: **hipinfer** | 4.22 ms, 81% BW | - |
-| decode ms/token, decode 1024: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 4.79 ms, 71% BW (hipinfer 1.14x faster) | 3.76 ms |
-| decode ms/token, decode 1024: torch.compile, gpt-fast style (reduce-overhead + static KV) | 6.84 ms, 50% BW (hipinfer 1.62x faster) | 5.47 ms |
-| decode ms/token, decode 1024: HF transformers, StaticCache + torch.compile | 7.09 ms, 48% BW (hipinfer 1.68x faster) | 5.56 ms |
-| decode ms/token, decode 1024: vLLM (V1 engine, CUDA graphs) | - | 3.95 ms |
+| decode ms/token, decode 128: **hipinfer** | 4.14 ms, 81% BW | 3.43 ms, 79% BW |
+| decode ms/token, decode 128: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 4.77 ms, 71% BW (hipinfer 1.15x faster) | 3.76 ms, 72% BW (hipinfer 1.10x faster) |
+| decode ms/token, decode 128: torch.compile, gpt-fast style (reduce-overhead + static KV) | 5.24 ms, 64% BW (hipinfer 1.27x faster) | 4.23 ms, 64% BW (hipinfer 1.23x faster) |
+| decode ms/token, decode 128: HF transformers, StaticCache + torch.compile | 5.51 ms, 61% BW (hipinfer 1.33x faster) | 4.34 ms, 62% BW (hipinfer 1.27x faster) |
+| decode ms/token, decode 128: vLLM (V1 engine, CUDA graphs) | - | 3.96 ms, 68% BW (hipinfer 1.15x faster) |
+| decode ms/token, decode 1024: **hipinfer** | 4.22 ms, 81% BW | 3.50 ms, 78% BW |
+| decode ms/token, decode 1024: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 4.79 ms, 71% BW (hipinfer 1.14x faster) | 3.76 ms, 72% BW (hipinfer 1.08x faster) |
+| decode ms/token, decode 1024: torch.compile, gpt-fast style (reduce-overhead + static KV) | 6.84 ms, 50% BW (hipinfer 1.62x faster) | 5.47 ms, 50% BW (hipinfer 1.57x faster) |
+| decode ms/token, decode 1024: HF transformers, StaticCache + torch.compile | 7.09 ms, 48% BW (hipinfer 1.68x faster) | 5.56 ms, 49% BW (hipinfer 1.59x faster) |
+| decode ms/token, decode 1024: vLLM (V1 engine, CUDA graphs) | - | 3.95 ms, 69% BW (hipinfer 1.13x faster) |
 
 | | RTX 2080 Ti | RTX A6000 |
 |---|---|---|
-| prefill ms, prefill 128: **hipinfer** | 8.3 ms | - |
-| prefill ms, prefill 128: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 11.2 ms (hipinfer 1.34x faster) | 9.1 ms |
-| prefill ms, prefill 128: torch.compile, gpt-fast style (reduce-overhead + static KV) | 16.2 ms (hipinfer 1.94x faster) | 8.9 ms |
-| prefill ms, prefill 512: **hipinfer** | 26.6 ms | - |
-| prefill ms, prefill 512: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 29.0 ms (hipinfer 1.09x faster) | 22.8 ms |
-| prefill ms, prefill 512: torch.compile, gpt-fast style (reduce-overhead + static KV) | 34.8 ms (hipinfer 1.31x faster) | 19.5 ms |
-| prefill ms, prefill 2000: **hipinfer** | 100.5 ms | - |
-| prefill ms, prefill 2000: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 114.8 ms (hipinfer 1.14x faster) | 87.3 ms |
-| prefill ms, prefill 2000: torch.compile, gpt-fast style (reduce-overhead + static KV) | 125.4 ms (hipinfer 1.25x faster) | 59.6 ms |
+| prefill ms, prefill 128: **hipinfer** | 8.3 ms | 6.3 ms |
+| prefill ms, prefill 128: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 11.2 ms (hipinfer 1.34x faster) | 9.1 ms (hipinfer 1.44x faster) |
+| prefill ms, prefill 128: torch.compile, gpt-fast style (reduce-overhead + static KV) | 16.2 ms (hipinfer 1.94x faster) | 8.9 ms (hipinfer 1.41x faster) |
+| prefill ms, prefill 512: **hipinfer** | 26.6 ms | 16.7 ms |
+| prefill ms, prefill 512: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 29.0 ms (hipinfer 1.09x faster) | 22.8 ms (hipinfer 1.37x faster) |
+| prefill ms, prefill 512: torch.compile, gpt-fast style (reduce-overhead + static KV) | 34.8 ms (hipinfer 1.31x faster) | 19.5 ms (hipinfer 1.17x faster) |
+| prefill ms, prefill 2000: **hipinfer** | 100.5 ms | 59.6 ms |
+| prefill ms, prefill 2000: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 114.8 ms (hipinfer 1.14x faster) | 87.3 ms (hipinfer 1.46x faster) |
+| prefill ms, prefill 2000: torch.compile, gpt-fast style (reduce-overhead + static KV) | 125.4 ms (hipinfer 1.25x faster) | 59.6 ms (hipinfer 1.00x faster) |
 
 
 ### Qwen2.5-0.5B

@@ -1,31 +1,32 @@
 [transformers] Token indices sequence length is longer than the specified maximum sequence length for this model (289076 > 131072). Running this sequence through the model will result in indexing errors
 unsloth/Llama-3.2-3B: 289076 test tokens, 16 windows of 1024
-Loading weights:   0%|          | 0/254 [00:00<?, ?it/s]Loading weights:  16%|█▌        | 41/254 [00:00<00:00, 390.23it/s]Loading weights:  39%|███▊      | 98/254 [00:00<00:00, 493.79it/s]Loading weights:  58%|█████▊    | 148/254 [00:00<00:00, 481.64it/s]Loading weights:  79%|███████▉  | 201/254 [00:00<00:00, 488.38it/s]Loading weights: 100%|██████████| 254/254 [00:00<00:00, 496.31it/s]
-window   0: ppl HF 5.4164  hipinfer 5.4166  top-1 agree 99.902%  mean KL 7.95e-06  max |dlogit| 0.145
-window   1: ppl HF 7.5643  hipinfer 7.5652  top-1 agree 99.951%  mean KL 9.19e-06  max |dlogit| 0.145
-window   2: ppl HF 8.7619  hipinfer 8.7625  top-1 agree 99.967%  mean KL 9.58e-06  max |dlogit| 0.145
-window   3: ppl HF 9.7910  hipinfer 9.7916  top-1 agree 99.951%  mean KL 9.68e-06  max |dlogit| 0.145
-window   4: ppl HF 10.7432  hipinfer 10.7433  top-1 agree 99.902%  mean KL 9.54e-06  max |dlogit| 0.250
-window   5: ppl HF 10.8683  hipinfer 10.8684  top-1 agree 99.902%  mean KL 9.67e-06  max |dlogit| 0.250
-window   6: ppl HF 10.7408  hipinfer 10.7406  top-1 agree 99.888%  mean KL 9.68e-06  max |dlogit| 0.250
-window   7: ppl HF 10.2218  hipinfer 10.2217  top-1 agree 99.841%  mean KL 9.64e-06  max |dlogit| 0.250
-window   8: ppl HF 9.9094  hipinfer 9.9094  top-1 agree 99.848%  mean KL 9.60e-06  max |dlogit| 0.250
-window   9: ppl HF 9.6831  hipinfer 9.6831  top-1 agree 99.844%  mean KL 9.72e-06  max |dlogit| 0.250
-window  10: ppl HF 9.3840  hipinfer 9.3837  top-1 agree 99.858%  mean KL 9.71e-06  max |dlogit| 1.219
-window  11: ppl HF 8.7844  hipinfer 8.7841  top-1 agree 99.870%  mean KL 9.76e-06  max |dlogit| 1.219
-window  12: ppl HF 8.4373  hipinfer 8.4371  top-1 agree 99.865%  mean KL 9.73e-06  max |dlogit| 1.219
-window  13: ppl HF 8.3346  hipinfer 8.3346  top-1 agree 99.867%  mean KL 9.69e-06  max |dlogit| 1.219
-window  14: ppl HF 8.3213  hipinfer 8.3212  top-1 agree 99.863%  mean KL 9.70e-06  max |dlogit| 1.219
-window  15: ppl HF 8.2765  hipinfer 8.2765  top-1 agree 99.866%  mean KL 9.78e-06  max |dlogit| 1.219
+Loading weights:   0%|          | 0/254 [00:00<?, ?it/s]Loading weights:   0%|          | 1/254 [00:00<00:29,  8.64it/s]Loading weights:  33%|███▎      | 84/254 [00:00<00:00, 457.37it/s]Loading weights:  54%|█████▎    | 136/254 [00:00<00:00, 470.78it/s]Loading weights:  73%|███████▎  | 185/254 [00:00<00:00, 469.32it/s]Loading weights:  92%|█████████▏| 234/254 [00:00<00:00, 472.73it/s]Loading weights: 100%|██████████| 254/254 [00:00<00:00, 450.80it/s]
+window   0: ppl HF 5.4164  hipinfer 5.4157  top-1 agree 99.902%  mean KL 8.03e-06  max |dlogit| 0.147
+window   1: ppl HF 7.5643  hipinfer 7.5641  top-1 agree 99.951%  mean KL 9.03e-06  max |dlogit| 0.227
+window   2: ppl HF 8.7619  hipinfer 8.7615  top-1 agree 99.967%  mean KL 9.35e-06  max |dlogit| 0.227
+window   3: ppl HF 9.7910  hipinfer 9.7912  top-1 agree 99.951%  mean KL 9.47e-06  max |dlogit| 0.227
+window   4: ppl HF 10.7432  hipinfer 10.7432  top-1 agree 99.902%  mean KL 9.45e-06  max |dlogit| 0.227
+window   5: ppl HF 10.8683  hipinfer 10.8684  top-1 agree 99.886%  mean KL 9.47e-06  max |dlogit| 0.227
+window   6: ppl HF 10.7408  hipinfer 10.7411  top-1 agree 99.902%  mean KL 9.61e-06  max |dlogit| 0.227
+window   7: ppl HF 10.2218  hipinfer 10.2220  top-1 agree 99.878%  mean KL 9.54e-06  max |dlogit| 0.227
+window   8: ppl HF 9.9094  hipinfer 9.9098  top-1 agree 99.881%  mean KL 9.55e-06  max |dlogit| 0.227
+window   9: ppl HF 9.6831  hipinfer 9.6837  top-1 agree 99.853%  mean KL 9.66e-06  max |dlogit| 0.227
+window  10: ppl HF 9.3840  hipinfer 9.3843  top-1 agree 99.867%  mean KL 9.78e-06  max |dlogit| 1.320
+window  11: ppl HF 8.7844  hipinfer 8.7846  top-1 agree 99.878%  mean KL 9.84e-06  max |dlogit| 1.320
+window  12: ppl HF 8.4373  hipinfer 8.4376  top-1 agree 99.880%  mean KL 9.81e-06  max |dlogit| 1.320
+window  13: ppl HF 8.3346  hipinfer 8.3350  top-1 agree 99.888%  mean KL 9.79e-06  max |dlogit| 1.320
+window  14: ppl HF 8.3213  hipinfer 8.3217  top-1 agree 99.876%  mean KL 9.75e-06  max |dlogit| 1.320
+window  15: ppl HF 8.2765  hipinfer 8.2770  top-1 agree 99.878%  mean KL 9.81e-06  max |dlogit| 1.320
 {
  "model": "unsloth/Llama-3.2-3B",
  "gpu": "NVIDIA RTX A6000",
+ "tp": 1,
  "seq": 1024,
  "windows": 16,
  "tokens": 16368,
  "ppl_hf": 8.276504058155089,
- "ppl_hipinfer": 8.27649770819415,
- "top1_agreement": 0.9986559139784946,
- "mean_kl_hf_to_hipinfer": 9.777692560198009e-06,
- "max_logit_diff": 1.21875
+ "ppl_hipinfer": 8.277019867941776,
+ "top1_agreement": 0.9987781036168133,
+ "mean_kl_hf_to_hipinfer": 9.808745031506334e-06,
+ "max_logit_diff": 1.3203125
 }

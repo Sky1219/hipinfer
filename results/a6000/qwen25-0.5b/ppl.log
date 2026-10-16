@@ -1,6 +1,6 @@
 [transformers] Token indices sequence length is longer than the specified maximum sequence length for this model (299078 > 131072). Running this sequence through the model will result in indexing errors
 Qwen/Qwen2.5-0.5B: 299078 test tokens, 16 windows of 1024
-Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]Loading weights:  83%|████████▎ | 241/290 [00:00<00:00, 2404.28it/s]Loading weights: 100%|██████████| 290/290 [00:00<00:00, 2439.81it/s]
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]Loading weights:  76%|███████▌  | 219/290 [00:00<00:00, 2156.13it/s]Loading weights: 100%|██████████| 290/290 [00:00<00:00, 2310.40it/s]
 window   0: ppl HF 8.7932  hipinfer 8.7902  top-1 agree 99.804%  mean KL 1.27e-05  max |dlogit| 0.141
 window   1: ppl HF 12.3117  hipinfer 12.3073  top-1 agree 99.755%  mean KL 1.40e-05  max |dlogit| 0.141
 window   2: ppl HF 13.1270  hipinfer 13.1256  top-1 agree 99.837%  mean KL 1.47e-05  max |dlogit| 0.141
@@ -20,6 +20,7 @@ window  15: ppl HF 13.4849  hipinfer 13.4846  top-1 agree 99.737%  mean KL 1.54e
 {
  "model": "Qwen/Qwen2.5-0.5B",
  "gpu": "NVIDIA RTX A6000",
+ "tp": 1,
  "seq": 1024,
  "windows": 16,
  "tokens": 16352,

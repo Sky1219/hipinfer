@@ -1,0 +1,56 @@
+{
+ "tinyllama": {
+  "window": "22:44:34-22:45:30",
+  "loaded_samples": 6,
+  "throttled_pct": 0,
+  "sm_min_mhz": 1560,
+  "sm_median_mhz": 1890,
+  "peak_c": 76,
+  "verdict": "clean"
+ },
+ "llama32-1b": {
+  "window": "22:48:27-22:49:48",
+  "loaded_samples": 12,
+  "throttled_pct": 33,
+  "sm_min_mhz": 1485,
+  "sm_median_mhz": 1605,
+  "peak_c": 90,
+  "verdict": "THROTTLED"
+ },
+ "qwen25-0.5b": {
+  "window": "22:53:53-22:54:45",
+  "loaded_samples": 6,
+  "throttled_pct": 0,
+  "sm_min_mhz": 1575,
+  "sm_median_mhz": 1755,
+  "peak_c": 72,
+  "verdict": "clean"
+ },
+ "qwen25-1.5b": {
+  "window": "22:57:32-22:59:11",
+  "loaded_samples": 13,
+  "throttled_pct": 31,
+  "sm_min_mhz": 1410,
+  "sm_median_mhz": 1590,
+  "peak_c": 91,
+  "verdict": "THROTTLED"
+ },
+ "llama32-3b": {
+  "window": "23:05:07-23:08:24",
+  "loaded_samples": 30,
+  "throttled_pct": 67,
+  "sm_min_mhz": 420,
+  "sm_median_mhz": 1410,
+  "peak_c": 93,
+  "verdict": "THROTTLED"
+ },
+ "mistral-7b": {
+  "window": "23:15:29-23:21:59",
+  "loaded_samples": 65,
+  "throttled_pct": 78,
+  "sm_min_mhz": 210,
+  "sm_median_mhz": 450,
+  "peak_c": 93,
+  "verdict": "THROTTLED"
+ }
+}

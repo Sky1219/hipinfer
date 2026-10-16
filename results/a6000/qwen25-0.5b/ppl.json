@@ -1,6 +1,7 @@
 {
  "model": "Qwen/Qwen2.5-0.5B",
  "gpu": "NVIDIA RTX A6000",
+ "tp": 1,
  "seq": 1024,
  "windows": 16,
  "tokens": 16352,

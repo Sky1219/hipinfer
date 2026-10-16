@@ -1,6 +1,7 @@
 {
  "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
  "gpu": "NVIDIA RTX A6000",
+ "tp": 1,
  "seq": 1024,
  "windows": 16,
  "tokens": 16368,

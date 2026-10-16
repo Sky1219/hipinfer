@@ -6,8 +6,8 @@
  "windows": 16,
  "tokens": 16368,
  "ppl_hf": 5.777385124222,
- "ppl_hipinfer": 5.777477231391939,
- "top1_agreement": 0.9987781036168133,
- "mean_kl_hf_to_hipinfer": 4.443100977969881e-06,
- "max_logit_diff": 1.04669189453125
+ "ppl_hipinfer": 5.7774288886113725,
+ "top1_agreement": 0.9991446725317693,
+ "mean_kl_hf_to_hipinfer": 4.628631403534978e-06,
+ "max_logit_diff": 1.93896484375
 }

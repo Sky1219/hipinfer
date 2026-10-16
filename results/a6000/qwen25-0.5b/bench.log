@@ -1,0 +1,99 @@
+NVIDIA RTX A6000 peak BW 768.0 GB/s | Qwen/Qwen2.5-0.5B {'vocab': 151936, 'hidden': 896, 'inter': 4864, 'layers': 24, 'heads': 14, 'kv_heads': 2, 'head_dim': 64, 'max_pos': 32768, 'window': 0, 'tied': True, 'qkv_bias': True, 'weight_bytes': 988065536}
+
+== GEMM (prefill, tensor cores) ==
+gemm          qkv M=128 N=1152 K=896             ours      12.6 us  cuBLAS               7.6 us  x 0.60  TFLOPs:    21.0 vs    34.9
+gemm          o M=128 N=896 K=896                ours      12.6 us  cuBLAS               8.5 us  x 0.67  TFLOPs:    16.3 vs    24.2
+gemm          gate_up M=128 N=9728 K=896         ours      37.3 us  cuBLAS              35.2 us  x 0.95  TFLOPs:    59.9 vs    63.3
+gemm          down M=128 N=896 K=4864            ours      34.8 us  cuBLAS              23.0 us  x 0.66  TFLOPs:    32.1 vs    48.4
+gemm          lm_head M=128 N=151936 K=896       ours     576.4 us  cuBLAS             499.5 us  x 0.87  TFLOPs:    60.5 vs    69.8
+gemm          qkv M=512 N=1152 K=896             ours      18.3 us  cuBLAS              14.5 us  x 0.79  TFLOPs:    57.7 vs    72.7
+gemm          o M=512 N=896 K=896                ours      16.8 us  cuBLAS              11.9 us  x 0.71  TFLOPs:    49.0 vs    69.3
+gemm          gate_up M=512 N=9728 K=896         ours     110.7 us  cuBLAS              97.0 us  x 0.88  TFLOPs:    80.6 vs    92.0
+gemm          down M=512 N=896 K=4864            ours      79.0 us  cuBLAS              49.2 us  x 0.62  TFLOPs:    56.5 vs    90.6
+gemm          lm_head M=512 N=151936 K=896       ours    1715.9 us  cuBLAS            1593.3 us  x 0.93  TFLOPs:    81.2 vs    87.5
+gemm          qkv M=2048 N=1152 K=896            ours      55.3 us  cuBLAS              39.9 us  x 0.72  TFLOPs:    76.5 vs   105.9
+gemm          o M=2048 N=896 K=896               ours      47.7 us  cuBLAS              39.4 us  x 0.83  TFLOPs:    68.9 vs    83.4
+gemm          gate_up M=2048 N=9728 K=896        ours     442.7 us  cuBLAS             349.4 us  x 0.79  TFLOPs:    80.6 vs   102.2
+gemm          down M=2048 N=896 K=4864           ours     267.6 us  cuBLAS             162.9 us  x 0.61  TFLOPs:    66.7 vs   109.6
+gemm          lm_head M=2048 N=151936 K=896      ours    6741.0 us  cuBLAS            5186.8 us  x 0.77  TFLOPs:    82.7 vs   107.5
+
+== GEMV (decode, weight-bandwidth bound) ==
+gemv          qkv+norm M=1 N=1152 K=896          ours       4.9 us  torch(cuBLAS)       15.5 us  x 3.15  GB/s:   420.0 vs   133.5
+gemv          o+res M=1 N=896 K=896              ours       3.4 us  torch(cuBLAS)        5.5 us  x 1.64  GB/s:   475.2 vs   290.4
+gemv          gate_up+norm+silu M=1 N=9728 K=896 ours      28.7 us  torch(cuBLAS)       56.4 us  x 1.97  GB/s:   608.0 vs   309.0
+gemv          down+res M=1 N=896 K=4864          ours      19.6 us  torch(cuBLAS)       16.7 us  x 0.85  GB/s:   445.7 vs   522.2
+gemv          lm_head+norm M=1 N=151936 K=896    ours     389.6 us  torch(cuBLAS)      400.0 us  x 1.03  GB/s:   698.8 vs   680.6
+gemv          qkv+norm M=4 N=1152 K=896          ours       7.1 us  torch(cuBLAS)       19.0 us  x 2.69  GB/s:   292.2 vs   108.7
+gemv          o+res M=4 N=896 K=896              ours       4.4 us  torch(cuBLAS)        6.8 us  x 1.53  GB/s:   364.7 vs   237.6
+gemv          gate_up+norm+silu M=4 N=9728 K=896 ours      32.4 us  torch(cuBLAS)       59.0 us  x 1.82  GB/s:   538.1 vs   295.6
+gemv          down+res M=4 N=896 K=4864          ours      21.4 us  torch(cuBLAS)       21.8 us  x 1.02  GB/s:   407.3 vs   399.9
+gemv          lm_head+norm M=4 N=151936 K=896    ours     401.3 us  torch(cuBLAS)      409.4 us  x 1.02  GB/s:   678.5 vs   665.1
+gemv          qkv+norm M=8 N=1152 K=896          ours       9.9 us  torch(cuBLAS)       18.5 us  x 1.87  GB/s:   207.8 vs   111.4
+gemv          o+res M=8 N=896 K=896              ours       5.9 us  torch(cuBLAS)        6.5 us  x 1.09  GB/s:   271.0 vs   248.9
+gemv          gate_up+norm+silu M=8 N=9728 K=896 ours      37.8 us  torch(cuBLAS)       59.2 us  x 1.57  GB/s:   461.4 vs   294.5
+gemv          down+res M=8 N=896 K=4864          ours      30.6 us  torch(cuBLAS)       21.9 us  x 0.72  GB/s:   284.7 vs   398.1
+gemv          lm_head+norm M=8 N=151936 K=896    ours     413.2 us  torch(cuBLAS)      414.5 us  x 1.00  GB/s:   659.0 vs   656.9
+
+== RMSNorm ==
+rmsnorm       M=1 H=896                          ours       2.1 us  HF eager            12.0 us  x 5.62  GB/s:     1.7 vs     0.3
+rmsnorm       M=1 H=896                          ours       2.1 us  F.rms_norm           2.6 us  x 1.20  GB/s:     1.7 vs     1.4
+rmsnorm       M=512 H=896                        ours       3.2 us  HF eager            21.0 us  x 6.61  GB/s:   578.1 vs    87.4
+rmsnorm       M=512 H=896                        ours       3.2 us  F.rms_norm           3.5 us  x 1.10  GB/s:   578.1 vs   527.1
+rmsnorm       M=4096 H=896                       ours      24.0 us  HF eager           203.6 us  x 8.50  GB/s:   612.6 vs    72.1
+rmsnorm       M=4096 H=896                       ours      24.0 us  F.rms_norm          24.0 us  x 1.00  GB/s:   612.6 vs   612.6
+
+== RoPE (+ KV-cache write) ==
+rope          T=1                                ours       2.3 us  HF eager            19.9 us  x 8.82
+rope          T=512                              ours       3.7 us  HF eager            33.3 us  x 9.03
+rope          T=2048                             ours      11.9 us  HF eager            86.2 us  x 7.26
+
+== Attention: causal prefill (FlashAttention-style, tensor cores) ==
+flash_prefill T=512 Hq=14 Hkv=2 D=64             ours      17.8 us  torch SDPA          16.1 us  x 0.90  TFLOPs:    26.4 vs    29.2
+flash_prefill T=1024 Hq=14 Hkv=2 D=64            ours      47.3 us  torch SDPA          40.2 us  x 0.85  TFLOPs:    39.7 vs    46.7
+flash_prefill T=2048 Hq=14 Hkv=2 D=64            ours     125.4 us  torch SDPA         125.7 us  x 1.00  TFLOPs:    59.9 vs    59.8
+
+== Attention: decode (split-K, GQA-shared K/V reads) ==
+decode_attn   B=1 len=1024 Hq=14 Hkv=2 D=64      ours       8.7 us  torch SDPA          10.4 us  x 1.20  GB/s:    60.2 vs    50.2
+decode_attn   B=1 len=4096 Hq=14 Hkv=2 D=64      ours      16.0 us  torch SDPA          13.4 us  x 0.84  GB/s:   131.4 vs   156.3
+decode_attn   B=8 len=1024 Hq=14 Hkv=2 D=64      ours      11.3 us  torch SDPA          10.6 us  x 0.95  GB/s:   372.4 vs   393.8
+decode_attn   B=8 len=4096 Hq=14 Hkv=2 D=64      ours      33.7 us  torch SDPA          33.2 us  x 0.98  GB/s:   498.0 vs   505.7
+decode_attn   B=32 len=2048 Hq=14 Hkv=2 D=64     ours      56.4 us  torch SDPA          56.5 us  x 1.00  GB/s:   594.7 vs   593.9
+
+== HF transformers reference timings ==
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]Loading weights:  88%|████████▊ | 256/290 [00:00<00:00, 2555.90it/s]Loading weights: 100%|██████████| 290/290 [00:00<00:00, 2596.69it/s]
+HF prefill T=  128:    22.24 ms
+HF prefill T=  512:    22.37 ms
+HF prefill T= 1024:    23.23 ms
+HF prefill T= 2000:    30.18 ms
+HF prefill T= 4096:    61.49 ms
+HF decode ctx=  128:  21.25 ms/token
+HF decode ctx= 1024:  21.41 ms/token
+
+== Prefill latency (ms) ==
+T=  128  hipinfer    3.36 ms (   38098 tok/s)   HF   22.24 ms   x6.62
+T=  512  hipinfer    7.25 ms (   70606 tok/s)   HF   22.37 ms   x3.09
+T= 1024  hipinfer   13.52 ms (   75734 tok/s)   HF   23.23 ms   x1.72
+T= 2000  hipinfer   24.90 ms (   80337 tok/s)   HF   30.18 ms   x1.21
+T= 4096  hipinfer   52.21 ms (   78457 tok/s)   HF   61.49 ms   x1.18
+
+== Decode, batch 1 (ms/token) ==
+ctx=  128  hipinfer  1.918 ms (graph) /  2.003 ms (no graph)   HF  21.25 ms   x11.1   roofline 1.291 ms -> 67% of peak BW
+ctx= 1024  hipinfer  1.968 ms (graph) /  2.056 ms (no graph)   HF  21.41 ms   x10.9   roofline 1.305 ms -> 66% of peak BW
+
+== Decode latency vs context length (batch 1, 128 new tokens) ==
+ctx=   128   1.915 ms/token   KV read     2.4 MB/step   roofline 1.290 ms  67% BW
+ctx=   512   1.928 ms/token   KV read     7.1 MB/step   roofline 1.296 ms  67% BW
+ctx=  1024   1.961 ms/token   KV read    13.4 MB/step   roofline 1.304 ms  66% BW
+ctx=  2048   2.049 ms/token   KV read    26.0 MB/step   roofline 1.320 ms  64% BW
+ctx=  4096   2.180 ms/token   KV read    51.1 MB/step   roofline 1.353 ms  62% BW
+ctx=  8192   2.257 ms/token   KV read   101.4 MB/step   roofline 1.419 ms  63% BW
+
+== Batched decode throughput (ctx 512, 128 new tokens; up to 64 sequences fit) ==
+B=  1   1.924 ms/step        520 tok/s     170 W   326.50 mJ/token
+B=  2   2.009 ms/step        995 tok/s     167 W   167.32 mJ/token
+B=  4   2.207 ms/step       1812 tok/s     167 W    91.91 mJ/token
+B=  8   2.385 ms/step       3354 tok/s     271 W    80.74 mJ/token
+B= 16   2.554 ms/step       6264 tok/s     272 W    43.40 mJ/token
+B= 32   2.901 ms/step      11032 tok/s     280 W    25.37 mJ/token
+B= 64   3.549 ms/step      18031 tok/s     289 W    16.05 mJ/token
+wrote results/a6000/qwen25-0.5b/bench.json

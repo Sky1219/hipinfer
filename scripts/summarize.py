@@ -16,6 +16,11 @@ MODEL_NAME = {"tinyllama": "TinyLlama-1.1B", "qwen25-0.5b": "Qwen2.5-0.5B", "lla
               "llama31-8b": "Llama-3.1-8B"}
 
 
+# Per GPU, from results/<gpu dir>/thermal.json (written after checking each benchmark window against
+# the GPU's temperature log): {model: {"verdict": "clean" | "minor" | "THROTTLED", ...}}
+THERMAL, THERMAL_DIR = {}, {}
+
+
 def load(root):
     """-> {gpu_name: {model_tag: {"bench":..., "gate":..., "ppl":...}}} (first directory per GPU wins)."""
     gpus, seen_dirs = {}, {}
@@ -41,6 +46,9 @@ def load(root):
                 continue
             seen_dirs[gpu] = d
             gpus[gpu] = models
+            tf = os.path.join(d, "thermal.json")
+            if os.path.exists(tf):
+                THERMAL[gpu], THERMAL_DIR[gpu] = json.load(open(tf)), os.path.basename(d)
     return gpus
 
 
@@ -62,6 +70,11 @@ def main():
     all_models = [m for m in MODEL_ORDER if any(m in gpus[g] for g in names)]
     all_models += sorted(m for g in names for m in gpus[g] if m not in all_models)
     hdr = "| | " + " | ".join(short(g) for g in names) + " |"
+
+    def mark(cells, m):
+        """Flag a GPU's cell when that model's benchmark ran thermally throttled."""
+        return [c + " ⚠" if c != "-" and THERMAL.get(g, {}).get(m, {}).get("verdict") == "THROTTLED" else c
+                for c, g in zip(cells, names)]
     sep = "|---" * (len(names) + 1) + "|"
 
     def cfg_of(m):
@@ -112,9 +125,13 @@ def main():
 
     print("\n## Decode, batch 1 (ms/token, greedy, 256 new tokens after a 128-token prompt)\n")
     print("Floor = (weight bytes + KV bytes read) / peak DRAM bandwidth. HF = transformers eager with a DynamicCache.\n")
+    for g in names:
+        if any(v.get("verdict") == "THROTTLED" for v in THERMAL.get(g, {}).values()):
+            print(f"⚠ = {short(g)} benchmark ran partly thermally throttled; this and every speed table below flags it. "
+                  f"Details: results/{THERMAL_DIR[g]}/THERMAL.md.\n")
     print("| model | " + " | ".join(short(g) for g in names) + " |")
     print(sep)
-    print("| peak DRAM BW (GB/s) | " + " | ".join(f'{next(iter(gpus[g].values()))["bench"]["peak_bw_GBs"]:.0f}' if any("bench" in e for e in gpus[g].values()) else "-" for g in names) + " |")
+    print("| peak DRAM BW (GB/s) | " + " | ".join(f'{next(e["bench"] for e in gpus[g].values() if "bench" in e)["peak_bw_GBs"]:.0f}' if any("bench" in e for e in gpus[g].values()) else "-" for g in names) + " |")
     for m in all_models:
         cells = []
         for g in names:
@@ -127,7 +144,7 @@ def main():
             else:
                 cells.append("-")
         if any(c != "-" for c in cells):
-            print(f"| {MODEL_NAME.get(m, m)} | " + " | ".join(cells) + " |")
+            print(f"| {MODEL_NAME.get(m, m)} | " + " | ".join(mark(cells, m)) + " |")
 
     print("\n## Decode throughput, batched (tok/s; ctx 512 + 128 new tokens; largest batch that fits)\n")
     print("| model | " + " | ".join(short(g) for g in names) + " |")
@@ -148,7 +165,7 @@ def main():
             else:
                 cells.append("-")
         if any(c != "-" for c in cells):
-            print(f"| {MODEL_NAME.get(m, m)} | " + " | ".join(cells) + " |")
+            print(f"| {MODEL_NAME.get(m, m)} | " + " | ".join(mark(cells, m)) + " |")
 
     print("\n## Prefill (prompt tokens/s; ms in parentheses; HF = transformers eager, SDPA attention)\n")
     print("| model | T | " + " | ".join(short(g) for g in names) + " |")
@@ -166,7 +183,7 @@ def main():
                     cells.append(f'{fmt_tokps(p["ours_tok_s"])} ({p["ours_ms"]:.1f} ms)')
                 else:
                     cells.append("-")
-            print(f"| {MODEL_NAME.get(m, m)} | {T} | " + " | ".join(cells) + " |")
+            print(f"| {MODEL_NAME.get(m, m)} | {T} | " + " | ".join(mark(cells, m)) + " |")
 
     print("\n## Decode latency vs context length (batch 1, ms/token; % of the bandwidth floor incl. KV reads)\n")
     print("| model | ctx | " + " | ".join(short(g) for g in names) + " |")
@@ -179,7 +196,7 @@ def main():
                 b = gpus[g].get(m, {}).get("bench")
                 p = next((x for x in b["e2e"].get("decode_ctx", []) if x["ctx"] == ctx), None) if b and "e2e" in b else None
                 cells.append(f'{p["ours_ms"]:.2f} ({100 * p["bw_util"]:.0f}%)' if p else "-")
-            print(f"| {MODEL_NAME.get(m, m)} | {ctx} | " + " | ".join(cells) + " |")
+            print(f"| {MODEL_NAME.get(m, m)} | {ctx} | " + " | ".join(mark(cells, m)) + " |")
 
     print("\n## Kernels vs PyTorch (speedup = torch time / hipinfer time; graph-replayed; TinyLlama shapes)\n")
     ref = "tinyllama" if "tinyllama" in all_models else all_models[0]
@@ -208,7 +225,7 @@ def main():
                 continue
             extra = f' ({k["TFLOPs"]:.0f} TF)' if "TFLOPs" in k else f' ({k["GB/s"]:.0f} GB/s)' if "GB/s" in k else ""
             cells.append(f'{k["speedup"]:.2f}x{extra}')
-        print(f"| {label} | " + " | ".join(cells) + " |")
+        print(f"| {label} | " + " | ".join(mark(cells, ref)) + " |")
 
     print("\n## GEMM vs cuBLAS at every model's shapes (TFLOPs, M=2048 prefill rows; ratio = hipinfer / cuBLAS)\n")
     print("| model | shape | " + " | ".join(short(g) for g in names) + " |")
@@ -221,7 +238,7 @@ def main():
                 k = next((x for x in (b["kernels"] if b else []) if x["kernel"] == "gemm" and x["role"] == role and x["M"] == 2048), None)
                 cells.append(f'{k["TFLOPs"]:.0f} / {k["TFLOPs_torch"]:.0f} ({k["speedup"]:.2f})' if k else "-")
             if any(c != "-" for c in cells):
-                print(f"| {MODEL_NAME.get(m, m)} | {role} | " + " | ".join(cells) + " |")
+                print(f"| {MODEL_NAME.get(m, m)} | {role} | " + " | ".join(mark(cells, m)) + " |")
 
     baselines(gpus, os.path.join(root, "baselines"))
 

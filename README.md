@@ -26,8 +26,33 @@ Hardware:
 > **How fresh are the numbers?** Every RTX 2080 Ti number here (one GPU and two) was re-measured
 > on 2026-10-15 on the current code, after the Turing prefill GEMM rewrite
 > ([write-up](docs/turing-prefill-gemm.md)): kernel tests, HF token gate, perplexity, benchmarks and
-> the multi-GPU suite. The AMD build was re-checked the same day. The A6000 speed columns are older:
-> TinyLlama only, from an earlier build.
+> the multi-GPU suite. The AMD build was re-checked the same day. The A6000 was re-run the same day
+> for six models (kernel tests, token gate, perplexity, benchmarks; in [results/SUMMARY.md](results/SUMMARY.md));
+> the A6000 columns in this README are older, TinyLlama only, from an earlier build.
+
+### Thermal throttling
+
+Due to resource constraints and degrading GPUs, runs were at times throttled due to overheating.
+All affected runtimes are listed below.
+
+- **RTX A6000, 2026-10-15 run.** This card holds its 300 W limit for about a minute, then reaches
+  90–93 °C with the fan at 90–100 % and throttles its SM clock (normally 1,800–1,920 MHz) to as low as
+  210 MHz. Every benchmark started on an idle card below 60 °C, and each one's time window was checked
+  against the GPU's temperature log ([results/a6000/THERMAL.md](results/a6000/THERMAL.md)). Affected
+  benchmarks, marked ⚠ in [results/SUMMARY.md](results/SUMMARY.md):
+
+  | model | share of the benchmark thermally throttled | SM clock min / median | peak |
+  |---|---|---|---|
+  | Llama-3.2-1B | 33 % | 1,485 / 1,605 MHz | 90 °C |
+  | Qwen2.5-1.5B | 31 % | 1,410 / 1,590 MHz | 91 °C |
+  | Llama-3.2-3B | 67 % | 420 / 1,410 MHz | 93 °C |
+  | Mistral-7B-v0.3 | 78 % | 210 / 450 MHz | 93 °C |
+
+  TinyLlama-1.1B and Qwen2.5-0.5B ran without throttling. The token gate and perplexity results don't
+  depend on clock speed and are valid for every model.
+- **RTX 2080 Ti.** These didn't overheat, but under sustained load their 250 W power cap held the
+  clock at 1.4–1.55 GHz. That affects Llama-3.2-3B prefill in the full suite: 289.7 ms against
+  273.6 ms in a short isolated run (marked ✱ in the results table).
 
 ## Quick start
 
