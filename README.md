@@ -15,14 +15,17 @@ CUDA/HIP graph and replayed.
 ## What it runs, and where
 
 Models: Llama 2 / 3 / 3.1 / 3.2, TinyLlama, Mistral and Qwen2 / 2.5. In practice that means head_dim
-64 or 128, any GQA group up to 8, tied or untied embeddings, Llama-3 RoPE scaling and QKV bias.
+64 or 128, any GQA group up to 8, tied or untied embeddings, Llama-3 RoPE scaling and QKV bias. It
+also runs one Mixture-of-Experts model, Granite-3.1-1B-A400M (32 experts, top-8), on a single GPU
+([design and results](docs/moe-design.md)).
 
 Hardware:
 
 - **NVIDIA, tested:** RTX 2080 Ti (Turing, sm_75), on one card and on two with tensor parallelism,
   and RTX A6000 (Ampere, sm_86). All kernel tests pass on both.
 - **AMD, compile-checked only.** It builds for MI200 (gfx90a), MI300 (gfx942) and RDNA3 (gfx1100)
-  with ROCm 7 and rocWMMA, but **it has never run on AMD hardware**.
+  with ROCm 7 and rocWMMA, but **it has never run on AMD hardware**. The MoE kernels came later and
+  haven't been compiled for AMD at all.
 
 ### Thermal throttling
 
@@ -272,12 +275,16 @@ in three ways.
 | Llama-3.2-1B | 13/20 | 10.4633 | 10.4631 | 99.81 % | 1.3e-5 |
 | Qwen2.5-1.5B | 17/20 | 9.4536 | 9.4535 | 99.86 % | 1.6e-5 |
 | Llama-3.2-3B | 20/20 | 8.2767 | 8.2768 | 99.82 % | 9.5e-6 |
+| Granite-3.1-1B-A400M (MoE) | 12/20 | 7.7292 | 7.7294 | 99.41 % | 2.6e-4 |
 
 - **Greedy token gate** ([tests/gate.py](tests/gate.py)): 7 prompts × 128 tokens, single-sequence
   with and without CUDA graphs, plus a batch of 6 sequences at different lengths (20 runs in all).
   Every divergence happens at a step where HF's own top two logits are exactly tied (gap 0) or one
   fp16 step apart (0.0156); one A6000 Llama-3.2-1B run also diverges at a gap of 0.0313. At such a step either token is a correct greedy choice. Llama-3.2-1B
   hits several of those near-ties in the first 128 tokens of its prompts, which is why it shows 13/20.
+  The MoE model diverges at gaps of up to 0.0469 and its KL is more than 10× the dense models'.
+  My guess, not yet checked, is router near-ties: a different expert choice moves the logits more
+  than fp16 rounding in a dense layer does.
 - **Perplexity** ([tests/ppl.py](tests/ppl.py)): WikiText-2 test, 16 windows of 1,024 tokens, both
   engines on the same tokens. This checks the whole distribution at every position, not just the
   top token. hipinfer's perplexity is within 0.003 % of HF's on the single-GPU 2080 Ti runs above,
@@ -288,6 +295,11 @@ in three ways.
   bit-exact against HF's fp16 order of operations. RMSNorm is bit-exact at 3 of the 5 tested
   shapes; at the other two the max error is 2.0e-3 on the 2080 Ti and 3.9e-3 on the A6000, within
   the test's 2e-3 absolute + 2e-3 relative tolerance.
+
+When a model doesn't match, [scripts/layer_diff.py](scripts/layer_diff.py) shows where: it compares
+every sub-step of every layer against HF and names the first one that is off by more than fp16
+rounding explains. On the four models I ran it on it finds nothing, and it names a planted 1 % RoPE
+error exactly ([docs/layer-diff.md](docs/layer-diff.md)).
 
 Llama-3.2-3B doesn't fit next to an HF reference copy on an 11 GB card, so its gate and perplexity
 run HF first and the engine second (`--hf-first`). Llama-3.1-8B and Mistral-7B-v0.3 only fit
@@ -352,11 +364,25 @@ each product explicitly.
   SDPA.
 - **AMD runs only the portable kernels** (WMMA GEMM and attention, scalar decode attention). MFMA
   versions of the register-resident kernels aren't written yet, and nothing has run on AMD hardware.
+- **MoE decode runs at 63 % of the bandwidth floor** on Granite-3.1-1B-A400M (2.26 ms/token on the
+  2080 Ti), against 81–87 % for the dense models. Each token reads 8 of 32 small experts, so the
+  GEMVs are short and the reads scattered. MoE runs on one GPU only; there's no expert parallelism yet.
 - **Not supported:** quantization (it's fp16 only), a paged KV cache (each slot's cache is
-  contiguous), sampling other than greedy, Mixture-of-Experts and sliding-window attention.
+  contiguous), sampling other than greedy, MoE models with shared experts or QK-norm (Qwen-MoE,
+  DeepSeek, OLMoE) and sliding-window attention.
 - **Sliding-window models:** Mistral-7B-v0.1 (4,096-token window) loads only with `max_seq` within
   its window, where full attention gives the same result, and the benchmarks cap its context there.
   Weight files exported before this check carry no window and should be re-exported.
+
+## More detail
+
+- [docs/claims.md](docs/claims.md): every claim in this README with its exact scope and the result
+  file behind it.
+- [docs/profiling.md](docs/profiling.md): where a decode step's time goes, kernel by kernel.
+- [docs/porting-a-model.md](docs/porting-a-model.md): the weight format, what a new model family
+  costs, and how each unsupported feature fails.
+- [docs/moe-design.md](docs/moe-design.md), [docs/layer-diff.md](docs/layer-diff.md),
+  [docs/turing-prefill-gemm.md](docs/turing-prefill-gemm.md).
 
 ## Author
 

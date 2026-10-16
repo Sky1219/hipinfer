@@ -124,7 +124,7 @@ wrong logits and is caught only by the gate and perplexity tests below.
 
 | feature | example models | what happens today |
 |---|---|---|
-| Mixture-of-Experts | Mixtral, Qwen-MoE, DeepSeek-V2/V3 | **loud**: `export.py` raises `KeyError` on `mlp.gate_proj` (the experts have different names). The engine has no router or expert GEMMs. |
+| Mixture-of-Experts with shared experts or QK-norm | Qwen-MoE, DeepSeek-V2/V3, OLMoE | **loud**: `export.py` rejects any MoE `model_type` other than Mixtral, Granite MoE and OLMoE, and the loader rejects QK-norm (OLMoE). Granite MoE runs on one GPU; Mixtral exports but hasn't run on a GPU ([moe-design.md](moe-design.md)). |
 | Sliding-window attention beyond the window | Mistral-7B-v0.1 at > 4,096 tokens, Gemma-2 | **loud**: the loader refuses `max_seq` > window. |
 | head_dim ∉ {64, 128}, GQA group > 8 | Phi-2 (80), Gemma (256) | **loud**: rejected at load time. |
 | Partial rotary | Phi | **loud**: `assert inv_freq.numel() == head_dim // 2` in the exporter. |
