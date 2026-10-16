@@ -15,7 +15,8 @@ Status: runs on one GPU, checked on an RTX 2080 Ti against HF transformers on Gr
 
 **The gate result depends on GEMM configs.** The autotuner times every tile config on first use,
 so two runs can pick different configs, which sum in different orders and round differently. The
-dense models pass the gate either way; Granite MoE does not. With the configs held fixed, its
+dense models have passed in every run, including runs whose picks differed (Llama-3.2-1B gave 13/20
+and 11/20); Granite MoE has not. With the configs held fixed, its
 results are bit-identical between runs and builds, so this is rounding, not a race. Five runs
 on the 2080 Ti ([`gate_runs/`](../results/2080ti/granite-moe-1b/gate_runs/), plus `gate.log`):
 three autotuned runs pass (all three picked the same configs), one autotuned run and one with
