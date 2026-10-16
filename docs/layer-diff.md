@@ -6,12 +6,10 @@ every sub-step of every layer on both sides for one prompt and prints the first 
 by more than fp16 rounding explains, plus the token positions and heads where the error sits.
 So "outputs don't match HF" becomes "layer 7's RoPE is off from position 1 on".
 
-> **Status (2026-10-16).** The HF side, the comparison and the report are tested on CPU
-> ([`tests/test_layer_diff.py`](../tests/test_layer_diff.py)). The engine side
-> (`hi_prefill_debug` in [`src/api.cu`](../src/api.cu), `Engine.prefill_debug` in
-> [`scripts/hipinfer.py`](../scripts/hipinfer.py)) was written without a GPU toolchain and **has
-> not been compiled or run yet**. The steps under [First run on the GPU](#first-run-on-the-gpu)
-> build it and check it.
+Checked on an RTX 2080 Ti: TinyLlama-1.1B, Qwen2.5-0.5B, Llama-3.2-1B and Llama-3.2-3B show no
+divergence anywhere (the closest point reaches 0.33–0.67 of its threshold), and a 1 % error planted
+in the RoPE frequencies is reported as `layer 0, rope`. The reports are in
+[`results/2080ti/layer_diff/`](../results/2080ti/layer_diff/).
 
 ## What gets compared
 
@@ -113,7 +111,7 @@ divergence`, and its closest point reaches 0.32 of the tolerance.
 - The exit code is 1 when anything diverged and 0 otherwise. `--json out.json` writes every
   point's numbers.
 
-## CPU only (verified 2026-10-16)
+## CPU only
 
 ```bash
 python tests/test_layer_diff.py
@@ -130,68 +128,35 @@ any point name above):
 python scripts/layer_diff.py --model hf-internal-testing/tiny-random-LlamaForCausalLM --candidate hf --device cpu --inject 1:rope
 ```
 
-## First run on the GPU
+## On the GPU
 
-These steps were written on 2026-10-16 for edmonds. Per the usual rules, use GPU 0 (a 2080 Ti),
-never GPU 1 (the A6000), and always set `CUDA_DEVICE_ORDER=PCI_BUS_ID`. They use a separate
-remote directory (`/data/axd200066/hipinfer_ld`), so nothing else's build in `hipinfer_pf` gets
-clobbered.
-
-**1. Ship the branch and build** (2080 Ti only, which compiles fast). Run from this checkout on
-the laptop:
+Build the engine as usual (`make`), then:
 
 ```bash
-tar --exclude=__pycache__ -cf - src tests scripts Makefile | ssh edmonds "mkdir -p /data/axd200066/hipinfer_ld && cd /data/axd200066/hipinfer_ld && rm -rf src tests scripts && tar -xmf -"
+python scripts/layer_diff.py --model TinyLlama/TinyLlama-1.1B-Chat-v1.0 --weights tinyllama.bin --json layer_diff_tinyllama.json
 ```
+
+It prints `no divergence` and exits 0 when every point is within its threshold. Both HF runs (fp32
+reference, then the fp16 floor) run on the GPU one after the other and are freed before the engine
+loads. When the fp32 copy does not fit next to the engine (TinyLlama in fp32 is 4.4 GB), add
+`--device cpu`: the HF runs move to the CPU while the engine stays on the GPU.
+
+**Negative control.** Make the engine wrong on purpose: scale the RoPE frequencies stored in a copy
+of the weight file by 1 %. The report must name `layer 0, rope`, with position 0 clean. This also
+exercises the `rope` dump, the most intricate copy (k comes back out of the KV cache):
 
 ```bash
-ssh edmonds 'cd /data/axd200066/hipinfer_ld && make NVCC=/usr/local/cuda/bin/nvcc NV_ARCH="-gencode arch=compute_75,code=sm_75"'
+cp tinyllama.bin tinyllama_badrope.bin
+python -c "import numpy as np, struct; p = 'tinyllama_badrope.bin'; hd = struct.unpack('<10i', open(p, 'rb').read(40))[8]; a = np.memmap(p, dtype=np.float32, mode='r+', offset=64, shape=(hd // 2,)); a *= 1.01; a.flush()"
+python scripts/layer_diff.py --model TinyLlama/TinyLlama-1.1B-Chat-v1.0 --weights tinyllama_badrope.bin
 ```
 
-If the build fails, the new code is the `debug dump` block above `attn_rows` and
-`hi_prefill_debug` / `hi_debug_bytes` after `hi_prefill_logits`.
+Qwen2.5 covers the QKV bias, and Llama-3.2 covers llama3 RoPE scaling and tied embeddings.
 
-**2. Confirm nothing else changed.** The dump only runs inside `hi_prefill_debug`.
+### Engine bug or dump bug?
 
-```bash
-ssh edmonds 'cd /data/axd200066/hipinfer_ld && export CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES=0 HF_HUB_CACHE=/datastore/hub && /data/axd200066/envs/baselines/bin/python tests/test_kernels.py | tail -3 && /data/axd200066/envs/baselines/bin/python tests/gate.py --weights /data/axd200066/models/tinyllama.bin --new 32'
-```
-
-**3. Diff TinyLlama.** Expect `no divergence` and exit code 0.
-
-```bash
-ssh edmonds 'cd /data/axd200066/hipinfer_ld && export CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES=0 HF_HUB_CACHE=/datastore/hub && /data/axd200066/envs/baselines/bin/python scripts/layer_diff.py --model TinyLlama/TinyLlama-1.1B-Chat-v1.0 --weights /data/axd200066/models/tinyllama.bin --json /data/axd200066/hipinfer_ld/layer_diff_tinyllama.json'
-```
-
-Both HF runs (fp32 reference, then fp16 floor) run on the GPU one after the other and are freed
-before the engine loads. TinyLlama in fp32 is 4.4 GB. For models whose fp32 copy does not fit
-in 11 GB (Llama-3.2-3B and up), add `--device cpu`: the HF runs move to the server's CPU while
-the engine stays on the GPU.
-
-**4. Negative control: make the engine wrong on purpose.** Scaling the RoPE frequencies stored
-in a copy of the weight file by 1% must be reported as `layer 0, rope`, with position 0 clean.
-This also checks the `rope` dump, which is the most intricate copy (k comes back out of the KV
-cache):
-
-```bash
-ssh edmonds 'mkdir -p /data/axd200066/tmp && cp /data/axd200066/models/tinyllama.bin /data/axd200066/tmp/tinyllama_badrope.bin && /data/axd200066/envs/baselines/bin/python -c "import numpy as np, struct; p = \"/data/axd200066/tmp/tinyllama_badrope.bin\"; hd = struct.unpack(\"<10i\", open(p, \"rb\").read(40))[8]; a = np.memmap(p, dtype=np.float32, mode=\"r+\", offset=64, shape=(hd // 2,)); a *= 1.01; a.flush()"'
-```
-
-```bash
-ssh edmonds 'cd /data/axd200066/hipinfer_ld && export CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES=0 HF_HUB_CACHE=/datastore/hub && /data/axd200066/envs/baselines/bin/python scripts/layer_diff.py --model TinyLlama/TinyLlama-1.1B-Chat-v1.0 --weights /data/axd200066/tmp/tinyllama_badrope.bin; rm /data/axd200066/tmp/tinyllama_badrope.bin'
-```
-
-**5. The other families.** Qwen2.5 covers the QKV bias, and Llama-3.2 covers llama3 RoPE scaling
-and tied embeddings:
-
-```bash
-ssh edmonds 'cd /data/axd200066/hipinfer_ld && export CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES=0 HF_HUB_CACHE=/datastore/hub && for m in "Qwen/Qwen2.5-0.5B qwen25-0.5b" "unsloth/Llama-3.2-1B llama32-1b" "unsloth/Llama-3.2-3B llama32-3b"; do set -- $m; /data/axd200066/envs/baselines/bin/python scripts/layer_diff.py --model $1 --weights /data/axd200066/models/$2.bin --device cpu --json /data/axd200066/hipinfer_ld/layer_diff_$2.json | tail -3; done'
-```
-
-### If step 3 reports a divergence
-
-The tool works on the HF side, so either the engine really differs or the uncompiled dump is
-wrong. Signs of a dump bug:
+A divergence means either the engine really differs or the debug dump copied the wrong thing.
+Signs of a dump bug:
 
 - **rel exactly 1.0 everywhere in one plane, cosine 0:** the plane was never written (the buffer
   is zeroed first). Look for a missing `dbg_step` call.

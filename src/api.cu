@@ -582,9 +582,8 @@ EXPORT void hi_argmax(const void* logits, int B, int V, int* tok_out, void* s) {
 }
 
 // ------------------------------------------------------------------ mixture of experts
-// UNVERIFIED: written 2026-10-16 without a GPU. It compiles (nvcc 12.0, sm_75, a local check
-// without a GPU) but has never run.
-// docs/moe-design.md has the design; tests/test_kernels.py test_moe() is the first check.
+// docs/moe-design.md has the design. Checked by tests/test_kernels.py test_moe() (kernels vs PyTorch)
+// and end to end against HF by tests/gate.py and tests/ppl.py (Granite MoE 1B).
 static int gemv_max();
 
 // Router + top-k for M normalised rows xn: idx[M, k] (int) and routing weights w[M, k] (fp32),
@@ -807,7 +806,7 @@ struct Config {
   int window;  // sliding-window attention span (0: none); the engine needs max_seq <= window
   float eps, attn_scaling;
   bool tied, qkv_bias;
-  // MoE (weight-file version 3; UNVERIFIED engine path): inter is per expert
+  // MoE (weight-file version 3): inter is per expert
   bool moe = false, qk_norm = false;
   int n_experts = 0, top_k = 0, moe_flags = 0;
   float moe_scale = 1.f;
@@ -1286,8 +1285,6 @@ EXPORT float hi_tp_allreduce_bench(Engine* e, size_t n, int iters) {
 }
 
 // ------------------------------------------------------------------ debug dump (hi_prefill_debug)
-// NOT YET COMPILED: written on 2026-10-16 without a GPU toolchain; build and run
-// scripts/layer_diff.py (docs/layer-diff.md) before relying on it.
 // While e->dbg is set (only inside hi_prefill_debug: one GPU, one prefill chunk), prefill copies
 // each sub-step's output rows into it: fp16 [dbg_T, width] planes back to back, plane 0 the
 // embedding, then per layer {attn_norm, qkv (before RoPE), rope (q | k after RoPE), attn,
@@ -1358,7 +1355,7 @@ static void attn_rows(Engine* e, const Layer& w, half* kc, half* vc, int slot, i
   dbg_step(e, w, kDbgO, e->x + (size_t)r0 * H, H, r0, m, s);
 }
 
-// MoE block for rows [r0, r0 + m) (UNVERIFIED): norm, router + top-k, experts + combine into
+// MoE block for rows [r0, r0 + m): norm, router + top-k, experts + combine into
 // e->x. Up to the GEMV limit the experts run as GEMVs (graph-capturable); above it, grouped GEMMs.
 static void moe_rows(Engine* e, const Layer& w, int r0, int m, hipStream_t s) {
   const Config& c = e->c;
@@ -1512,7 +1509,7 @@ EXPORT size_t hi_debug_bytes(Engine* e, int T) {
   return n * (size_t)T * 2;
 }
 
-// Debug (scripts/layer_diff.py; NOT YET COMPILED, see the dump layout above attn_rows): prefill
+// Debug (scripts/layer_diff.py; see the dump layout above attn_rows): prefill
 // like hi_prefill_logits and also copy every sub-step's activations for the T rows into dst, a
 // device pointer on the engine's GPU of hi_debug_bytes(e, T) bytes (zeroed first, so a plane the
 // engine never wrote compares as all zeros). One GPU, T <= max_prefill. Returns the greedy next
@@ -1567,7 +1564,7 @@ static void decode_step(Engine* e, int B) {
       hi_rope_cache(e->qkv, e->qkv_dim, B, hq, hkv, D, e->rope, e->d_pos, 0, 0, kc, vc, e->max_seq, s);
     }
     hi_decode_attn(e->qkv, e->qkv_dim, kc, vc, e->max_seq, e->d_pos, e->att, HD, B, hq, hkv, D, e->work, s);
-    if (c.moe) {  // UNVERIFIED: one GPU (no all-reduce); GEMV experts for small B, grouped GEMMs above
+    if (c.moe) {  // one GPU only (no all-reduce); GEMV experts for small B, grouped GEMMs above
       if (small) hi_gemv(e->att, HD, nullptr, 0.f, w.wo, e->x, H, B, H, HD, ep, s);
       else hi_gemm(e->att, HD, w.wo, nullptr, e->x, H, B, H, HD, ep, s);
       moe_rows(e, w, 0, B, s);

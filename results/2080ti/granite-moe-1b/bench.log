@@ -1,0 +1,38 @@
+NVIDIA GeForce RTX 2080 Ti peak BW 616.0 GB/s | ibm-granite/granite-3.1-1b-a400m-base {'vocab': 49152, 'hidden': 1024, 'inter': 512, 'layers': 24, 'heads': 16, 'kv_heads': 8, 'head_dim': 64, 'max_pos': 131072, 'window': 0, 'tied': False, 'qkv_bias': False, 'weight_bytes': 857311232}
+
+== HF transformers reference timings ==
+Loading weights:   0%|          | 0/218 [00:00<?, ?it/s]Loading weights:  42%|████▏     | 92/218 [00:00<00:00, 889.87it/s]Loading weights:  88%|████████▊ | 191/218 [00:00<00:00, 926.59it/s]Loading weights: 100%|██████████| 218/218 [00:00<00:00, 971.76it/s]
+HF prefill T=  128:   105.75 ms
+HF prefill T=  512:   106.96 ms
+HF prefill T= 1024:   135.23 ms
+HF prefill T= 2000:   274.92 ms
+HF prefill T= 4096:   824.34 ms
+HF decode ctx=  128:  67.23 ms/token
+HF decode ctx= 1024:  67.18 ms/token
+
+== Prefill latency (ms) ==
+T=  128  hipinfer   17.77 ms (    7202 tok/s)   HF  105.75 ms   x5.95
+T=  512  hipinfer   27.17 ms (   18842 tok/s)   HF  106.96 ms   x3.94
+T= 1024  hipinfer   42.03 ms (   24362 tok/s)   HF  135.23 ms   x3.22
+T= 2000  hipinfer   70.43 ms (   28397 tok/s)   HF  274.92 ms   x3.90
+T= 4096  hipinfer  135.19 ms (   30298 tok/s)   HF  824.34 ms   x6.10
+
+== Decode, batch 1 (ms/token) ==
+ctx=  128  hipinfer  2.258 ms (graph) /  2.268 ms (no graph)   HF  67.23 ms   x29.8   roofline 1.412 ms -> 63% of peak BW
+ctx= 1024  hipinfer  2.360 ms (graph) /  2.372 ms (no graph)   HF  67.18 ms   x28.5   roofline 1.484 ms -> 63% of peak BW
+
+== Decode latency vs context length (batch 1, 128 new tokens) ==
+ctx=   128   2.252 ms/token   KV read     9.4 MB/step   roofline 1.407 ms  62% BW
+ctx=   512   2.298 ms/token   KV read    28.3 MB/step   roofline 1.438 ms  63% BW
+ctx=  1024   2.361 ms/token   KV read    53.5 MB/step   roofline 1.479 ms  63% BW
+ctx=  2048   2.434 ms/token   KV read   103.8 MB/step   roofline 1.560 ms  64% BW
+
+== Batched decode throughput (ctx 512, 128 new tokens; up to 64 sequences fit) ==
+B=  1   2.298 ms/step        435 tok/s     213 W   489.61 mJ/token
+B=  2   3.276 ms/step        610 tok/s     251 W   410.53 mJ/token
+B=  4   5.373 ms/step        744 tok/s     247 W   332.25 mJ/token
+B=  8   5.125 ms/step       1561 tok/s     217 W   139.22 mJ/token
+B= 16   6.161 ms/step       2597 tok/s     220 W    84.59 mJ/token
+B= 32   7.619 ms/step       4200 tok/s     249 W    59.28 mJ/token
+B= 64  10.886 ms/step       5879 tok/s     249 W    42.30 mJ/token
+wrote results/2080ti/granite-moe-1b/bench.json

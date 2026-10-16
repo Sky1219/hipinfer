@@ -1,0 +1,13 @@
+{
+ "model": "ibm-granite/granite-3.1-1b-a400m-base",
+ "gpu": "NVIDIA GeForce RTX 2080 Ti",
+ "tp": 1,
+ "seq": 1024,
+ "windows": 16,
+ "tokens": 16368,
+ "ppl_hf": 7.72941240074481,
+ "ppl_hipinfer": 7.729237749467591,
+ "top1_agreement": 0.9941348973607038,
+ "mean_kl_hf_to_hipinfer": 0.00026218679618410847,
+ "max_logit_diff": 3.59375
+}

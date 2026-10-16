@@ -13,7 +13,10 @@ MODEL_ORDER = ["tinyllama", "qwen25-0.5b", "llama32-1b", "qwen25-1.5b", "llama32
 MODEL_NAME = {"tinyllama": "TinyLlama-1.1B", "qwen25-0.5b": "Qwen2.5-0.5B", "llama32-1b": "Llama-3.2-1B",
               "qwen25-1.5b": "Qwen2.5-1.5B", "llama32-3b": "Llama-3.2-3B", "mistral-7b": "Mistral-7B-v0.3",
               "mistral-7b-v0.1": "Mistral-7B-v0.1 (window ignored)",
-              "llama31-8b": "Llama-3.1-8B"}
+              "llama31-8b": "Llama-3.1-8B", "granite-moe-1b": "Granite-3.1-1B-A400M (MoE)"}
+# MoE models: (experts, top-k, all weights in fp16 GB); their bench weight_bytes counts only what one
+# token reads (router plus its top-k experts)
+MOE = {"granite-moe-1b": (32, 8, 2.6)}
 
 
 # Per GPU, from results/<gpu dir>/thermal.json (written after checking each benchmark window against
@@ -100,7 +103,12 @@ def main():
             notes.append("MHA")
         else:
             notes.append(f"GQA group {c['heads'] // c['kv_heads']}")
-        print(f"| {MODEL_NAME.get(m, m)} | {c['weight_bytes'] / 1e9:.2f} | {c['layers']} | {c['hidden']} | {c['heads']}/{c['kv_heads']} | "
+        size = f"{c['weight_bytes'] / 1e9:.2f}"
+        if m in MOE:
+            E, k, total = MOE[m]
+            notes.append(f"MoE, {E} experts, top-{k}")
+            size = f"{total} ({size} read per token)"
+        print(f"| {MODEL_NAME.get(m, m)} | {size} | {c['layers']} | {c['hidden']} | {c['heads']}/{c['kv_heads']} | "
               f"{c['head_dim']} | {c['vocab']} | {', '.join(notes)} |")
 
     print("\n## Correctness vs HF transformers (fp16)\n")

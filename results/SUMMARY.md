@@ -9,6 +9,7 @@
 | Llama-3.2-3B | 6.43 | 28 | 3072 | 24/8 | 128 | 128256 | tied embeddings, GQA group 3 |
 | Mistral-7B-v0.3 | 14.23 | 32 | 4096 | 32/8 | 128 | 32768 | GQA group 4 |
 | Llama-3.1-8B | 15.01 | 32 | 4096 | 32/8 | 128 | 128256 | GQA group 4 |
+| Granite-3.1-1B-A400M (MoE) | 2.6 (0.86 read per token) | 24 | 1024 | 16/8 | 64 | 49152 | GQA group 2, MoE, 32 experts, top-8 |
 
 ## Correctness vs HF transformers (fp16)
 
@@ -29,6 +30,7 @@ Greedy gate: 7 prompts x 128 tokens, single-sequence with and without CUDA graph
 | Mistral-7B-v0.3 | RTX A6000 | PASS | 20/20 | 5.7774 | 5.7774 | 99.91% | 4.6e-06 | 1.939 |
 | Mistral-7B-v0.1 (window ignored) | RTX A6000 | PASS | 20/20 | 5.6893 | 5.6893 | 99.84% | 4.6e-06 | 0.506 |
 | Llama-3.1-8B | RTX A6000 | PASS | 14/20 | 6.5467 | 6.5469 | 99.89% | 1.1e-05 | 3.141 |
+| Granite-3.1-1B-A400M (MoE) | RTX 2080 Ti | PASS | 12/20 | 7.7292 | 7.7294 | 99.41% | 2.6e-04 | 3.594 |
 
 ## Decode, batch 1 (ms/token, greedy, 256 new tokens after a 128-token prompt)
 
@@ -46,6 +48,7 @@ Floor = (weight bytes + KV bytes read) / peak DRAM bandwidth. HF = transformers 
 | Llama-3.2-3B | **12.11** (87% BW; HF copy does not fit) | **9.97** (84% BW; HF 33.2, 3.3x) ⚠ |
 | Mistral-7B-v0.3 | - | **21.36** (87% BW; HF 37.1, 1.7x) ⚠ |
 | Llama-3.1-8B | - | **24.87** (79% BW; HF 37.0, 1.5x) ⚠ |
+| Granite-3.1-1B-A400M (MoE) | **2.26** (63% BW; HF 67.2, 29.8x) | - |
 
 ## Decode throughput, batched (tok/s; ctx 512 + 128 new tokens; largest batch that fits)
 
@@ -58,6 +61,7 @@ Floor = (weight bytes + KV bytes read) / peak DRAM bandwidth. HF = transformers 
 | Llama-3.2-3B | B=8: 479; B=16: **888** (18.0 ms/step, 249 mJ/tok at 221 W) | B=8: 674; B=64: **1920** (33.3 ms/step, 93 mJ/tok at 179 W) ⚠ |
 | Mistral-7B-v0.3 | - | B=8: 181; B=64: **1082** (59.2 ms/step, 168 mJ/tok at 182 W) ⚠ |
 | Llama-3.1-8B | - | B=8: 189; B=64: **908** (70.5 ms/step, 198 mJ/tok at 180 W) ⚠ |
+| Granite-3.1-1B-A400M (MoE) | B=8: 1561; B=64: **5879** (10.9 ms/step, 42 mJ/tok at 249 W) | - |
 
 ## Prefill (prompt tokens/s; ms in parentheses; HF = transformers eager, SDPA attention)
 
@@ -97,6 +101,11 @@ Floor = (weight bytes + KV bytes read) / peak DRAM bandwidth. HF = transformers 
 | Llama-3.1-8B | 1024 | - | 4983 (205.5 ms; HF 174.7 ms, 0.85x) ⚠ |
 | Llama-3.1-8B | 2000 | - | 5041 (396.8 ms; HF 339.9 ms, 0.86x) ⚠ |
 | Llama-3.1-8B | 4096 | - | 2494 (1642.2 ms; HF 718.9 ms, 0.44x) ⚠ |
+| Granite-3.1-1B-A400M (MoE) | 128 | 7202 (17.8 ms; HF 105.8 ms, 5.95x) | - |
+| Granite-3.1-1B-A400M (MoE) | 512 | 18.8k (27.2 ms; HF 107.0 ms, 3.94x) | - |
+| Granite-3.1-1B-A400M (MoE) | 1024 | 24.4k (42.0 ms; HF 135.2 ms, 3.22x) | - |
+| Granite-3.1-1B-A400M (MoE) | 2000 | 28.4k (70.4 ms; HF 274.9 ms, 3.90x) | - |
+| Granite-3.1-1B-A400M (MoE) | 4096 | 30.3k (135.2 ms; HF 824.3 ms, 6.10x) | - |
 
 ## Decode latency vs context length (batch 1, ms/token; % of the bandwidth floor incl. KV reads)
 
@@ -141,6 +150,10 @@ Floor = (weight bytes + KV bytes read) / peak DRAM bandwidth. HF = transformers 
 | Llama-3.1-8B | 2048 | - | 33.46 (59%) ⚠ |
 | Llama-3.1-8B | 4096 | - | 33.90 (60%) ⚠ |
 | Llama-3.1-8B | 8192 | - | 29.48 (71%) ⚠ |
+| Granite-3.1-1B-A400M (MoE) | 128 | 2.25 (62%) | - |
+| Granite-3.1-1B-A400M (MoE) | 512 | 2.30 (63%) | - |
+| Granite-3.1-1B-A400M (MoE) | 1024 | 2.36 (63%) | - |
+| Granite-3.1-1B-A400M (MoE) | 2048 | 2.43 (64%) | - |
 
 ## Kernels vs PyTorch (speedup = torch time / hipinfer time; graph-replayed; TinyLlama shapes)
 

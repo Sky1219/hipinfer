@@ -1,8 +1,20 @@
 # Mixture-of-Experts in hipinfer: design
 
-Status (2026-10-16): export and a CPU reference engine are written and checked against HF on CPU.
-The GPU kernels and engine integration compile (nvcc 12.0, sm_75 to sm_89) but have **never run**. See
-[overnight-moe-log.md](overnight-moe-log.md) for what is verified and the commands for the GPU server.
+Status: runs on one GPU, checked on an RTX 2080 Ti against HF transformers on Granite MoE 1B
+(`ibm-granite/granite-3.1-1b-a400m-base`, 32 experts, top-8). Results are in
+[`results/2080ti/granite-moe-1b/`](../results/2080ti/granite-moe-1b/).
+
+| check | result |
+|---|---|
+| `tests/test_kernels.py` `test_moe()`: router, top-k, GEMV and grouped expert paths vs PyTorch | all pass |
+| token gate (`tests/gate.py`): 7 prompts with and without CUDA graphs, plus batched B=6 | pass: 12/20 runs token-identical; the other 8 diverge where HF's own top-2 gap is at most 0.05 |
+| WikiText-2 perplexity (`tests/ppl.py`, 16 windows) | 7.7292 vs HF's 7.7294, top-1 agreement 99.4 % |
+| dense models unchanged (TinyLlama token gate) | 20/20 token-identical |
+| decode, B=1, ctx 128 | 2.26 ms/token, 30× HF; **63 % of the weight-read floor** (dense models: 81–87 %) |
+| prefill, 2,000 tokens | 70 ms, 3.9× HF |
+
+Not done yet: tensor or expert parallelism with MoE (rejected at load), OLMoE (needs the QK-norm
+kernel), Mixtral on a GPU (too big for the GPUs tested), and AMD.
 
 ## Target models
 
@@ -85,7 +97,7 @@ at `offset + e * bytes_per_expert`, and an expert-parallel rank reads its expert
 
 ## Kernels
 
-All new kernels are in `src/kernels.cuh`, marked `UNVERIFIED` (compiled, never run).
+All MoE kernels are at the end of `src/kernels.cuh`; `tests/test_kernels.py` `test_moe()` checks each one.
 
 1. **Router + top-k** (`moe_router_kernel`): one block per token. Reads the normalised hidden row
    (fp16), computes the E router logits with one warp per expert (fp32 accumulate, rounded to fp16
@@ -187,8 +199,26 @@ QKV + RoPE + cache-write GEMV epilogue (it needs a full-row reduction first), so
 spans ranks: an all-reduce of one float per row per layer (or replicate attention, step 2).
 Router: `norm_topk = 0`, fp16 weights. D = 128, 16/16 heads: supported head size.
 
+## Running the checks
+
+```bash
+python -c "import sys; sys.path[:0] = ['tests']; import test_kernels as t; t.test_moe(); print('FAILS', t.FAILS)"
+python scripts/export.py --model ibm-granite/granite-3.1-1b-a400m-base --out granite-moe-1b.bin
+python tests/test_moe_ref.py --quick     # CPU reference engine vs HF on the exported file
+python tests/gate.py --model ibm-granite/granite-3.1-1b-a400m-base --weights granite-moe-1b.bin
+python tests/ppl.py  --model ibm-granite/granite-3.1-1b-a400m-base --weights granite-moe-1b.bin
+```
+
+If `test_moe()` fails, check the router first (indices, then weights), then the GEMV path, then the
+grouped path (`hi.moe_experts(..., path=1|2)` forces one). `scripts/ref_engine.py`'s `moe_route` /
+`moe_experts` are the reference and run on CUDA tensors too.
+
 ## Later
 
+* Decode bandwidth. B=1 decode reaches 63 % of the weight-read floor against 81–87 % for the dense
+  models: each token reads 8 of 32 small experts (512 × 1,024 per projection), so every GEMV is
+  short and the reads are scattered. One fused launch over the selected experts is the first thing
+  to try.
 * Device-side grouped GEMM (one launch over all experts) for prefill and capturable batched decode.
 * Expert-aware batched decode GEMV: at B = 8 with top-8 of 32 experts most experts are hit by
   more than one token; group pairs by expert so each expert's weights stream once per step.

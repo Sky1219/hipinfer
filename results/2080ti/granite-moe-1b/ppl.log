@@ -1,0 +1,31 @@
+ibm-granite/granite-3.1-1b-a400m-base: 355892 test tokens, 16 windows of 1024
+Loading weights:   0%|          | 0/218 [00:00<?, ?it/s]Loading weights:  34%|███▍      | 74/218 [00:00<00:00, 737.34it/s]Loading weights:  76%|███████▌  | 165/218 [00:00<00:00, 830.15it/s]Loading weights: 100%|██████████| 218/218 [00:00<00:00, 885.52it/s]
+window   0: ppl HF 4.7674  hipinfer 4.7627  top-1 agree 99.707%  mean KL 2.92e-04  max |dlogit| 1.398
+window   1: ppl HF 6.1372  hipinfer 6.1346  top-1 agree 99.560%  mean KL 2.25e-04  max |dlogit| 1.398
+window   2: ppl HF 6.9264  hipinfer 6.9267  top-1 agree 99.413%  mean KL 2.46e-04  max |dlogit| 1.742
+window   3: ppl HF 7.5595  hipinfer 7.5589  top-1 agree 99.438%  mean KL 2.24e-04  max |dlogit| 1.742
+window   4: ppl HF 8.0640  hipinfer 8.0630  top-1 agree 99.492%  mean KL 2.11e-04  max |dlogit| 1.742
+window   5: ppl HF 8.7868  hipinfer 8.7858  top-1 agree 99.495%  mean KL 2.07e-04  max |dlogit| 2.227
+window   6: ppl HF 8.8851  hipinfer 8.8837  top-1 agree 99.497%  mean KL 2.00e-04  max |dlogit| 2.227
+window   7: ppl HF 9.3320  hipinfer 9.3317  top-1 agree 99.487%  mean KL 1.99e-04  max |dlogit| 2.574
+window   8: ppl HF 8.8404  hipinfer 8.8401  top-1 agree 99.468%  mean KL 2.08e-04  max |dlogit| 3.207
+window   9: ppl HF 8.5979  hipinfer 8.5972  top-1 agree 99.462%  mean KL 2.24e-04  max |dlogit| 3.207
+window  10: ppl HF 8.6017  hipinfer 8.6008  top-1 agree 99.440%  mean KL 2.33e-04  max |dlogit| 3.207
+window  11: ppl HF 8.5359  hipinfer 8.5356  top-1 agree 99.389%  mean KL 2.56e-04  max |dlogit| 3.594
+window  12: ppl HF 8.4349  hipinfer 8.4353  top-1 agree 99.368%  mean KL 2.62e-04  max |dlogit| 3.594
+window  13: ppl HF 8.1564  hipinfer 8.1565  top-1 agree 99.358%  mean KL 2.63e-04  max |dlogit| 3.594
+window  14: ppl HF 7.9161  hipinfer 7.9161  top-1 agree 99.394%  mean KL 2.59e-04  max |dlogit| 3.594
+window  15: ppl HF 7.7294  hipinfer 7.7292  top-1 agree 99.413%  mean KL 2.62e-04  max |dlogit| 3.594
+{
+ "model": "ibm-granite/granite-3.1-1b-a400m-base",
+ "gpu": "NVIDIA GeForce RTX 2080 Ti",
+ "tp": 1,
+ "seq": 1024,
+ "windows": 16,
+ "tokens": 16368,
+ "ppl_hf": 7.72941240074481,
+ "ppl_hipinfer": 7.729237749467591,
+ "top1_agreement": 0.9941348973607038,
+ "mean_kl_hf_to_hipinfer": 0.00026218679618410847,
+ "max_logit_diff": 3.59375
+}

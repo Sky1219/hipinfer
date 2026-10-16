@@ -1,0 +1,42 @@
+Loading weights:   0%|          | 0/218 [00:00<?, ?it/s]Loading weights:  46%|████▋     | 101/218 [00:00<00:00, 974.73it/s]Loading weights:  92%|█████████▏| 200/218 [00:00<00:00, 941.20it/s]Loading weights: 100%|██████████| 218/218 [00:00<00:00, 989.62it/s]
+hi_prefill: p0 1020 + T 5 exceeds max_seq 1024
+hi_prefill: slot 8 outside [0, max_batch 8)
+hi_prefill: token 49152 at 0 outside vocab 49152
+hi_decode: B 9 outside [1, max_batch 8]
+hi_decode: slot 0 at position 1023 + 2 steps exceeds max_seq 1024
+ibm-granite/granite-3.1-1b-a400m-base: layers 24 hidden 1024 heads 16/8 head_dim 64 vocab 49152 tied=False qkv_bias=False
+prompt 0 (len 5): prefill logits max |diff| = 0.1562
+  prompt 0 single graph=True: diverges at step 29 (hf gap 0.0312) -> near-tie, OK
+  prompt 0 single graph=False: diverges at step 29 (hf gap 0.0312) -> near-tie, OK
+prompt 1 (len 19): prefill logits max |diff| = 0.0391
+  prompt 1 single graph=True: diverges at step 56 (hf gap 0.0000) -> near-tie, OK
+  prompt 1 single graph=False: diverges at step 56 (hf gap 0.0000) -> near-tie, OK
+prompt 2 (len 16): prefill logits max |diff| = 0.0312
+  prompt 2 single graph=True: 128/128 tokens identical
+  prompt 2 single graph=False: 128/128 tokens identical
+prompt 3 (len 21): prefill logits max |diff| = 0.0312
+  prompt 3 single graph=True: 128/128 tokens identical
+  prompt 3 single graph=False: 128/128 tokens identical
+prompt 4 (len 18): prefill logits max |diff| = 0.2539
+  prompt 4 single graph=True: diverges at step 43 (hf gap 0.0469) -> near-tie, OK
+  prompt 4 single graph=False: diverges at step 43 (hf gap 0.0469) -> near-tie, OK
+prompt 5 (len 15): prefill logits max |diff| = 0.1094
+  prompt 5 single graph=True: 128/128 tokens identical
+  prompt 5 single graph=False: 128/128 tokens identical
+prompt 6 (len 700): prefill logits max |diff| = 0.1250
+  prompt 6 single graph=True: 128/128 tokens identical
+  prompt 6 single graph=False: 128/128 tokens identical
+  batched B=6 slot 0: 128/128 tokens identical
+  batched B=6 slot 1: diverges at step 56 (hf gap 0.0000) -> near-tie, OK
+  batched B=6 slot 2: 128/128 tokens identical
+  batched B=6 slot 3: 128/128 tokens identical
+  batched B=6 slot 4: diverges at step 43 (hf gap 0.0469) -> near-tie, OK
+  batched B=6 slot 5: 128/128 tokens identical
+  prefill past max_seq: rejected
+  prefill slot >= max_batch: rejected
+  token outside vocab: rejected
+  decode B > max_batch: rejected
+  decode past max_seq: rejected
+
+12/20 runs token-identical, max prefill-logit |diff| 0.2539
+GATE PASS

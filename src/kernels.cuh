@@ -1934,9 +1934,7 @@ __global__ void __launch_bounds__(kARThreads) allreduce_oneshot_kernel(ARArgs a,
 
 // =================================================================================
 // Mixture of Experts (docs/moe-design.md).
-// UNVERIFIED: written 2026-10-16 without a GPU. Everything from here to the end of the file
-// compiles (nvcc 12.0, sm_75, no spills) but has never run; tests/test_kernels.py test_moe() is
-// its first check.
+// Everything from here to the end of the file is checked by tests/test_kernels.py test_moe().
 // Rounding follows HF's default (grouped_mm) experts path: router logits rounded to fp16, each
 // expert's down projection rounded to fp16, times its routing weight (an fp16-rounded product
 // when the model rounds its weights to fp16), summed over the k experts in fp32, rounded once,
@@ -1946,7 +1944,7 @@ constexpr int kMoeMaxE = 256, kMoeMaxK = 16;
 constexpr int kMoeNormTopk = 1, kMoeFp16Weights = 2;  // moe_flags bits (weight-file header)
 
 // NR dot products x[r] . w[r] over K8 uint4 (8 halves each), one warp: 16-byte loads, 4 per lane
-// in flight, fp32 accumulation. Every lane gets the warp-reduced sums. (UNVERIFIED)
+// in flight, fp32 accumulation. Every lane gets the warp-reduced sums.
 template <int NR>
 __device__ __forceinline__ void warp_dot(const uint4* const (&x)[NR], const uint4* const (&w)[NR], int K8, float (&acc)[NR]) {
   constexpr int U = 4;
@@ -1974,7 +1972,7 @@ __device__ __forceinline__ void warp_dot(const uint4* const (&x)[NR], const uint
 }
 
 // ---------------------------------------------------------------------------------
-// Router + top-k + routing weights, one block per token (UNVERIFIED). Logits l = fp16(xn . Wr[e])
+// Router + top-k + routing weights, one block per token. Logits l = fp16(xn . Wr[e])
 // (one warp per expert), then warp 0 picks the k largest in k rounds of a warp argmax (NaN above
 // numbers, ties to the lower index: argmax_better), in descending order. Weights: softmax over the
 // k (kMoeNormTopk; Mixtral's renormalised top-k and Granite's top-k softmax are the same thing) or
@@ -2040,7 +2038,7 @@ moe_router_kernel(const half* __restrict__ xn, int ldx, const half* __restrict__
 }
 
 // ---------------------------------------------------------------------------------
-// Small-batch (decode) experts as GEMVs over the selected experts only (UNVERIFIED). Pair
+// Small-batch (decode) experts as GEMVs over the selected experts only. Pair
 // p = token * k + j runs expert idx[p] on token p / k; grid.y = pairs, so the launch shape is
 // fixed and the expert choice stays on the device (CUDA-graph capturable).
 // Gate/up + SwiGLU: one warp per (pair, unit o): weight rows r0 = (o/16)*32 + o%16 and r0 + 16
@@ -2063,7 +2061,7 @@ moe_gemv_gu_kernel(const half* __restrict__ xn, int ldx, const half* __restrict_
   }
 }
 
-// Down projection + combine + residual, one warp per (token b, hidden column h) (UNVERIFIED): the
+// Down projection + combine + residual, one warp per (token b, hidden column h): the
 // k dot products wdown[idx[b,j]][h] . act[b*k + j] (4 at a time), each rounded to fp16, weighted,
 // summed over j in fp32, rounded, scaled, and added to x[b, h]. No atomics; deterministic.
 __global__ void __launch_bounds__(256)
@@ -2103,7 +2101,7 @@ moe_gemv_down_kernel(const half* __restrict__ act, const half* __restrict__ wdow
 
 // ---------------------------------------------------------------------------------
 // Grouped (prefill / batched) path, part 1: counting sort of the n = M*k (token, slot) pairs by
-// expert, one block (UNVERIFIED). off[E+1] = exclusive prefix of the counts; perm[q] = the pair at
+// expert, one block. off[E+1] = exclusive prefix of the counts; perm[q] = the pair at
 // sorted position q; inv[pair] = q. The order within one expert follows the shared-memory atomics,
 // which changes no result (every row of a GEMM is computed independently of the others).
 // ---------------------------------------------------------------------------------
@@ -2128,7 +2126,7 @@ moe_sort_kernel(const int* __restrict__ idx, int n, int E, int* __restrict__ off
   }
 }
 
-// Part 2: rows[q] = xn[perm[q] / k], so each expert's tokens are contiguous (UNVERIFIED).
+// Part 2: rows[q] = xn[perm[q] / k], so each expert's tokens are contiguous.
 __global__ void moe_gather_kernel(const half* __restrict__ xn, int ldx, const int* __restrict__ perm, int k, int H,
                                   half* __restrict__ rows) {
   const int q = blockIdx.x;
@@ -2139,7 +2137,7 @@ __global__ void moe_gather_kernel(const half* __restrict__ xn, int ldx, const in
 
 // Part 3 (after the per-expert GEMMs wrote y[q] = expert output of sorted row q, fp16): token t's
 // weighted sum over its k rows y[inv[t*k + j]], rounded as in moe_gemv_down_kernel, added to x[t]
-// (UNVERIFIED). One block per token, 8 columns per thread.
+//. One block per token, 8 columns per thread.
 __global__ void moe_combine_kernel(const half* __restrict__ y, const int* __restrict__ inv, const float* __restrict__ wts,
                                    int k, int H, int flags, float scale, half* x, int ldx) {
   const int t = blockIdx.x;
