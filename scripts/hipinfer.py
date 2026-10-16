@@ -51,13 +51,18 @@ lib.hi_logits.restype = I
 lib.hi_set_state.argtypes = [P, I, IP, IP]
 lib.hi_set_state.restype = I
 lib.hi_sync.argtypes = [P]
-# MoE (UNVERIFIED: the library side compiles but has never run on a GPU)
+# MoE
 lib.hi_moe_config.argtypes = [P, IP]
 lib.hi_moe_router.argtypes = [P, I, P, I, I, I, I, I, P, P, P]
 lib.hi_moe_work_bytes.argtypes = [I, I, I, I, I]
 lib.hi_moe_work_bytes.restype = C.c_size_t
 lib.hi_moe_experts.argtypes = [P, I, P, P, P, P, I, I, I, I, I, I, F, P, I, I, P, P]
 MOE_NORM_TOPK, MOE_FP16_WEIGHTS = 1, 2  # moe_flags bits
+if hasattr(lib, "hi_prefill_debug"):  # debug dump (scripts/layer_diff.py); absent from builds that predate it
+    lib.hi_debug_bytes.argtypes = [P, I]
+    lib.hi_debug_bytes.restype = C.c_size_t
+    lib.hi_prefill_debug.argtypes = [P, I, IP, I, I, P]
+    lib.hi_prefill_debug.restype = I
 
 
 def _s():
@@ -240,6 +245,17 @@ class Engine:
         arr = (C.c_int * len(tokens))(*tokens)
         out = torch.empty(len(tokens), self.vocab, dtype=torch.float16, device=self.device)
         self._ok(lib.hi_prefill_logits(self.h, slot, arr, len(tokens), p0, C.c_void_p(out.data_ptr())), "prefill_logits")
+        return out
+
+    def prefill_debug(self, slot, tokens, p0=0):
+        """Prefill (one GPU, len(tokens) <= max_prefill) and return every layer's intermediates as
+        one flat fp16 tensor on the GPU; scripts/layer_diff.py split_engine_dump names the planes.
+        Not yet verified on a GPU (written before hi_prefill_debug was first compiled)."""
+        if not hasattr(lib, "hi_prefill_debug"):
+            raise RuntimeError("this libhipinfer.so has no hi_prefill_debug; rebuild it (make)")
+        arr = (C.c_int * len(tokens))(*tokens)
+        out = torch.empty(lib.hi_debug_bytes(self.h, len(tokens)) // 2, dtype=torch.float16, device=self.device)
+        self._ok(lib.hi_prefill_debug(self.h, slot, arr, len(tokens), p0, C.c_void_p(out.data_ptr())), "prefill_debug")
         return out
 
     def decode(self, B, steps, graph=True):
