@@ -129,11 +129,16 @@ def read_config(path):
     """Model config from a weight file's header (scripts/export.py), without loading the weights."""
     import struct
     with open(path, "rb") as f:
-        h = struct.unpack("<10i2f2i", f.read(56))
-    if h[0] != 0x48495046 or h[1] != 2:
-        raise ValueError(f"{path}: not a version-2 hipinfer weight file")
+        raw = f.read(128)
+    h = struct.unpack("<10i2f2i", raw[:56])
+    if h[0] != 0x48495046 or h[1] not in (2, 3):
+        raise ValueError(f"{path}: not a version-2/3 hipinfer weight file")
     keys = ["vocab", "hidden", "inter", "layers", "heads", "kv_heads", "head_dim", "max_pos"]
-    return dict(zip(keys, h[2:10]), eps=h[10], tied=bool(h[12] & 1), qkv_bias=bool(h[12] & 2), window=h[13])
+    cfg = dict(zip(keys, h[2:10]), eps=h[10], tied=bool(h[12] & 1), qkv_bias=bool(h[12] & 2), window=h[13],
+               moe=bool(h[12] & 4))
+    if h[1] == 3:  # MoE (inter is per expert)
+        cfg["n_experts"], cfg["top_k"], moe_flags, cfg["moe_scale"] = struct.unpack("<3if", raw[64:80])
+    return cfg
 
 
 def max_context(cfg):
