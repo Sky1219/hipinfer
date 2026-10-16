@@ -763,6 +763,8 @@ struct Engine {
   hipEvent_t ev[8];                    // TP: compute <-> comm ordering in the overlapped prefill
   std::vector<hipGraphExec_t> graphs;  // per batch size
   size_t layer_cache;                  // elements per layer of the KV cache
+  half* dbg = nullptr;                 // hi_prefill_debug: where prefill copies its intermediates (null: off)
+  int dbg_T = 0;                       // rows of each dbg plane
 };
 
 // Vocabulary-sharded logits ([rows, vl] at src, row stride vl) into the caller's [rows, vocab]
@@ -1162,6 +1164,59 @@ EXPORT float hi_tp_allreduce_bench(Engine* e, size_t n, int iters) {
   });
 }
 
+// ------------------------------------------------------------------ debug dump (hi_prefill_debug)
+// NOT YET COMPILED: written on 2026-10-16 without a GPU toolchain; build and run
+// scripts/layer_diff.py (docs/layer-diff.md) before relying on it.
+// While e->dbg is set (only inside hi_prefill_debug: one GPU, one prefill chunk), prefill copies
+// each sub-step's output rows into it: fp16 [dbg_T, width] planes back to back, plane 0 the
+// embedding, then per layer {attn_norm, qkv (before RoPE), rope (q | k after RoPE), attn,
+// o_proj (residual stream after the O GEMM), mlp_norm, gate_up (SwiGLU output), down (residual
+// stream after the down GEMM)}, then final_norm and logits. scripts/layer_diff.py engine_layout
+// is the same layout. Copies run on the prefill stream; decode and its graphs never dump.
+enum { kDbgAttnNorm, kDbgQkv, kDbgRope, kDbgAttn, kDbgO, kDbgMlpNorm, kDbgGateUp, kDbgDown, kDbgSteps };
+static int dbg_planes(const Engine* e) { return 1 + e->c.layers * kDbgSteps + 2; }
+static size_t dbg_width(const Engine* e, int p) {
+  const Config& c = e->c;
+  const int last = dbg_planes(e) - 1;  // logits; last - 1: final_norm
+  if (p == last) return c.vocab;
+  if (p == 0 || p == last - 1) return c.hidden;
+  switch ((p - 1) % kDbgSteps) {
+    case kDbgQkv: return (size_t)(c.n_heads + 2 * c.n_kv) * c.head_dim;
+    case kDbgRope: return (size_t)(c.n_heads + c.n_kv) * c.head_dim;
+    case kDbgAttn: return (size_t)c.n_heads * c.head_dim;
+    case kDbgGateUp: return c.inter;
+    default: return c.hidden;
+  }
+}
+static half* dbg_plane(const Engine* e, int p) {
+  size_t off = 0;
+  for (int i = 0; i < p; i++) off += dbg_width(e, i);
+  return e->dbg + off * e->dbg_T;
+}
+// Copy rows [r0, r0 + m) of src (row stride ld; src points at row r0) into plane p.
+static void dbg_copy(Engine* e, int p, const half* src, int ld, int r0, int m, hipStream_t s) {
+  if (!e->dbg) return;
+  const size_t w = dbg_width(e, p);
+  HI_CHECK(hipMemcpy2DAsync(dbg_plane(e, p) + (size_t)r0 * w, w * 2, src, (size_t)ld * 2, w * 2, m,
+                            hipMemcpyDeviceToDevice, s));
+}
+static void dbg_step(Engine* e, const Layer& w, int step, const half* src, int ld, int r0, int m, hipStream_t s) {
+  if (e->dbg) dbg_copy(e, 1 + (int)(&w - e->L.data()) * kDbgSteps + step, src, ld, r0, m, s);
+}
+// RoPE output: q rotated in place in the QKV buffer, k rotated into the cache (slot, positions pb + r0...).
+static void dbg_rope(Engine* e, const Layer& w, const half* q, int ld, const half* kc, int slot, int r0, int m, int pb,
+                     hipStream_t s) {
+  if (!e->dbg) return;
+  const int D = e->c.head_dim, p = 1 + (int)(&w - e->L.data()) * kDbgSteps + kDbgRope;
+  const size_t wd = dbg_width(e, p);
+  half* dst = dbg_plane(e, p) + (size_t)r0 * wd;
+  HI_CHECK(hipMemcpy2DAsync(dst, wd * 2, q, (size_t)ld * 2, (size_t)e->hq * D * 2, m, hipMemcpyDeviceToDevice, s));
+  for (int h = 0; h < e->hkv; h++)
+    HI_CHECK(hipMemcpy2DAsync(dst + (size_t)(e->hq + h) * D, wd * 2,
+                              kc + (((size_t)slot * e->hkv + h) * e->max_seq + pb + r0) * D, (size_t)D * 2,
+                              (size_t)D * 2, m, hipMemcpyDeviceToDevice, s));
+}
+
 // Attention block for rows [r0, r0 + m) of the n prompt rows: norm, QKV, RoPE + cache write,
 // causal attention over the cache (rows before r0 already written), O projection into e->x.
 static void attn_rows(Engine* e, const Layer& w, half* kc, half* vc, int slot, int r0, int m, int pb, hipStream_t s) {
@@ -1170,11 +1225,16 @@ static void attn_rows(Engine* e, const Layer& w, half* kc, half* vc, int slot, i
   const int ep = e->rank == 0 ? 1 : 0;  // row-parallel outputs: rank 0 adds the residual, the others store partials
   half* q = e->qkv + (size_t)r0 * ld;
   hi_rmsnorm(e->x + (size_t)r0 * H, w.attn_norm, e->xn + (size_t)r0 * H, m, H, c.eps, s);
+  dbg_step(e, w, kDbgAttnNorm, e->xn + (size_t)r0 * H, H, r0, m, s);
   hi_gemm(e->xn + (size_t)r0 * H, H, w.wqkv, w.bqkv, q, ld, m, ld, H, 0, s);
+  dbg_step(e, w, kDbgQkv, q, ld, r0, m, s);
   hi_rope_cache(q, ld, m, hq, hkv, D, e->rope, nullptr, pb + r0, slot, kc, vc, e->max_seq, s);
+  dbg_rope(e, w, q, ld, kc, slot, r0, m, pb, s);
   hi_flash_prefill(q, ld, kc + (size_t)slot * hkv * e->max_seq * D, vc + (size_t)slot * hkv * e->max_seq * D, e->max_seq,
                    e->att + (size_t)r0 * HD, HD, m, pb + r0, hq, hkv, D, s);
+  dbg_step(e, w, kDbgAttn, e->att + (size_t)r0 * HD, HD, r0, m, s);
   hi_gemm(e->att + (size_t)r0 * HD, HD, w.wo, nullptr, e->x + (size_t)r0 * H, H, m, H, HD, ep, s);
+  dbg_step(e, w, kDbgO, e->x + (size_t)r0 * H, H, r0, m, s);
 }
 
 // MLP block for rows [r0, r0 + m): norm, gate/up + SwiGLU, down projection into e->x.
@@ -1182,8 +1242,11 @@ static void mlp_rows(Engine* e, const Layer& w, int r0, int m, hipStream_t s) {
   const Config& c = e->c;
   const int H = c.hidden, il = e->il, ep = e->rank == 0 ? 1 : 0;
   hi_rmsnorm(e->x + (size_t)r0 * H, w.mlp_norm, e->xn + (size_t)r0 * H, m, H, c.eps, s);
+  dbg_step(e, w, kDbgMlpNorm, e->xn + (size_t)r0 * H, H, r0, m, s);
   hi_gemm(e->xn + (size_t)r0 * H, H, w.wgu, nullptr, e->act + (size_t)r0 * il, il, m, 2 * il, H, 2, s);
+  dbg_step(e, w, kDbgGateUp, e->act + (size_t)r0 * il, il, r0, m, s);
   hi_gemm(e->act + (size_t)r0 * il, il, w.wdown, nullptr, e->x + (size_t)r0 * H, H, m, H, il, ep, s);
+  dbg_step(e, w, kDbgDown, e->x + (size_t)r0 * H, H, r0, m, s);
 }
 
 // Run the transformer layers over n tokens already embedded into e->x, continuing slot `slot`
@@ -1247,9 +1310,11 @@ static int prefill(Engine* e, int slot, const int* tokens, int T, int p0, half* 
     const int pb = p0 + t0;
     HI_CHECK(hipMemcpyAsync(e->d_ptok, tokens + t0, n * 4, hipMemcpyHostToDevice, s));
     embed_kernel<<<n, 256, 0, s>>>(e->d_ptok, e->embed, e->x, H);
+    dbg_copy(e, 0, e->x, H, 0, n, s);
     prefill_layers(e, slot, n, pb);
     if (all_logits) {
       hi_rmsnorm(e->x, e->final_norm, e->xn, n, H, c.eps, s);
+      dbg_copy(e, dbg_planes(e) - 2, e->xn, H, 0, n, s);
       if (e->world == 1) {
         hi_gemm(e->xn, H, e->lm_head, nullptr, all_logits + (size_t)t0 * V, V, n, V, H, 0, s);
       } else {  // this rank's vocabulary columns (hi_prefill_logits requires T <= max_prefill: one chunk)
@@ -1303,6 +1368,31 @@ EXPORT int hi_prefill_logits(Engine* e, int slot, const int* tokens, int T, int 
   if (T > e->max_pf) { fprintf(stderr, "hi_prefill_logits: T %d > max_prefill %d\n", T, e->max_pf); return -1; }
   const int tok = rank0(e, [&](Engine* r) { return prefill(r, slot, tokens, T, p0, (half*)dst); });
   if (e->world > 1) tp_gather_logits(e, T, dst);
+  return tok;
+}
+
+// Bytes hi_prefill_debug writes for T prompt tokens.
+EXPORT size_t hi_debug_bytes(Engine* e, int T) {
+  size_t n = 0;
+  for (int p = 0; p < dbg_planes(e); p++) n += dbg_width(e, p);
+  return n * (size_t)T * 2;
+}
+
+// Debug (scripts/layer_diff.py; NOT YET COMPILED, see the dump layout above attn_rows): prefill
+// like hi_prefill_logits and also copy every sub-step's activations for the T rows into dst, a
+// device pointer on the engine's GPU of hi_debug_bytes(e, T) bytes (zeroed first, so a plane the
+// engine never wrote compares as all zeros). One GPU, T <= max_prefill. Returns the greedy next
+// token, or -1 for bad arguments.
+EXPORT int hi_prefill_debug(Engine* e, int slot, const int* tokens, int T, int p0, void* dst) {
+  if (!prefill_ok(e, slot, tokens, T, p0, "hi_prefill_debug")) return -1;
+  if (e->world > 1) { fprintf(stderr, "hi_prefill_debug: tensor-parallel engines are not supported\n"); return -1; }
+  if (T > e->max_pf) { fprintf(stderr, "hi_prefill_debug: T %d > max_prefill %d\n", T, e->max_pf); return -1; }
+  DevGuard dg(e->dev);
+  HI_CHECK(hipMemsetAsync(dst, 0, hi_debug_bytes(e, T), e->st));
+  e->dbg = (half*)dst;
+  e->dbg_T = T;
+  const int tok = prefill(e, slot, tokens, T, p0, dbg_plane(e, dbg_planes(e) - 1));  // logits land in their plane
+  e->dbg = nullptr;
   return tok;
 }
 
