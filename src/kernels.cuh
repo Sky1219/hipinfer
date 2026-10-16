@@ -1931,3 +1931,239 @@ __global__ void __launch_bounds__(kARThreads) allreduce_oneshot_kernel(ARArgs a,
   } while (p0 < v1);
   if (threadIdx.x == 0) a.epoch[b] = e;
 }
+
+// =================================================================================
+// Mixture of Experts (docs/moe-design.md).
+// UNVERIFIED: written 2026-10-16 without a GPU. Everything from here to the end of the file
+// compiles (nvcc 12.0, sm_75, no spills) but has never run; tests/test_kernels.py test_moe() is
+// its first check.
+// Rounding follows HF's default (grouped_mm) experts path: router logits rounded to fp16, each
+// expert's down projection rounded to fp16, times its routing weight (an fp16-rounded product
+// when the model rounds its weights to fp16), summed over the k experts in fp32, rounded once,
+// optionally scaled (Granite's residual multiplier, rounded again), added to the residual.
+// =================================================================================
+constexpr int kMoeMaxE = 256, kMoeMaxK = 16;
+constexpr int kMoeNormTopk = 1, kMoeFp16Weights = 2;  // moe_flags bits (weight-file header)
+
+// NR dot products x[r] . w[r] over K8 uint4 (8 halves each), one warp: 16-byte loads, 4 per lane
+// in flight, fp32 accumulation. Every lane gets the warp-reduced sums. (UNVERIFIED)
+template <int NR>
+__device__ __forceinline__ void warp_dot(const uint4* const (&x)[NR], const uint4* const (&w)[NR], int K8, float (&acc)[NR]) {
+  constexpr int U = 4;
+  const int lane = threadIdx.x % HI_WARP;
+#pragma unroll
+  for (int r = 0; r < NR; r++) acc[r] = 0.f;
+  for (int base = 0; base < K8; base += HI_WARP * U) {
+    uint4 wv[NR][U], xv[NR][U];
+#pragma unroll
+    for (int u = 0; u < U; u++) {
+      const int i = base + u * HI_WARP + lane;
+#pragma unroll
+      for (int r = 0; r < NR; r++) {
+        wv[r][u] = i < K8 ? __ldg(w[r] + i) : make_uint4(0, 0, 0, 0);
+        xv[r][u] = i < K8 ? x[r][i] : make_uint4(0, 0, 0, 0);
+      }
+    }
+#pragma unroll
+    for (int u = 0; u < U; u++)
+#pragma unroll
+      for (int r = 0; r < NR; r++) acc[r] += dot8(wv[r][u], xv[r][u]);
+  }
+#pragma unroll
+  for (int r = 0; r < NR; r++) acc[r] = warp_sum(acc[r]);
+}
+
+// ---------------------------------------------------------------------------------
+// Router + top-k + routing weights, one block per token (UNVERIFIED). Logits l = fp16(xn . Wr[e])
+// (one warp per expert), then warp 0 picks the k largest in k rounds of a warp argmax (NaN above
+// numbers, ties to the lower index: argmax_better), in descending order. Weights: softmax over the
+// k (kMoeNormTopk; Mixtral's renormalised top-k and Granite's top-k softmax are the same thing) or
+// over all E (OLMoE), rounded to fp16 with kMoeFp16Weights. Writes idx[t*k + j], w[t*k + j].
+// E <= kMoeMaxE, k <= kMoeMaxK, H % 8 == 0.
+// ---------------------------------------------------------------------------------
+__global__ void __launch_bounds__(256)
+moe_router_kernel(const half* __restrict__ xn, int ldx, const half* __restrict__ Wr, int E, int H, int k, int flags,
+                  int* __restrict__ idx_out, float* __restrict__ w_out) {
+  __shared__ float logit[kMoeMaxE];
+  const int t = blockIdx.x, lane = threadIdx.x % HI_WARP, warp = threadIdx.x / HI_WARP, nw = blockDim.x / HI_WARP;
+  const uint4* xr = reinterpret_cast<const uint4*>(xn + (size_t)t * ldx);
+  for (int ex = warp; ex < E; ex += nw) {
+    const uint4* const x[1] = {xr};
+    const uint4* const w[1] = {reinterpret_cast<const uint4*>(Wr + (size_t)ex * H)};
+    float acc[1];
+    warp_dot<1>(x, w, H / 8, acc);
+    if (lane == 0) logit[ex] = __half2float(__float2half(acc[0]));  // HF rounds the router linear to fp16
+  }
+  __syncthreads();
+  if (warp != 0) return;
+  constexpr int S = kMoeMaxE / HI_WARP;  // logits per lane
+  float v[S];
+#pragma unroll
+  for (int i = 0; i < S; i++) { const int ex = i * HI_WARP + lane; v[i] = ex < E ? logit[ex] : HI_NEG_INF; }
+  unsigned taken = 0;  // bit i: this lane's expert i * HI_WARP + lane is already selected
+  int sel_i[kMoeMaxK];
+  float sel_v[kMoeMaxK];
+  for (int j = 0; j < k; j++) {
+    float best = HI_NEG_INF;
+    int bi = 0x7fffffff;  // above every expert index, so any untaken expert beats it
+#pragma unroll
+    for (int i = 0; i < S; i++) {
+      const int ex = i * HI_WARP + lane;
+      if (ex < E && !(taken >> i & 1) && argmax_better(v[i], ex, best, bi)) { best = v[i]; bi = ex; }
+    }
+    for (int o = HI_WARP / 2; o > 0; o >>= 1) {
+      const float ov = hi_shfl_xor(best, o);
+      const int oi = hi_shfl_xor_i(bi, o);
+      if (argmax_better(ov, oi, best, bi)) { best = ov; bi = oi; }
+    }
+    // every lane now holds the same winner; its owner marks it taken
+    if (bi % HI_WARP == lane) taken |= 1u << (bi / HI_WARP);
+    sel_i[j] = bi;
+    sel_v[j] = best;
+  }
+  const float m = sel_v[0];
+  float denom = 0.f;
+  if (flags & kMoeNormTopk) {
+    for (int j = 0; j < k; j++) denom += expf(sel_v[j] - m);
+  } else {
+    float s = 0.f;
+    for (int ex = lane; ex < E; ex += HI_WARP) s += expf(logit[ex] - m);
+    denom = warp_sum(s);
+  }
+  if (lane == 0)
+    for (int j = 0; j < k; j++) {
+      float wj = expf(sel_v[j] - m) / denom;
+      if (flags & kMoeFp16Weights) wj = __half2float(__float2half(wj));
+      idx_out[(size_t)t * k + j] = sel_i[j];
+      w_out[(size_t)t * k + j] = wj;
+    }
+}
+
+// ---------------------------------------------------------------------------------
+// Small-batch (decode) experts as GEMVs over the selected experts only (UNVERIFIED). Pair
+// p = token * k + j runs expert idx[p] on token p / k; grid.y = pairs, so the launch shape is
+// fixed and the expert choice stays on the device (CUDA-graph capturable).
+// Gate/up + SwiGLU: one warp per (pair, unit o): weight rows r0 = (o/16)*32 + o%16 and r0 + 16
+// of the expert's interleaved wgu [2I, H]; act[p, o] = silu(gate) * up, rounded like silu_mul.
+// ---------------------------------------------------------------------------------
+__global__ void __launch_bounds__(256)
+moe_gemv_gu_kernel(const half* __restrict__ xn, int ldx, const half* __restrict__ wgu, const int* __restrict__ idx, int k,
+                   int H, int I, half* __restrict__ act) {
+  const int p = blockIdx.y, lane = threadIdx.x % HI_WARP, warp = threadIdx.x / HI_WARP, nw = blockDim.x / HI_WARP;
+  const half* W = wgu + (size_t)idx[p] * 2 * I * H;
+  const uint4* xr = reinterpret_cast<const uint4*>(xn + (size_t)(p / k) * ldx);
+  for (int o = blockIdx.x * nw + warp; o < I; o += gridDim.x * nw) {
+    const int r0 = (o / 16) * 32 + (o % 16);
+    const uint4* const x[2] = {xr, xr};
+    const uint4* const w[2] = {reinterpret_cast<const uint4*>(W + (size_t)r0 * H),
+                               reinterpret_cast<const uint4*>(W + (size_t)(r0 + 16) * H)};
+    float acc[2];
+    warp_dot<2>(x, w, H / 8, acc);
+    if (lane == 0) act[(size_t)p * I + o] = silu_mul(acc[0], acc[1]);
+  }
+}
+
+// Down projection + combine + residual, one warp per (token b, hidden column h) (UNVERIFIED): the
+// k dot products wdown[idx[b,j]][h] . act[b*k + j] (4 at a time), each rounded to fp16, weighted,
+// summed over j in fp32, rounded, scaled, and added to x[b, h]. No atomics; deterministic.
+__global__ void __launch_bounds__(256)
+moe_gemv_down_kernel(const half* __restrict__ act, const half* __restrict__ wdown, const int* __restrict__ idx,
+                     const float* __restrict__ wts, int k, int H, int I, int flags, float scale, half* x, int ldx) {
+  const int b = blockIdx.y, lane = threadIdx.x % HI_WARP, warp = threadIdx.x / HI_WARP, nw = blockDim.x / HI_WARP;
+  for (int h = blockIdx.x * nw + warp; h < H; h += gridDim.x * nw) {
+    float sum = 0.f;
+    for (int j0 = 0; j0 < k; j0 += 4) {
+      const uint4* xs[4];
+      const uint4* ws[4];
+#pragma unroll
+      for (int r = 0; r < 4; r++) {
+        const int p = b * k + (j0 + r < k ? j0 + r : j0);  // past k: repeat a valid row, result unused
+        xs[r] = reinterpret_cast<const uint4*>(act + (size_t)p * I);
+        ws[r] = reinterpret_cast<const uint4*>(wdown + ((size_t)idx[p] * H + h) * I);
+      }
+      const uint4* const x4[4] = {xs[0], xs[1], xs[2], xs[3]};
+      const uint4* const w4[4] = {ws[0], ws[1], ws[2], ws[3]};
+      float acc[4];
+      warp_dot<4>(x4, w4, I / 8, acc);
+#pragma unroll
+      for (int r = 0; r < 4; r++)
+        if (j0 + r < k) {
+          const float c = __half2float(__float2half(acc[r])) * wts[(size_t)b * k + j0 + r];
+          sum += (flags & kMoeFp16Weights) ? __half2float(__float2half(c)) : c;
+        }
+    }
+    if (lane == 0) {
+      half o = __float2half(sum);
+      if (scale != 1.f) o = __float2half(__half2float(o) * scale);
+      half* dst = x + (size_t)b * ldx + h;
+      *dst = __hadd(*dst, o);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------------
+// Grouped (prefill / batched) path, part 1: counting sort of the n = M*k (token, slot) pairs by
+// expert, one block (UNVERIFIED). off[E+1] = exclusive prefix of the counts; perm[q] = the pair at
+// sorted position q; inv[pair] = q. The order within one expert follows the shared-memory atomics,
+// which changes no result (every row of a GEMM is computed independently of the others).
+// ---------------------------------------------------------------------------------
+__global__ void __launch_bounds__(1024)
+moe_sort_kernel(const int* __restrict__ idx, int n, int E, int* __restrict__ off, int* __restrict__ perm,
+                int* __restrict__ inv) {
+  __shared__ int cnt[kMoeMaxE], cur[kMoeMaxE];
+  for (int e = threadIdx.x; e < E; e += blockDim.x) cnt[e] = 0;
+  __syncthreads();
+  for (int p = threadIdx.x; p < n; p += blockDim.x) atomicAdd(&cnt[idx[p]], 1);
+  __syncthreads();
+  if (threadIdx.x == 0) {
+    int s = 0;
+    for (int e = 0; e < E; e++) { off[e] = s; cur[e] = s; s += cnt[e]; }
+    off[E] = s;
+  }
+  __syncthreads();
+  for (int p = threadIdx.x; p < n; p += blockDim.x) {
+    const int q = atomicAdd(&cur[idx[p]], 1);
+    perm[q] = p;
+    inv[p] = q;
+  }
+}
+
+// Part 2: rows[q] = xn[perm[q] / k], so each expert's tokens are contiguous (UNVERIFIED).
+__global__ void moe_gather_kernel(const half* __restrict__ xn, int ldx, const int* __restrict__ perm, int k, int H,
+                                  half* __restrict__ rows) {
+  const int q = blockIdx.x;
+  const uint4* src = reinterpret_cast<const uint4*>(xn + (size_t)(perm[q] / k) * ldx);
+  uint4* dst = reinterpret_cast<uint4*>(rows + (size_t)q * H);
+  for (int i = threadIdx.x; i < H / 8; i += blockDim.x) dst[i] = src[i];
+}
+
+// Part 3 (after the per-expert GEMMs wrote y[q] = expert output of sorted row q, fp16): token t's
+// weighted sum over its k rows y[inv[t*k + j]], rounded as in moe_gemv_down_kernel, added to x[t]
+// (UNVERIFIED). One block per token, 8 columns per thread.
+__global__ void moe_combine_kernel(const half* __restrict__ y, const int* __restrict__ inv, const float* __restrict__ wts,
+                                   int k, int H, int flags, float scale, half* x, int ldx) {
+  const int t = blockIdx.x;
+  uint4* xr = reinterpret_cast<uint4*>(x + (size_t)t * ldx);
+  for (int i = threadIdx.x; i < H / 8; i += blockDim.x) {
+    float s[8] = {0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f};
+    for (int j = 0; j < k; j++) {
+      const float w = wts[(size_t)t * k + j];
+      H8 v;
+      v.u = reinterpret_cast<const uint4*>(y + (size_t)inv[(size_t)t * k + j] * H)[i];
+#pragma unroll
+      for (int u = 0; u < 8; u++) {
+        const float c = __half2float(v.h[u]) * w;
+        s[u] += (flags & kMoeFp16Weights) ? __half2float(__float2half(c)) : c;
+      }
+    }
+    H8 xv;
+    xv.u = xr[i];
+#pragma unroll
+    for (int u = 0; u < 8; u++) {
+      half o = __float2half(s[u]);
+      if (scale != 1.f) o = __float2half(__half2float(o) * scale);
+      xv.h[u] = __hadd(xv.h[u], o);
+    }
+    xr[i] = xv.u;
+  }
+}
