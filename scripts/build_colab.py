@@ -131,9 +131,9 @@ Run all cells. The notebook sizes itself to the GPU:
 | 22–39 GB (L4) | up to Llama-3.2-3B | on, up to 3B |
 | less (T4) | 4 small models | off |
 
-Expected time on an A100: about 1–1.5 h for the hipinfer suite (kernel tests, HF token gate, WikiText-2
-perplexity and benchmarks per model; the HF reference runs take most of it), plus about 1 h for the engine
-comparison. It ends by downloading `hipinfer_results_<gpu>.zip`; send that back.
+Expected time on an A100: about 2–2.5 h in all, of which about 1 h is the engine comparison. Each model
+is deleted from disk once it is done, so about 60 GB of free disk is enough. It ends by downloading
+`hipinfer_results_<gpu>.zip`; send that back.
 """),
         code("""
 !nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv
@@ -176,10 +176,9 @@ print("hipinfer suite:", MODELS)
 print("engine comparison:", BASELINE_MODELS if RUN_BASELINES else "off")
 """),
         md("""
-**hipinfer suite**: build for this GPU, kernel tests (vs PyTorch), then per model the HF token gate,
-WikiText-2 perplexity vs HF and the benchmarks. `GEMM_SWEEP=1` also times every GEMM tile config for
-the first model. A background `nvidia-smi` log records temperature and clocks every 5 s for the whole
-run (`results/colab_<gpu>/gpu_log.csv`), so the results can be checked for thermal throttling.
+**Build and kernel tests**, once: build for this GPU, then every kernel against PyTorch. A background
+`nvidia-smi` log records temperature and clocks every 5 s for the whole run
+(`results/colab_<gpu>/gpu_log.csv`), so the results can be checked for thermal throttling.
 """),
         code("""
 os.makedirs(f"results/colab_{gpu}", exist_ok=True)
@@ -191,40 +190,59 @@ gpulog = subprocess.Popen(
     f"{why}.sw_thermal_slowdown,{why}.hw_thermal_slowdown "
     f"--format=csv -l 5 > results/colab_{gpu}/gpu_log.csv", shell=True)
 !chmod +x scripts/run_all.sh scripts/run_baselines.sh
-!PY=python GEMM_SWEEP=1 PPL_WINDOWS=8 scripts/run_all.sh colab_{gpu} {MODELS}
+!PY=python SKIP_SINGLE=1 SKIP_TP=1 scripts/run_all.sh colab_{gpu}
 """),
         md("""
-**Engine comparison** (skipped when `RUN_BASELINES` is off): llama.cpp, vLLM, torch.compile and HF
-transformers on the same GPU and models, with hipinfer re-run beside them in the same session.
-
-- llama.cpp is built from source for this GPU only (about 5 min). Its converter makes an F16 GGUF per
-  model, which is deleted after that model to save disk.
-- vLLM goes in its own virtual environment (about 5 min to install), because it pins its own PyTorch
-  and would otherwise replace the one hipinfer is built against.
-- A model is skipped if the disk is too full for its GGUF.
+**Engine comparison setup** (skipped when `RUN_BASELINES` is off). vLLM goes in its own virtual
+environment (about 5 min), because it pins its own PyTorch and would otherwise replace the one hipinfer is
+built against. llama.cpp is built for this GPU only (about 5 min) on its first use below.
 """),
         code("""
 sh = get_ipython().system
 if RUN_BASELINES:
     # llama.cpp's converter needs only these (its requirements file would replace Colab's PyTorch)
-    sh("pip install -q sentencepiece protobuf ninja")
-    sh("[ -x /content/vllm_env/bin/python ] || (python -m venv /content/vllm_env && /content/vllm_env/bin/pip install -q vllm)")
+    sh("pip install -q --no-cache-dir sentencepiece protobuf ninja")
+    sh("[ -x /content/vllm_env/bin/python ] || (python -m venv /content/vllm_env && /content/vllm_env/bin/pip install -q --no-cache-dir vllm)")
     sh("/content/vllm_env/bin/python -c 'import vllm; print(\\"vllm\\", vllm.__version__)'")
-    HF = {"tinyllama": "TinyLlama/TinyLlama-1.1B-Chat-v1.0", "llama32-1b": "unsloth/Llama-3.2-1B",
-          "qwen25-1.5b": "Qwen/Qwen2.5-1.5B", "llama32-3b": "unsloth/Llama-3.2-3B",
-          "llama31-8b": "unsloth/Meta-Llama-3.1-8B"}
-    GB = {"tinyllama": 2.2, "llama32-1b": 2.5, "qwen25-1.5b": 3.1, "llama32-3b": 6.4, "llama31-8b": 16.1}
-    for m in BASELINE_MODELS:
-        free = shutil.disk_usage("/content").free / 1e9
-        if free < GB[m] * 1.5 + 5:
-            print(f"== skipping {m}: only {free:.0f} GB free disk")
-            continue
-        gguf = f"/content/{m}-f16.gguf"
-        print(f"== {m}")
+sh("pip cache purge -q 2>/dev/null; df -h /content | tail -1")
+"""),
+        md("""
+**Per model**, one at a time: HF token gate, WikiText-2 perplexity vs HF and the benchmarks (`GEMM_SWEEP`
+also times every GEMM tile config on the first model), then the engine comparison for the models in
+`BASELINE_MODELS` (llama.cpp, vLLM, torch.compile and HF, with hipinfer re-run beside them). Afterwards the
+model's HF download, hipinfer weights and GGUF are deleted, so the disk only ever holds one model (the 8B
+peaks at about 50 GB). A model already finished in this runtime is skipped, so the cell can be re-run
+after an interruption.
+"""),
+        code("""
+from huggingface_hub import constants
+HF = {"tinyllama": "TinyLlama/TinyLlama-1.1B-Chat-v1.0", "llama32-1b": "unsloth/Llama-3.2-1B",
+      "qwen25-0.5b": "Qwen/Qwen2.5-0.5B", "qwen25-1.5b": "Qwen/Qwen2.5-1.5B", "llama32-3b": "unsloth/Llama-3.2-3B",
+      "mistral-7b": "mistralai/Mistral-7B-v0.3", "llama31-8b": "unsloth/Meta-Llama-3.1-8B"}
+GB = {"tinyllama": 2.2, "llama32-1b": 2.5, "qwen25-0.5b": 1.0, "qwen25-1.5b": 3.1, "llama32-3b": 6.4,
+      "mistral-7b": 14.5, "llama31-8b": 16.1}
+for i, m in enumerate(MODELS.split()):
+    out = f"results/colab_{gpu}/{m}"
+    if os.path.exists(f"{out}/bench.json") and (m not in BASELINE_MODELS or not RUN_BASELINES
+                                               or os.path.exists(f"results/baselines/colab_{gpu}/{m}/llamacpp.json")):
+        print(f"== {m}: done earlier in this runtime, skipped")
+        continue
+    free = shutil.disk_usage("/content").free / 1e9
+    if free < GB[m] * 3 + 5:
+        print(f"== {m}: needs about {GB[m] * 3 + 5:.0f} GB of disk, {free:.0f} GB free -> skipped")
+        continue
+    print(f"######## {m} ({free:.0f} GB free disk)")
+    sh(f"PY=python SKIP_BUILD=1 SKIP_KERNEL_TESTS=1 SKIP_TP=1 GEMM_SWEEP={int(i == 0)} PPL_WINDOWS=8 "
+       f"scripts/run_all.sh colab_{gpu} {m}")
+    gguf = f"/content/{m}-f16.gguf"
+    if RUN_BASELINES and m in BASELINE_MODELS:
         sh(f"PY=python LLAMA_CPP=/content/llama.cpp CUDA_ARCHS={cap} GGUF={gguf} MODEL={HF[m]} WEIGHTS={m}.bin "
            f"VLLM_PY=/content/vllm_env/bin/python SCRATCH=/content/tmp scripts/run_baselines.sh colab_{gpu}/{m}")
-        if os.path.exists(gguf):
-            os.remove(gguf)
+    # free the disk for the next model: HF download, hipinfer weights, GGUF
+    shutil.rmtree(os.path.join(constants.HF_HUB_CACHE, "models--" + HF[m].replace("/", "--")), ignore_errors=True)
+    for f in (f"{m}.bin", gguf):
+        if os.path.exists(f):
+            os.remove(f)
 """),
         md("Summary tables (the same script produces results/SUMMARY.md in the repo), then download the results."),
         code("""
