@@ -1290,7 +1290,8 @@ EXPORT float hi_tp_allreduce_bench(Engine* e, size_t n, int iters) {
 // embedding, then per layer {attn_norm, qkv (before RoPE), rope (q | k after RoPE), attn,
 // o_proj (residual stream after the O GEMM), mlp_norm, gate_up (SwiGLU output), down (residual
 // stream after the down GEMM)}, then final_norm and logits. scripts/layer_diff.py engine_layout
-// is the same layout. Copies run on the prefill stream; decode and its graphs never dump.
+// is the same layout. Copies run on the prefill stream. Decode dumps only through
+// hi_decode_debug (one step, no graph), and only the planes its MoE layers fill.
 enum { kDbgAttnNorm, kDbgQkv, kDbgRope, kDbgAttn, kDbgO, kDbgMlpNorm, kDbgGateUp, kDbgDown, kDbgSteps };
 static int dbg_planes(const Engine* e) { return 1 + e->c.layers * kDbgSteps + 2; }
 static size_t dbg_width(const Engine* e, int p) {
@@ -1362,9 +1363,11 @@ static void moe_rows(Engine* e, const Layer& w, int r0, int m, hipStream_t s) {
   const int H = c.hidden;
   half* xn = e->xn + (size_t)r0 * H;
   hi_rmsnorm(e->x + (size_t)r0 * H, w.mlp_norm, xn, m, H, c.eps, s);
+  dbg_step(e, w, kDbgMlpNorm, xn, H, r0, m, s);  // the router's input (gate_up has no single value: left zero)
   hi_moe_router(xn, H, w.router, m, c.n_experts, H, c.top_k, c.moe_flags, e->moe_idx, e->moe_w, s);
   hi_moe_experts(xn, H, w.ewgu, w.ewdown, e->moe_idx, e->moe_w, m, c.n_experts, c.top_k, H, c.inter, c.moe_flags,
                  c.moe_scale, e->x + (size_t)r0 * H, H, 0, e->moe_work, s);
+  dbg_step(e, w, kDbgDown, e->x + (size_t)r0 * H, H, r0, m, s);
 }
 
 // MLP block for rows [r0, r0 + m): norm, gate/up + SwiGLU, down projection into e->x.
@@ -1639,6 +1642,23 @@ static bool decode_ok(Engine* e, int B, int steps) {
 EXPORT float hi_decode(Engine* e, int B, int steps, int use_graph) {
   if (!decode_ok(e, B, steps)) return -1.f;
   return rank0(e, [&](Engine* r) { return decode_rank(r, B, steps, use_graph); });
+}
+
+// One decode step on slots [0, B), run without a graph, that dumps into dst (device pointer on
+// the engine's GPU, hi_debug_bytes(e, B) bytes) in the hi_prefill_debug layout with B rows. Only
+// MoE layers dump: their mlp_norm (the router's input) and down planes; the rest stay zero.
+// For scripts/moe_router_trace.py. Returns 0, or -1 for bad arguments.
+EXPORT int hi_decode_debug(Engine* e, int B, void* dst) {
+  if (!decode_ok(e, B, 1)) return -1;
+  if (e->world > 1) { fprintf(stderr, "hi_decode_debug: tensor-parallel engines are not supported\n"); return -1; }
+  DevGuard dg(e->dev);
+  HI_CHECK(hipMemsetAsync(dst, 0, hi_debug_bytes(e, B), e->st));
+  e->dbg = (half*)dst;
+  e->dbg_T = B;
+  decode_step(e, B);
+  e->dbg = nullptr;
+  HI_CHECK(hipStreamSynchronize(e->st));
+  return 0;
 }
 
 EXPORT void hi_sync(Engine* e) { each_rank(e, [](Engine* r) { HI_CHECK(hipStreamSynchronize(r->st)); }); }

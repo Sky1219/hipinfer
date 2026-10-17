@@ -1,0 +1,41 @@
+Loading weights:   0%|          | 0/218 [00:00<?, ?it/s]Loading weights:  46%|████▋     | 101/218 [00:00<00:00, 950.85it/s]Loading weights:  90%|█████████ | 197/218 [00:00<00:00, 947.58it/s]Loading weights: 100%|██████████| 218/218 [00:00<00:00, 966.87it/s]
+ibm-granite/granite-3.1-1b-a400m-base: prompt 1 (len 19), 24 layers, 32 experts top-8, GPU NVIDIA GeForce RTX 2080 Ti, HIPINFER_GEMM_AUTOTUNE=1, split-K forced to 4
+traced engine run equals the graph-captured run (first diff None); torch recompute of the engine's router sets disagrees with hi_moe_router at 0 points
+tokens diverge at step 75: HF 623 (gap 0.0000), engine 645
+2256 (position, layer) router points feed the compared tokens. Engine vs HF router logits, max |diff| per point: median 0.0031, p99 0.0588, max 0.1211. HF margins: 3 exact ties, 39 < 0.002, 183 < 0.01
+expert sets differ at 24 points (each side on its own routing history)
+  pos 35 layer 11: HF margin 0.00024, engine margin 0.00049, HF-only [8], engine-only [25]
+  pos 35 layer 13: HF margin 0.01514, engine margin 0.03955, HF-only [29], engine-only [17]
+  pos 35 layer 16: HF margin 0.01416, engine margin 0.01685, HF-only [15], engine-only [26]
+  pos 35 layer 18: HF margin 0.00610, engine margin 0.02686, HF-only [0], engine-only [26]
+  pos 35 layer 22: HF margin 0.00635, engine margin 0.00684, HF-only [8], engine-only [31]
+  pos 37 layer 0: HF margin 0.00391, engine margin 0.00000, HF-only [21], engine-only [17]
+  pos 37 layer 2: HF margin 0.00195, engine margin 0.00171, HF-only [25], engine-only [0]
+  pos 37 layer 3: HF margin 0.04468, engine margin 0.01111, HF-only [23], engine-only [24]
+  pos 37 layer 11: HF margin 0.00037, engine margin 0.00269, HF-only [28], engine-only [19]
+  pos 37 layer 14: HF margin 0.02966, engine margin 0.00049, HF-only [10], engine-only [18]
+  pos 38 layer 13: HF margin 0.00598, engine margin 0.00159, HF-only [22], engine-only [9]
+  pos 38 layer 16: HF margin 0.00180, engine margin 0.00308, HF-only [21], engine-only [10]
+  pos 38 layer 19: HF margin 0.00342, engine margin 0.00269, HF-only [20], engine-only [5]
+  pos 43 layer 12: HF margin 0.00131, engine margin 0.00206, HF-only [22], engine-only [1]
+  pos 48 layer 7: HF margin 0.00269, engine margin 0.00171, HF-only [28], engine-only [23]
+  pos 64 layer 9: HF margin 0.00104, engine margin 0.00005, HF-only [6], engine-only [5]
+  pos 75 layer 0: HF margin 0.00195, engine margin 0.00000, HF-only [28], engine-only [23]
+  pos 75 layer 11: HF margin 0.00793, engine margin 0.01282, HF-only [23], engine-only [10]
+  pos 78 layer 9: HF margin 0.00310, engine margin 0.00287, HF-only [30], engine-only [0]
+  pos 79 layer 2: HF margin 0.00131, engine margin 0.00424, HF-only [8], engine-only [12]
+  pos 79 layer 14: HF margin 0.00439, engine margin 0.00000, HF-only [28], engine-only [17]
+  pos 79 layer 15: HF margin 0.04297, engine margin 0.00464, HF-only [14], engine-only [22]
+  pos 83 layer 6: HF margin 0.00313, engine margin 0.00493, HF-only [16], engine-only [11]
+  pos 86 layer 5: HF margin 0.00061, engine margin 0.00012, HF-only [16], engine-only [27]
+router near-tie check (router tie 0.01, token tie 0.05):
+    router difference at pos 35 (decode input of step 17) layer 11: HF-only [8] engine-only [25], HF margin 0.00024 (1 ulp), engine margin 0.00049 -> adopt
+    router difference at pos 37 (decode input of step 19) layer 0: HF-only [21] engine-only [17], HF margin 0.00391 (1 ulp), engine margin 0.00000 -> adopt
+    router difference at pos 64 (decode input of step 46) layer 9: HF-only [6] engine-only [5], HF margin 0.00246 (161 ulp), engine margin 0.00005 -> adopt
+    router difference at pos 66 (decode input of step 48) layer 4: HF-only [1] engine-only [19], HF margin 0.00183 (15 ulp), engine margin 0.00037 -> adopt
+    router difference at pos 68 (decode input of step 50) layer 17: HF-only [5] engine-only [18], HF margin 0.00076 (25 ulp), engine margin 0.00076 -> adopt
+    router difference at pos 75 (decode input of step 57) layer 0: HF-only [28] engine-only [23], HF margin 0.00195 (1 ulp), engine margin 0.00000 -> adopt
+    router difference at pos 79 (decode input of step 61) layer 14: HF-only [28] engine-only [17], HF margin 0.00140 (23 ulp), engine margin 0.00000 -> adopt
+  -> EXPLAINED: HF with 7 adopted router near-ties gives the engine's tokens through step 75; HF top-2 gap at step 75 now 0.0312
+  engine vs HF router logits on that run, max |diff| per point: median 0.0020, p99 0.0054, max 0.0078
+  adopted 7 points, HF margins max 0.00391, in ulps max 161

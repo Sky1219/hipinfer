@@ -1,0 +1,42 @@
+Loading weights:   0%|          | 0/218 [00:00<?, ?it/s]Loading weights:  34%|███▍      | 74/218 [00:00<00:00, 651.88it/s]Loading weights:  64%|██████▍   | 140/218 [00:00<00:00, 568.49it/s]Loading weights:  91%|█████████ | 198/218 [00:00<00:00, 548.09it/s]Loading weights: 100%|██████████| 218/218 [00:00<00:00, 572.72it/s]
+hi_prefill: p0 1020 + T 5 exceeds max_seq 1024
+hi_prefill: slot 8 outside [0, max_batch 8)
+hi_prefill: token 49152 at 0 outside vocab 49152
+hi_decode: B 9 outside [1, max_batch 8]
+hi_decode: slot 0 at position 1023 + 2 steps exceeds max_seq 1024
+ibm-granite/granite-3.1-1b-a400m-base: layers 24 hidden 1024 heads 16/8 head_dim 64 vocab 49152 tied=False qkv_bias=False
+prompt 0 (len 5): prefill logits max |diff| = 0.1562
+  prompt 0 single graph=True: 128/128 tokens identical
+  prompt 0 single graph=False: 128/128 tokens identical
+prompt 1 (len 19): prefill logits max |diff| = 0.0430
+  prompt 1 single graph=True: diverges at step 70 (hf gap 0.0625) -> router near-tie, OK (HF with 8 adopted router near-ties gives the engine's tokens through step 70; max adopted HF router margin 0.0039)
+  prompt 1 single graph=False: diverges at step 70 (hf gap 0.0625) -> router near-tie, OK (HF with 8 adopted router near-ties gives the engine's tokens through step 70; max adopted HF router margin 0.0039)
+prompt 2 (len 16): prefill logits max |diff| = 0.0234
+  prompt 2 single graph=True: 128/128 tokens identical
+  prompt 2 single graph=False: 128/128 tokens identical
+prompt 3 (len 21): prefill logits max |diff| = 0.0400
+  prompt 3 single graph=True: 128/128 tokens identical
+  prompt 3 single graph=False: 128/128 tokens identical
+prompt 4 (len 18): prefill logits max |diff| = 0.0781
+  prompt 4 single graph=True: diverges at step 43 (hf gap 0.0469) -> near-tie, OK
+  prompt 4 single graph=False: diverges at step 43 (hf gap 0.0469) -> near-tie, OK
+prompt 5 (len 15): prefill logits max |diff| = 0.0742
+  prompt 5 single graph=True: 128/128 tokens identical
+  prompt 5 single graph=False: 128/128 tokens identical
+prompt 6 (len 700): prefill logits max |diff| = 0.4023
+  prompt 6 single graph=True: 128/128 tokens identical
+  prompt 6 single graph=False: 128/128 tokens identical
+  batched B=6 slot 0: 128/128 tokens identical
+  batched B=6 slot 1: 128/128 tokens identical
+  batched B=6 slot 2: 128/128 tokens identical
+  batched B=6 slot 3: 128/128 tokens identical
+  batched B=6 slot 4: diverges at step 43 (hf gap 0.0469) -> near-tie, OK
+  batched B=6 slot 5: 128/128 tokens identical
+  prefill past max_seq: rejected
+  prefill slot >= max_batch: rejected
+  token outside vocab: rejected
+  decode B > max_batch: rejected
+  decode past max_seq: rejected
+
+15/20 runs token-identical, max prefill-logit |diff| 0.4023, 2 accepted by the router near-tie check
+GATE PASS

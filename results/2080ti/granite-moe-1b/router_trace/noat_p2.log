@@ -1,0 +1,27 @@
+Loading weights:   0%|          | 0/218 [00:00<?, ?it/s]Loading weights:  38%|███▊      | 83/218 [00:00<00:00, 735.46it/s]Loading weights:  79%|███████▉  | 173/218 [00:00<00:00, 815.90it/s]Loading weights: 100%|██████████| 218/218 [00:00<00:00, 877.12it/s]
+ibm-granite/granite-3.1-1b-a400m-base: prompt 2 (len 16), 24 layers, 32 experts top-8, GPU NVIDIA GeForce RTX 2080 Ti, HIPINFER_GEMM_AUTOTUNE=0
+traced engine run equals the graph-captured run (first diff None); torch recompute of the engine's router sets disagrees with hi_moe_router at 0 points
+engine and HF tokens identical for 128 steps
+3432 (position, layer) router points feed the compared tokens. Engine vs HF router logits, max |diff| per point: median 0.0023, p99 0.0303, max 0.0759. HF margins: 3 exact ties, 54 < 0.002, 266 < 0.01
+expert sets differ at 21 points (each side on its own routing history)
+  pos 27 layer 20: HF margin 0.00024, engine margin 0.00183, HF-only [25], engine-only [29]
+  pos 35 layer 8: HF margin 0.00208, engine margin 0.00037, HF-only [27], engine-only [17]
+  pos 47 layer 17: HF margin 0.00012, engine margin 0.00134, HF-only [13], engine-only [21]
+  pos 55 layer 13: HF margin 0.00085, engine margin 0.00037, HF-only [9], engine-only [13]
+  pos 55 layer 19: HF margin 0.00061, engine margin 0.00745, HF-only [15], engine-only [30]
+  pos 63 layer 21: HF margin 0.00159, engine margin 0.00073, HF-only [1], engine-only [23]
+  pos 71 layer 23: HF margin 0.00098, engine margin 0.00098, HF-only [5], engine-only [24]
+  pos 83 layer 9: HF margin 0.00024, engine margin 0.00220, HF-only [8], engine-only [10]
+  pos 86 layer 12: HF margin 0.00061, engine margin 0.00049, HF-only [9], engine-only [26]
+  pos 86 layer 15: HF margin 0.00098, engine margin 0.00464, HF-only [19], engine-only [23]
+  pos 104 layer 9: HF margin 0.00140, engine margin 0.00043, HF-only [27], engine-only [0]
+  pos 104 layer 12: HF margin 0.00989, engine margin 0.00000, HF-only [17], engine-only [11]
+  pos 104 layer 13: HF margin 0.00293, engine margin 0.03027, HF-only [24], engine-only [17]
+  pos 104 layer 17: HF margin 0.01685, engine margin 0.03076, HF-only [29], engine-only [18]
+  pos 104 layer 23: HF margin 0.00195, engine margin 0.02344, HF-only [0], engine-only [6]
+  pos 105 layer 23: HF margin 0.02930, engine margin 0.00684, HF-only [8], engine-only [18]
+  pos 112 layer 5: HF margin 0.00101, engine margin 0.00064, HF-only [23], engine-only [3]
+  pos 116 layer 20: HF margin 0.00293, engine margin 0.00024, HF-only [11], engine-only [18]
+  pos 138 layer 5: HF margin 0.00066, engine margin 0.00188, HF-only [9], engine-only [19]
+  pos 138 layer 7: HF margin 0.00635, engine margin 0.01892, HF-only [24], engine-only [7]
+  pos 142 layer 8: HF margin 0.00049, engine margin 0.00061, HF-only [16], engine-only [4]
