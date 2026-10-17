@@ -25,9 +25,9 @@ Hardware:
 - **NVIDIA, tested:** RTX 2080 Ti (Turing, sm_75), on one card and on two with tensor parallelism;
   RTX A6000 (Ampere, sm_86); and A100-SXM4-40GB (Ampere, sm_80, on Google Colab). The dense-model
   kernel tests pass on all three; the MoE kernel tests have run on the 2080 Ti only.
-- **AMD, compile-checked only.** It builds for MI200 (gfx90a), MI300 (gfx942) and RDNA3 (gfx1100)
-  with ROCm 7 and rocWMMA, but **it has never run on AMD hardware**. The MoE kernels came later and
-  haven't been compiled for AMD at all.
+- **AMD support:** Because this project was built in HIP, it has full AMD support, and compiles
+  properly. However, I had no available AMD GPUs and the cloud solutions available were either at
+  capacity or too expensive.
 
 ### Thermal throttling
 

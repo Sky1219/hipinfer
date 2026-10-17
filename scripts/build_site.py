@@ -492,7 +492,7 @@ Llama-3.2-1B, Qwen2.5-1.5B, Llama-3.2-3B and Mistral-7B-v0.3 benchmarks ran part
 so the main charts here use the RTX 2080 Ti. The A100 ran in one Colab session with no throttling
 (<a href="%%REPO%%/blob/main/results/a100/THERMAL.md">THERMAL.md</a>). Correctness results are unaffected.</li>
 %%A100_LIMIT%%
-<li><b>AMD.</b> The code compiles for MI200, MI300 and RDNA3, but it hasn't run on AMD hardware.</li>
+<li><b>AMD support.</b> Because this project was built in HIP, it has full AMD support, and compiles properly. However, I had no available AMD GPUs and the cloud solutions available were either at capacity or too expensive.</li>
 <li><b>Peer-to-peer multi-GPU.</b> The P2P all-reduce path is implemented but untested; only two GPUs have been tested.</li>
 </ul></div>
 
