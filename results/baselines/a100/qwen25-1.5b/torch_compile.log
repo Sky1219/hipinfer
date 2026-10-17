@@ -1,0 +1,9 @@
+greedy tokens vs HF eager: 0/32 match
+  compile+first run ctx=128: 23 s
+torch.compile decode ctx=  128   4.426 ms/token
+  compile+first run ctx=1024: 23 s
+torch.compile decode ctx= 1024   5.861 ms/token
+torch.compile prefill T=  128     10.58 ms
+torch.compile prefill T=  512     19.33 ms
+torch.compile prefill T= 2000     37.21 ms
+wrote results/baselines/colab_NVIDIA_A100-SXM4-40GB/qwen25-1.5b/torch_compile.json

@@ -1,0 +1,39 @@
+NVIDIA A100-SXM4-40GB peak BW 1555.0 GB/s | unsloth/Llama-3.2-3B {'vocab': 128256, 'hidden': 3072, 'inter': 8192, 'layers': 28, 'heads': 24, 'kv_heads': 8, 'head_dim': 128, 'max_pos': 131072, 'window': 0, 'tied': True, 'qkv_bias': False, 'weight_bytes': 6425499648}
+
+== HF transformers reference timings ==
+HF prefill T=  128:    31.91 ms
+HF prefill T=  512:    32.11 ms
+HF prefill T= 1024:    39.59 ms
+HF prefill T= 2000:    78.42 ms
+HF prefill T= 4096:   160.68 ms
+HF decode ctx=  128:  32.39 ms/token
+HF decode ctx= 1024:  32.51 ms/token
+
+== Prefill latency (ms) ==
+T=  128  hipinfer   10.75 ms (   11912 tok/s)   HF   31.91 ms   x2.97
+T=  512  hipinfer   24.23 ms (   21130 tok/s)   HF   32.11 ms   x1.33
+T= 1024  hipinfer   44.67 ms (   22922 tok/s)   HF   39.59 ms   x0.89
+T= 2000  hipinfer   87.03 ms (   22980 tok/s)   HF   78.42 ms   x0.90
+T= 4096  hipinfer  183.91 ms (   22272 tok/s)   HF  160.68 ms   x0.87
+
+== Decode, batch 1 (ms/token) ==
+ctx=  128  hipinfer  5.598 ms (graph) /  5.780 ms (no graph)   HF  32.39 ms   x5.8   roofline 4.151 ms -> 74% of peak BW
+ctx= 1024  hipinfer  5.705 ms (graph) /  5.888 ms (no graph)   HF  32.51 ms   x5.7   roofline 4.217 ms -> 74% of peak BW
+
+== Decode latency vs context length (batch 1, 128 new tokens) ==
+ctx=   128   5.587 ms/token   KV read    22.0 MB/step   roofline 4.146 ms  74% BW
+ctx=   512   5.622 ms/token   KV read    66.1 MB/step   roofline 4.175 ms  74% BW
+ctx=  1024   5.688 ms/token   KV read   124.8 MB/step   roofline 4.212 ms  74% BW
+ctx=  2048   5.840 ms/token   KV read   242.2 MB/step   roofline 4.288 ms  73% BW
+ctx=  4096   6.015 ms/token   KV read   477.1 MB/step   roofline 4.439 ms  74% BW
+ctx=  8192   6.356 ms/token   KV read   946.9 MB/step   roofline 4.741 ms  75% BW
+
+== Batched decode throughput (ctx 512, 128 new tokens; up to 64 sequences fit) ==
+B=  1   5.681 ms/step        176 tok/s     207 W   1175.62 mJ/token
+B=  2   5.926 ms/step        337 tok/s     258 W   764.21 mJ/token
+B=  4   6.485 ms/step        617 tok/s     288 W   466.64 mJ/token
+B=  8   7.171 ms/step       1116 tok/s     251 W   225.13 mJ/token
+B= 16   8.019 ms/step       1995 tok/s     256 W   128.42 mJ/token
+B= 32   9.384 ms/step       3410 tok/s     266 W    78.10 mJ/token
+B= 64  11.480 ms/step       5575 tok/s     284 W    50.95 mJ/token
+wrote results/baselines/colab_NVIDIA_A100-SXM4-40GB/llama32-3b/hipinfer.json

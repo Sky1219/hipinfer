@@ -1,0 +1,44 @@
+{
+ "engine": "vLLM",
+ "gpu": "NVIDIA A100-SXM4-40GB",
+ "decode_b1": [
+  {
+   "ctx": 128,
+   "ms": 4.192764492188417,
+   "all_ms": [
+    4.195159847657948,
+    4.192764492188417,
+    4.1933130625047
+   ],
+   "method": "(generate 257 tok - generate 1 tok) / 256"
+  },
+  {
+   "ctx": 1024,
+   "ms": 4.186268234374069,
+   "all_ms": [
+    4.186268234374069,
+    4.197887640625453,
+    4.196440671876189
+   ],
+   "method": "(generate 257 tok - generate 1 tok) / 256"
+  }
+ ],
+ "prefill": [
+  {
+   "T": 128,
+   "ms": 11.405364999518497,
+   "note": "end-to-end generate() with 1 output token"
+  },
+  {
+   "T": 512,
+   "ms": 19.911553999918397,
+   "note": "end-to-end generate() with 1 output token"
+  },
+  {
+   "T": 2000,
+   "ms": 35.76457899998786,
+   "note": "end-to-end generate() with 1 output token"
+  }
+ ],
+ "vllm": "0.31.0"
+}

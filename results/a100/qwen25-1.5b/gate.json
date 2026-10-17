@@ -1,0 +1,114 @@
+{
+ "model": "Qwen/Qwen2.5-1.5B",
+ "gpu": "NVIDIA A100-SXM4-40GB",
+ "new_tokens": 128,
+ "pass": true,
+ "identical": 16,
+ "runs": 20,
+ "router_accepted": 0,
+ "router_tie": 0.01,
+ "max_prefill_logit_diff": 0.0390625,
+ "prompt_lens": [
+  5,
+  13,
+  17,
+  19,
+  15,
+  14,
+  700
+ ],
+ "log": [
+  {
+   "run": "prompt 0 single graph=True",
+   "identical": true
+  },
+  {
+   "run": "prompt 0 single graph=False",
+   "identical": true
+  },
+  {
+   "run": "prompt 1 single graph=True",
+   "identical": true
+  },
+  {
+   "run": "prompt 1 single graph=False",
+   "identical": true
+  },
+  {
+   "run": "prompt 2 single graph=True",
+   "identical": true
+  },
+  {
+   "run": "prompt 2 single graph=False",
+   "identical": true
+  },
+  {
+   "run": "prompt 3 single graph=True",
+   "identical": true
+  },
+  {
+   "run": "prompt 3 single graph=False",
+   "identical": true
+  },
+  {
+   "run": "prompt 4 single graph=True",
+   "identical": false,
+   "step": 26,
+   "hf_gap": 0.015625,
+   "accepted": true
+  },
+  {
+   "run": "prompt 4 single graph=False",
+   "identical": false,
+   "step": 26,
+   "hf_gap": 0.015625,
+   "accepted": true
+  },
+  {
+   "run": "prompt 5 single graph=True",
+   "identical": true
+  },
+  {
+   "run": "prompt 5 single graph=False",
+   "identical": true
+  },
+  {
+   "run": "prompt 6 single graph=True",
+   "identical": true
+  },
+  {
+   "run": "prompt 6 single graph=False",
+   "identical": true
+  },
+  {
+   "run": "batched B=6 slot 0",
+   "identical": true
+  },
+  {
+   "run": "batched B=6 slot 1",
+   "identical": true
+  },
+  {
+   "run": "batched B=6 slot 2",
+   "identical": true
+  },
+  {
+   "run": "batched B=6 slot 3",
+   "identical": false,
+   "step": 118,
+   "hf_gap": 0.015625,
+   "accepted": true
+  },
+  {
+   "run": "batched B=6 slot 4",
+   "identical": false,
+   "step": 26,
+   "hf_gap": 0.015625,
+   "accepted": true
+  },
+  {
+   "run": "batched B=6 slot 5",
+   "identical": true
+  }
+ ]
+}

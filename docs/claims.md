@@ -15,7 +15,7 @@ are fp16 and all generation is greedy.
 
 | claim | exact scope | evidence |
 |---|---|---|
-| Runs and passes all kernel tests on NVIDIA | 2080 Ti and A6000 only. 899 checks, 0 failures, on each. | [results/2080ti/test_kernels.log](../results/2080ti/test_kernels.log), [results/a6000/test_kernels.log](../results/a6000/test_kernels.log) |
+| Runs and passes all kernel tests on NVIDIA | 2080 Ti, A6000 and A100-SXM4-40GB (Colab). The 899 dense-model checks pass with 0 failures on each; the MoE kernel checks have run on the 2080 Ti only (on the A100 run they were skipped for a missing file). | [results/2080ti/test_kernels.log](../results/2080ti/test_kernels.log), [results/a6000/test_kernels.log](../results/a6000/test_kernels.log), [results/a100/test_kernels.log](../results/a100/test_kernels.log) |
 | One source tree for NVIDIA (`nvcc`) and AMD (`hipcc`) | `src/hip_compat.h` maps the `hip*` API onto CUDA under `nvcc`. The NVIDIA fast paths (`mma.sync`, `ldmatrix`, `cp.async`) are NVIDIA-only; AMD gets the portable WMMA / rocWMMA and scalar kernels. | [src/hip_compat.h](../src/hip_compat.h), [Makefile](../Makefile) |
 | **AMD: compile-checked only** | `make hip` builds for gfx90a (MI200), gfx942 (MI300) and gfx1100 (RDNA3) with ROCm 7 + rocWMMA, RCCL optional. **It has never run on AMD hardware**: no kernel test, correctness or performance result exists for any AMD GPU. The MoE kernels were added after that build check and haven't been compiled for AMD. No build log is committed; the evidence is the commit message of 7370172 ("The AMD build ... compiles on this code"). | README "What it runs, and where"; `git show 7370172` |
 
@@ -43,6 +43,8 @@ from the main 2026-10-15 suite, and llama.cpp's from a separate session on 2026-
 | **Slower at 3B prefill** | Llama-3.2-3B, 2,000 tokens: 289.7 vs 261.8 ms (**1.11× slower**) in the full suite, where the 2080 Ti's 250 W power cap holds it at 1.4–1.55 GHz. A short isolated run gives 273.6 ms (1.04× slower). **Also slower at 512 tokens: 76.7 vs 65.4 ms (1.17×).** The cause is GEMMs at 0.93–0.94× cuBLAS (§6). | same; [docs/turing-prefill-gemm.md](turing-prefill-gemm.md) |
 | A6000, TinyLlama only | Decode 3.42 vs 3.78 ms (1.11×) at ctx 128, 3.49 vs 3.79 (1.09×) at 1,024. Prefill 6.3 / 16.7 / 57.9 vs 9.8 / 24.5 / 89.7 ms at 128 / 512 / 2,000 tokens. hipinfer, llama.cpp and vLLM ran back to back in one session, all unthrottled ([THERMAL.md](../results/a6000/THERMAL.md)). The other models' A6000 llama.cpp runs were throttled and are not used. | `results/baselines/a6000/tinyllama/{hipinfer,llamacpp}.json` |
 
+| A100, four models, one session | Decode at ctx 128, hipinfer vs llama.cpp: TinyLlama 2.18 vs 2.57 ms (1.18×), Llama-3.2-1B 2.32 vs 2.63 (1.14×), Qwen2.5-1.5B 3.21 vs 4.08 (1.27×), Llama-3.2-3B 5.60 vs 6.17 (1.10×). Prefill at 2,000 tokens: hipinfer faster on all four (1.16–1.45×). No throttling ([THERMAL.md](../results/a100/THERMAL.md)). | `results/baselines/a100/<model>/{hipinfer,llamacpp}.json` |
+
 Not compared: batch > 1, quantized formats (llama.cpp's main use), CPU offload, any model above 3B.
 
 ## 4. Against vLLM, torch.compile and HF transformers
@@ -51,6 +53,7 @@ Not compared: batch > 1, quantized formats (llama.cpp's main use), CPU offload, 
 |---|---|---|
 | **Faster batch-1 decode than vLLM** | **TinyLlama-1.1B only, batch 1, A6000 only.** vLLM 0.31 (V1 engine, CUDA graphs, fp16): 3.98 / 3.98 ms/token at ctx 128 / 1,024, measured as (generate 257 tokens − generate 1 token) / 256, so its per-step scheduler overhead is included. hipinfer in the same session: 3.42 / 3.49 ms (1.16× / 1.14×), all unthrottled. vLLM was not run on the 2080 Ti, on any other model unthrottled, or at any batch size above 1. | `results/baselines/a6000/tinyllama/{hipinfer,vllm}.json` |
 | Faster than torch.compile (gpt-fast style) | TinyLlama only, batch 1, both GPUs. 2080 Ti: 4.14 vs 5.24 ms (1.27×) at ctx 128, 4.22 vs 6.84 (1.62×) at 1,024. A6000: 1.23× / 1.57×. Prefill at 2,000 tokens on the A6000 is level (59.6 vs 59.6 ms). | `results/baselines/{2080ti,a6000}/torch_compile.json` |
+| A100: faster batch-1 decode than vLLM and torch.compile | vLLM 0.31 at ctx 128: TinyLlama 2.83 vs 2.18 ms (1.30×), Llama-3.2-1B 2.86 vs 2.32 (1.23×), Qwen2.5-1.5B 4.19 vs 3.21 (1.31×); Llama-3.2-3B not run (disk). torch.compile: 1.44× / 1.33× / 1.21× on TinyLlama / Llama-3.2-1B / Llama-3.2-3B; its Qwen2.5-1.5B run is invalid (the baseline dropped the QKV bias, 0/32 tokens matched HF). **Prefill at 2,000 tokens is the other way round:** vLLM (its time includes one generated token) and torch.compile are 1.02–1.22× faster than hipinfer. Same session, no throttling. | `results/baselines/a100/<model>/*.json` |
 | 3.8–11.5× faster than HF transformers | 2080 Ti, batch-1 decode, against HF **eager** with a DynamicCache. That is a weak baseline, so quote it with that qualifier or not at all. | `e2e.decode_b1[].hf_ms` |
 
 ## 5. Correctness against HF transformers

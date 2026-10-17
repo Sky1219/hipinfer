@@ -1,0 +1,25 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+[transformers] Token indices sequence length is longer than the specified maximum sequence length for this model (299078 > 131072). Running this sequence through the model will result in indexing errors
+Qwen/Qwen2.5-1.5B: 299078 test tokens, 8 windows of 1024
+Loading weights:   0%|          | 0/338 [00:00<?, ?it/s]Loading weights:   0%|          | 1/338 [00:00<01:05,  5.13it/s]Loading weights:  58%|█████▊    | 195/338 [00:00<00:00, 789.47it/s]Loading weights:  88%|████████▊ | 299/338 [00:00<00:00, 813.01it/s]Loading weights: 100%|██████████| 338/338 [00:00<00:00, 720.69it/s]
+window   0: ppl HF 6.7121  hipinfer 6.7122  top-1 agree 99.706%  mean KL 1.26e-05  max |dlogit| 0.131
+window   1: ppl HF 8.8735  hipinfer 8.8749  top-1 agree 99.804%  mean KL 1.46e-05  max |dlogit| 0.216
+window   2: ppl HF 9.4148  hipinfer 9.4162  top-1 agree 99.739%  mean KL 1.55e-05  max |dlogit| 0.216
+window   3: ppl HF 10.2232  hipinfer 10.2241  top-1 agree 99.780%  mean KL 1.59e-05  max |dlogit| 0.216
+window   4: ppl HF 11.3566  hipinfer 11.3575  top-1 agree 99.824%  mean KL 1.60e-05  max |dlogit| 0.216
+window   5: ppl HF 11.5103  hipinfer 11.5108  top-1 agree 99.821%  mean KL 1.63e-05  max |dlogit| 0.216
+window   6: ppl HF 11.8557  hipinfer 11.8557  top-1 agree 99.804%  mean KL 1.63e-05  max |dlogit| 0.216
+window   7: ppl HF 11.9787  hipinfer 11.9787  top-1 agree 99.768%  mean KL 1.61e-05  max |dlogit| 0.216
+{
+ "model": "Qwen/Qwen2.5-1.5B",
+ "gpu": "NVIDIA A100-SXM4-40GB",
+ "tp": 1,
+ "seq": 1024,
+ "windows": 8,
+ "tokens": 8176,
+ "ppl_hf": 11.97867437818788,
+ "ppl_hipinfer": 11.978731910676672,
+ "top1_agreement": 0.9976761252446184,
+ "mean_kl_hf_to_hipinfer": 1.6117424635447148e-05,
+ "max_logit_diff": 0.21630859375
+}

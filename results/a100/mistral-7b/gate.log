@@ -1,0 +1,43 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/291 [00:00<?, ?it/s]Loading weights:   0%|          | 1/291 [00:03<16:43,  3.46s/it]Loading weights:   4%|▍         | 13/291 [00:04<01:12,  3.82it/s]Loading weights:   5%|▍         | 14/291 [00:04<01:11,  3.87it/s]Loading weights:   5%|▌         | 15/291 [00:04<01:14,  3.72it/s]Loading weights:   8%|▊         | 22/291 [00:05<00:53,  4.99it/s]Loading weights:  10%|▉         | 29/291 [00:06<00:31,  8.26it/s]Loading weights:  11%|█         | 31/291 [00:07<00:52,  4.94it/s]Loading weights:  11%|█▏        | 33/291 [00:07<00:47,  5.38it/s]Loading weights:  14%|█▎        | 40/291 [00:08<00:43,  5.82it/s]Loading weights:  14%|█▍        | 42/291 [00:09<00:48,  5.18it/s]Loading weights:  17%|█▋        | 49/291 [00:10<00:39,  6.13it/s]Loading weights:  17%|█▋        | 50/291 [00:10<00:38,  6.33it/s]Loading weights:  20%|█▉        | 58/291 [00:11<00:38,  6.05it/s]Loading weights:  23%|██▎       | 67/291 [00:12<00:30,  7.44it/s]Loading weights:  23%|██▎       | 68/291 [00:12<00:30,  7.39it/s]Loading weights:  32%|███▏      | 94/291 [00:13<00:10, 18.61it/s]Loading weights:  33%|███▎      | 97/291 [00:14<00:15, 12.37it/s]Loading weights:  35%|███▌      | 103/291 [00:15<00:17, 10.57it/s]Loading weights:  36%|███▌      | 105/291 [00:15<00:18,  9.98it/s]Loading weights:  38%|███▊      | 112/291 [00:16<00:22,  7.89it/s]Loading weights:  42%|████▏     | 121/291 [00:17<00:23,  7.28it/s]Loading weights:  45%|████▍     | 130/291 [00:19<00:22,  7.10it/s]Loading weights:  45%|████▌     | 132/291 [00:19<00:21,  7.56it/s]Loading weights:  48%|████▊     | 139/291 [00:20<00:22,  6.67it/s]Loading weights:  48%|████▊     | 140/291 [00:20<00:22,  6.79it/s]Loading weights:  51%|█████     | 148/291 [00:22<00:21,  6.58it/s]Loading weights:  52%|█████▏    | 150/291 [00:22<00:19,  7.05it/s]Loading weights:  54%|█████▍    | 157/291 [00:23<00:21,  6.34it/s]Loading weights:  57%|█████▋    | 166/291 [00:24<00:19,  6.44it/s]Loading weights:  58%|█████▊    | 168/291 [00:25<00:18,  6.79it/s]Loading weights:  60%|██████    | 175/291 [00:26<00:18,  6.36it/s]Loading weights:  63%|██████▎   | 184/291 [00:27<00:17,  6.17it/s]Loading weights:  66%|██████▋   | 193/291 [00:29<00:15,  6.44it/s]Loading weights:  67%|██████▋   | 194/291 [00:29<00:15,  6.46it/s]Loading weights:  67%|██████▋   | 195/291 [00:29<00:14,  6.55it/s]Loading weights:  69%|██████▉   | 202/291 [00:30<00:13,  6.62it/s]Loading weights:  70%|███████   | 204/291 [00:30<00:12,  7.06it/s]Loading weights:  73%|███████▎  | 211/291 [00:31<00:12,  6.38it/s]Loading weights:  73%|███████▎  | 213/291 [00:31<00:11,  6.81it/s]Loading weights:  76%|███████▌  | 220/291 [00:33<00:11,  6.32it/s]Loading weights:  79%|███████▊  | 229/291 [00:34<00:09,  6.37it/s]Loading weights:  82%|████████▏ | 238/291 [00:35<00:08,  6.59it/s]Loading weights:  82%|████████▏ | 239/291 [00:35<00:07,  6.70it/s]Loading weights:  82%|████████▏ | 240/291 [00:36<00:07,  6.83it/s]Loading weights:  85%|████████▍ | 247/291 [00:37<00:06,  6.34it/s]Loading weights:  88%|████████▊ | 256/291 [00:38<00:05,  6.37it/s]Loading weights:  91%|█████████ | 265/291 [00:40<00:03,  6.60it/s]Loading weights:  92%|█████████▏| 267/291 [00:40<00:03,  6.68it/s]Loading weights:  94%|█████████▍| 274/291 [00:41<00:02,  6.43it/s]Loading weights:  97%|█████████▋| 283/291 [00:42<00:01,  6.58it/s]Loading weights: 100%|██████████| 291/291 [00:42<00:00,  6.80it/s]
+hi_prefill: p0 1019 + T 6 exceeds max_seq 1024
+hi_prefill: slot 8 outside [0, max_batch 8)
+hi_prefill: token 32768 at 0 outside vocab 32768
+hi_decode: B 9 outside [1, max_batch 8]
+hi_decode: slot 0 at position 1023 + 2 steps exceeds max_seq 1024
+mistralai/Mistral-7B-v0.3: layers 32 hidden 4096 heads 32/8 head_dim 128 vocab 32768 tied=False qkv_bias=False
+prompt 0 (len 6): prefill logits max |diff| = 0.0117
+  prompt 0 single graph=True: 128/128 tokens identical
+  prompt 0 single graph=False: 128/128 tokens identical
+prompt 1 (len 23): prefill logits max |diff| = 0.0156
+  prompt 1 single graph=True: 128/128 tokens identical
+  prompt 1 single graph=False: 128/128 tokens identical
+prompt 2 (len 18): prefill logits max |diff| = 0.0117
+  prompt 2 single graph=True: 128/128 tokens identical
+  prompt 2 single graph=False: 128/128 tokens identical
+prompt 3 (len 20): prefill logits max |diff| = 0.0127
+  prompt 3 single graph=True: 128/128 tokens identical
+  prompt 3 single graph=False: 128/128 tokens identical
+prompt 4 (len 19): prefill logits max |diff| = 0.0088
+  prompt 4 single graph=True: 128/128 tokens identical
+  prompt 4 single graph=False: 128/128 tokens identical
+prompt 5 (len 16): prefill logits max |diff| = 0.0391
+  prompt 5 single graph=True: 128/128 tokens identical
+  prompt 5 single graph=False: 128/128 tokens identical
+prompt 6 (len 700): prefill logits max |diff| = 0.0156
+  prompt 6 single graph=True: 128/128 tokens identical
+  prompt 6 single graph=False: 128/128 tokens identical
+  batched B=6 slot 0: 128/128 tokens identical
+  batched B=6 slot 1: 128/128 tokens identical
+  batched B=6 slot 2: 128/128 tokens identical
+  batched B=6 slot 3: 128/128 tokens identical
+  batched B=6 slot 4: 128/128 tokens identical
+  batched B=6 slot 5: 128/128 tokens identical
+  prefill past max_seq: rejected
+  prefill slot >= max_batch: rejected
+  token outside vocab: rejected
+  decode B > max_batch: rejected
+  decode past max_seq: rejected
+
+20/20 runs token-identical, max prefill-logit |diff| 0.0391
+GATE PASS

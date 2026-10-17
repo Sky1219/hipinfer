@@ -1,0 +1,28 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Generating test split:   0%|          | 0/4358 [00:00<?, ? examples/s]Generating test split: 100%|██████████| 4358/4358 [00:00<00:00, 147984.72 examples/s]
+Generating train split:   0%|          | 0/36718 [00:00<?, ? examples/s]Generating train split: 100%|██████████| 36718/36718 [00:00<00:00, 827257.83 examples/s]
+Generating validation split:   0%|          | 0/3760 [00:00<?, ? examples/s]Generating validation split: 100%|██████████| 3760/3760 [00:00<00:00, 667820.58 examples/s]
+[transformers] Token indices sequence length is longer than the specified maximum sequence length for this model (341468 > 2048). Running this sequence through the model will result in indexing errors
+TinyLlama/TinyLlama-1.1B-Chat-v1.0: 341468 test tokens, 8 windows of 1024
+Loading weights:   0%|          | 0/201 [00:00<?, ?it/s]Loading weights:  38%|███▊      | 76/201 [00:00<00:00, 685.31it/s]Loading weights:  72%|███████▏  | 145/201 [00:00<00:00, 675.48it/s]Loading weights: 100%|██████████| 201/201 [00:00<00:00, 687.33it/s]
+window   0: ppl HF 5.0276  hipinfer 5.0283  top-1 agree 99.902%  mean KL 5.21e-06  max |dlogit| 0.054
+window   1: ppl HF 7.2862  hipinfer 7.2868  top-1 agree 99.902%  mean KL 5.81e-06  max |dlogit| 0.062
+window   2: ppl HF 8.1295  hipinfer 8.1301  top-1 agree 99.870%  mean KL 5.88e-06  max |dlogit| 0.119
+window   3: ppl HF 8.7575  hipinfer 8.7577  top-1 agree 99.853%  mean KL 5.84e-06  max |dlogit| 0.119
+window   4: ppl HF 9.5211  hipinfer 9.5212  top-1 agree 99.863%  mean KL 5.94e-06  max |dlogit| 0.119
+window   5: ppl HF 10.2280  hipinfer 10.2282  top-1 agree 99.870%  mean KL 5.94e-06  max |dlogit| 0.119
+window   6: ppl HF 10.5898  hipinfer 10.5898  top-1 agree 99.874%  mean KL 6.12e-06  max |dlogit| 0.119
+window   7: ppl HF 10.7326  hipinfer 10.7326  top-1 agree 99.853%  mean KL 6.25e-06  max |dlogit| 0.119
+{
+ "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+ "gpu": "NVIDIA A100-SXM4-40GB",
+ "tp": 1,
+ "seq": 1024,
+ "windows": 8,
+ "tokens": 8184,
+ "ppl_hf": 10.732559872839317,
+ "ppl_hipinfer": 10.732572604522458,
+ "top1_agreement": 0.998533724340176,
+ "mean_kl_hf_to_hipinfer": 6.251484901600591e-06,
+ "max_logit_diff": 0.119140625
+}

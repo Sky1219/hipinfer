@@ -3,7 +3,8 @@
 An LLM inference engine I wrote from scratch in HIP. On one RTX 2080 Ti it runs Llama, Qwen and
 TinyLlama models in fp16 **5–47 % faster than llama.cpp at batch-1 decode** (128-token context;
 3–43 % at 1,024), and its outputs match Hugging Face transformers (WikiText-2 perplexity within
-0.01 %).
+0.01 %). On an A100 it is 10–27 % faster than llama.cpp and 23–31 % faster than vLLM at batch-1
+decode, measured in one session, though slower than vLLM and torch.compile on long-prompt prefill.
 
 The same source tree builds with `hipcc` for AMD GPUs and with plain `nvcc` for NVIDIA GPUs. There
 are no vendor libraries in the hot path: the GEMV, GEMM, RMSNorm, RoPE and FlashAttention-style
@@ -21,8 +22,9 @@ also runs one Mixture-of-Experts model, Granite-3.1-1B-A400M (32 experts, top-8)
 
 Hardware:
 
-- **NVIDIA, tested:** RTX 2080 Ti (Turing, sm_75), on one card and on two with tensor parallelism,
-  and RTX A6000 (Ampere, sm_86). All kernel tests pass on both.
+- **NVIDIA, tested:** RTX 2080 Ti (Turing, sm_75), on one card and on two with tensor parallelism;
+  RTX A6000 (Ampere, sm_86); and A100-SXM4-40GB (Ampere, sm_80, on Google Colab). The dense-model
+  kernel tests pass on all three; the MoE kernel tests have run on the 2080 Ti only.
 - **AMD, compile-checked only.** It builds for MI200 (gfx90a), MI300 (gfx942) and RDNA3 (gfx1100)
   with ROCm 7 and rocWMMA, but **it has never run on AMD hardware**. The MoE kernels came later and
   haven't been compiled for AMD at all.
@@ -136,6 +138,37 @@ holds it out to 8k-token contexts (86 % at 8,192 tokens on Llama-3.2-3B). llama.
 on the same models. Qwen2.5-0.5B is lower, at 69 %: its matrices are small enough that launch and
 synchronization overhead start to show.
 
+### On an A100
+
+A100-SXM4-40GB (1,555 GB/s) on Google Colab, everything in one session with no thermal throttling
+([THERMAL.md](results/a100/THERMAL.md)). hipinfer was re-run next to the other engines, so every
+row compares runs a few minutes apart.
+
+| batch-1 decode, ms/token, ctx 128 | hipinfer | % of floor | llama.cpp | vLLM 0.31 | torch.compile |
+|---|---|---|---|---|---|
+| TinyLlama-1.1B | **2.18** | 61 % | 2.57 (1.18× slower) | 2.83 (1.30×) | 3.14 (1.44×) |
+| Llama-3.2-1B | **2.32** | 69 % | 2.63 (1.14×) | 2.86 (1.23×) | 3.08 (1.33×) |
+| Qwen2.5-1.5B | **3.21** | 62 % | 4.08 (1.27×) | 4.19 (1.31×) | not valid ✝ |
+| Llama-3.2-3B | **5.60** | 74 % | 6.17 (1.10×) | not run ✱ | 6.79 (1.21×) |
+
+| prefill, 2,000 tokens, ms | hipinfer | llama.cpp | vLLM 0.31 (incl. 1 generated token) | torch.compile |
+|---|---|---|---|---|
+| TinyLlama-1.1B | 35.6 | 51.7 | **29.9** | 34.8 |
+| Llama-3.2-1B | 33.3 | 47.7 | 30.4 | **30.2** |
+| Qwen2.5-1.5B | 43.5 | 63.1 | **35.8** | not valid ✝ |
+| Llama-3.2-3B | 87.0 | 100.8 | not run ✱ | **73.8** |
+
+✝ My torch.compile baseline left out Qwen2's QKV bias, so its tokens didn't match HF (0/32) and
+its numbers are excluded. The bias is fixed in `scripts/bench_baselines.py` but hasn't been re-run.
+✱ The Colab disk filled before vLLM could load Llama-3.2-3B.
+
+Mistral-7B-v0.3 also ran on the A100 (no other engines): 11.07 ms/token, 83 % of the floor.
+
+**Decode on the A100 is further from the floor than on the 2080 Ti** (61–74 % on the 1–3B models,
+against 81–87 %). The weights stream about 2.5× faster, but each kernel launch costs about the
+same, so the fixed per-launch time is a bigger share of a token. On Mistral-7B, where each kernel
+moves more data, it is back to 83 %. llama.cpp and vLLM sit further below the floor still (47–67 %).
+
 ### Against other engines on TinyLlama
 
 Same GPU, fp16 weights, batch 1. On the A6000, hipinfer, llama.cpp and vLLM ran back to back in one
@@ -158,8 +191,9 @@ separately on the same machines.
 
 ### What I take from this
 
-- **At batch-1 decode, hipinfer was faster than llama.cpp on every model I measured**, and faster
-  than vLLM and torch.compile on TinyLlama, the one model I ran those on. At a 128-token context
+- **At batch-1 decode, hipinfer was faster than llama.cpp on every model I measured**, on all
+  three GPUs, and faster than vLLM and torch.compile on every model I ran them on (TinyLlama on
+  the A6000; three or four models on the A100). At a 128-token context
   the lead over llama.cpp is 5–16 % on the 1–3B models and 47 % on Qwen2.5-0.5B; at 1,024 tokens it
   is 3.0–14.4 % and 43 %. It shrinks as models grow,
   because everyone converges on the same bandwidth floor. I think the gain comes from fewer kernel
@@ -169,6 +203,11 @@ separately on the same machines.
   is bound by the GEMMs, and mine run at 0.92–0.95× cuBLAS. That leaves Llama-3.2-3B 1.04–1.11×
   behind llama.cpp at 2,000 tokens (isolated run vs full suite) and 1.17× behind at 512 (76.7 vs
   65.4 ms), with Llama-3.2-1B level with it. The gap is not closed.
+- **On the A100, long prompts are where hipinfer loses.** It still beats llama.cpp at every prompt
+  length, but at 2,000 tokens vLLM and torch.compile are 1.02–1.22× faster, and HF transformers
+  itself pulls ahead on long prompts (from 512 to 4,096 tokens depending on the model, after which
+  hipinfer runs at 0.79–0.95× HF). All three use cuBLAS and FlashAttention-2, and on the A100 my
+  GEMMs run at only 0.50–0.72× cuBLAS.
 - **Keep the scope in mind.** These are batch-1 latency numbers on small models. vLLM and llama.cpp
   are built for far more: many concurrent requests, quantization, hundreds of architectures. Batch 1
   is just where a small engine can be checked against a hard floor.
@@ -295,7 +334,8 @@ in three ways.
 - **Perplexity** ([tests/ppl.py](tests/ppl.py)): WikiText-2 test, 16 windows of 1,024 tokens, both
   engines on the same tokens. This checks the whole distribution at every position, not just the
   top token. hipinfer's perplexity is within 0.003 % of HF's on the single-GPU 2080 Ti runs above,
-  within 0.0062 % on the A6000 and within 0.0098 % on sharded runs.
+  within 0.0062 % on the A6000, within 0.0052 % on the A100 and within 0.0098 % on sharded runs.
+  On the A100 every model's token gate passes too.
 - **Kernel tests** ([tests/test_kernels.py](tests/test_kernels.py)): every kernel against PyTorch
   references at head_dim 64 and 128, every GQA group from 1 to 8, all 27 GEMM configs and their
   split-K variants, ragged batches, chunked-prefill offsets and 4,000-token contexts. RoPE is
@@ -362,12 +402,14 @@ each product explicitly.
 - **Prefill GEMM on Turing: 0.92–0.95× cuBLAS** at 2,048 rows on Llama-3.2-3B's shapes. This decides
   prefill on 3B-and-up models, and it's why Llama-3.2-3B is still 1.04–1.11× behind llama.cpp. Most
   of what's left is each GEMM's last wave: one 256×128 block per SM on 68 SMs.
-- **Prefill GEMM on Ampere: 0.71–0.85× cuBLAS** on the A6000 at the same shapes. The Ampere
-  `cp.async` path is less tuned than the Turing one.
+- **Prefill GEMM on Ampere: 0.71–0.85× cuBLAS** on the A6000 and **0.50–0.72×** on the A100 at the
+  same shapes. The Ampere `cp.async` path is less tuned than the Turing one, and on the A100 it is
+  the reason long-prompt prefill trails vLLM, torch.compile and HF.
 - **Batched decode at 16–64 sequences:** the projections at these shapes haven't been timed against
   cuBLAS on the current build, so I have no number for them.
-- **Attention on Ampere is at parity, not ahead:** on the A6000, prefill attention runs at
-  0.90–1.11× PyTorch SDPA (its FlashAttention backend) and decode attention at 0.87–1.09×. On the 2080 Ti, where PyTorch has no flash kernel, it's 8–53× faster than
+- **Attention on Ampere is at parity at best:** on the A6000, prefill attention runs at
+  0.90–1.11× PyTorch SDPA (its FlashAttention backend) and decode attention at 0.87–1.09×; on the
+  A100 it is behind, at 0.67–0.72× and 0.66–0.73×. On the 2080 Ti, where PyTorch has no flash kernel, it's 8–53× faster than
   SDPA.
 - **AMD runs only the portable kernels** (WMMA GEMM and attention, scalar decode attention). MFMA
   versions of the register-resident kernels aren't written yet, and nothing has run on AMD hardware.

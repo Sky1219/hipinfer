@@ -266,6 +266,10 @@ def baselines(gpus, bdir):
     def add(f, model):
         r = json.load(open(f))
         eng = os.path.splitext(os.path.basename(f))[0]
+        match = r.get("greedy_match_vs_hf")  # a baseline whose tokens differ from HF computes another model
+        if match and match.split("/")[0] != match.split("/")[1]:
+            print(f"<!-- skipped {f.replace(os.sep, '/')}: greedy tokens vs HF {match} -->")
+            return
         g = data.setdefault((r["gpu"], model), {})
         if eng == "hipinfer":  # bench.py rerun next to the baselines (same session)
             e2e = r["e2e"]

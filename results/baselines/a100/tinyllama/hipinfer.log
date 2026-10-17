@@ -1,0 +1,34 @@
+NVIDIA A100-SXM4-40GB peak BW 1555.0 GB/s | TinyLlama/TinyLlama-1.1B-Chat-v1.0 {'vocab': 32000, 'hidden': 2048, 'inter': 5632, 'layers': 22, 'heads': 32, 'kv_heads': 4, 'head_dim': 64, 'max_pos': 2048, 'window': 0, 'tied': False, 'qkv_bias': False, 'weight_bytes': 2069024768}
+
+== HF transformers reference timings ==
+HF prefill T=  128:    25.92 ms
+HF prefill T=  512:    26.24 ms
+HF prefill T= 1024:    26.80 ms
+HF prefill T= 2000:    33.13 ms
+HF decode ctx=  128:  24.48 ms/token
+HF decode ctx= 1024:  25.30 ms/token
+
+== Prefill latency (ms) ==
+T=  128  hipinfer    5.14 ms (   24893 tok/s)   HF   25.92 ms   x5.04
+T=  512  hipinfer   11.19 ms (   45764 tok/s)   HF   26.24 ms   x2.35
+T= 1024  hipinfer   18.54 ms (   55227 tok/s)   HF   26.80 ms   x1.45
+T= 2000  hipinfer   35.64 ms (   56111 tok/s)   HF   33.13 ms   x0.93
+
+== Decode, batch 1 (ms/token) ==
+ctx=  128  hipinfer  2.177 ms (graph) /  2.304 ms (no graph)   HF  24.48 ms   x11.2   roofline 1.334 ms -> 61% of peak BW
+ctx= 1024  hipinfer  2.249 ms (graph) /  2.373 ms (no graph)   HF  25.30 ms   x11.2   roofline 1.347 ms -> 60% of peak BW
+
+== Decode latency vs context length (batch 1, 128 new tokens) ==
+ctx=   128   2.167 ms/token   KV read     4.3 MB/step   roofline 1.333 ms  62% BW
+ctx=   512   2.184 ms/token   KV read    13.0 MB/step   roofline 1.339 ms  61% BW
+ctx=  1024   2.236 ms/token   KV read    24.5 MB/step   roofline 1.346 ms  60% BW
+
+== Batched decode throughput (ctx 512, 128 new tokens; up to 64 sequences fit) ==
+B=  1   2.180 ms/step        459 tok/s     171 W   372.61 mJ/token
+B=  2   2.306 ms/step        867 tok/s     233 W   268.76 mJ/token
+B=  4   2.588 ms/step       1546 tok/s     246 W   159.36 mJ/token
+B=  8   3.273 ms/step       2444 tok/s     207 W    84.79 mJ/token
+B= 16   3.676 ms/step       4353 tok/s     240 W    55.11 mJ/token
+B= 32   3.859 ms/step       8291 tok/s     255 W    30.70 mJ/token
+B= 64   4.560 ms/step      14034 tok/s     262 W    18.69 mJ/token
+wrote results/baselines/colab_NVIDIA_A100-SXM4-40GB/tinyllama/hipinfer.json

@@ -1,0 +1,13 @@
+{
+ "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+ "gpu": "NVIDIA A100-SXM4-40GB",
+ "tp": 1,
+ "seq": 1024,
+ "windows": 8,
+ "tokens": 8184,
+ "ppl_hf": 10.732559872839317,
+ "ppl_hipinfer": 10.732572604522458,
+ "top1_agreement": 0.998533724340176,
+ "mean_kl_hf_to_hipinfer": 6.251484901600591e-06,
+ "max_logit_diff": 0.119140625
+}

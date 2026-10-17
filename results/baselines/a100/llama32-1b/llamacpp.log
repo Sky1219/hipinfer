@@ -1,0 +1,12 @@
+$ /content/llama.cpp/build/bin/llama-bench -m /content/llama32-1b-f16.gguf -ngl 99 -r 5 -o json -p 128,512,2000 -n 0 -fa 0,1 -ub 512,2048 -b 2048
+ggml_cuda_init: found 1 CUDA devices (Total VRAM: 40441 MiB):
+  Device 0: NVIDIA A100-SXM4-40GB, compute capability 8.0, VMM: yes, VRAM: 40441 MiB
+$ /content/llama.cpp/build/bin/llama-bench -m /content/llama32-1b-f16.gguf -ngl 99 -r 5 -o json -p 0 -n 256 -d 128,1024 -fa 0,1
+ggml_cuda_init: found 1 CUDA devices (Total VRAM: 40441 MiB):
+  Device 0: NVIDIA A100-SXM4-40GB, compute capability 8.0, VMM: yes, VRAM: 40441 MiB
+llama.cpp prefill T=  128      6.41 ms  (fa=1 ub=512)
+llama.cpp prefill T=  512     12.74 ms  (fa=1 ub=2048)
+llama.cpp prefill T= 2000     47.67 ms  (fa=1 ub=512)
+llama.cpp decode  ctx=  128   2.633 ms/token  (fa=1)
+llama.cpp decode  ctx= 1024   2.641 ms/token  (fa=1)
+wrote results/baselines/colab_NVIDIA_A100-SXM4-40GB/llama32-1b/llamacpp.json

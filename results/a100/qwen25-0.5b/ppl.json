@@ -1,0 +1,13 @@
+{
+ "model": "Qwen/Qwen2.5-0.5B",
+ "gpu": "NVIDIA A100-SXM4-40GB",
+ "tp": 1,
+ "seq": 1024,
+ "windows": 8,
+ "tokens": 8176,
+ "ppl_hf": 17.223637675781017,
+ "ppl_hipinfer": 17.222703989331198,
+ "top1_agreement": 0.997431506849315,
+ "mean_kl_hf_to_hipinfer": 1.552755463562647e-05,
+ "max_logit_diff": 0.125
+}

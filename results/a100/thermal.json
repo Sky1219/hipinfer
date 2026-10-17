@@ -1,0 +1,57 @@
+{
+ "tinyllama": {
+  "window": "whole run 00:27-01:43 UTC",
+  "loaded_samples": 152,
+  "throttled_pct": 0,
+  "sm_min_mhz": 1230,
+  "sm_median_mhz": 1410,
+  "peak_c": 65,
+  "verdict": "clean"
+ },
+ "llama32-1b": {
+  "window": "whole run 00:27-01:43 UTC",
+  "loaded_samples": 152,
+  "throttled_pct": 0,
+  "sm_min_mhz": 1230,
+  "sm_median_mhz": 1410,
+  "peak_c": 65,
+  "verdict": "clean"
+ },
+ "qwen25-0.5b": {
+  "window": "whole run 00:27-01:43 UTC",
+  "loaded_samples": 152,
+  "throttled_pct": 0,
+  "sm_min_mhz": 1230,
+  "sm_median_mhz": 1410,
+  "peak_c": 65,
+  "verdict": "clean"
+ },
+ "qwen25-1.5b": {
+  "window": "whole run 00:27-01:43 UTC",
+  "loaded_samples": 152,
+  "throttled_pct": 0,
+  "sm_min_mhz": 1230,
+  "sm_median_mhz": 1410,
+  "peak_c": 65,
+  "verdict": "clean"
+ },
+ "llama32-3b": {
+  "window": "whole run 00:27-01:43 UTC",
+  "loaded_samples": 152,
+  "throttled_pct": 0,
+  "sm_min_mhz": 1230,
+  "sm_median_mhz": 1410,
+  "peak_c": 65,
+  "verdict": "clean"
+ },
+ "mistral-7b": {
+  "window": "whole run 00:27-01:43 UTC",
+  "loaded_samples": 152,
+  "throttled_pct": 0,
+  "sm_min_mhz": 1230,
+  "sm_median_mhz": 1410,
+  "peak_c": 65,
+  "verdict": "clean"
+ },
+ "baselines": {}
+}

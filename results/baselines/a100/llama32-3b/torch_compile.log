@@ -1,0 +1,10 @@
+[transformers] Both `max_new_tokens` (=32) and `max_length`(=131072) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+greedy tokens vs HF eager: 32/32 match
+  compile+first run ctx=128: 23 s
+torch.compile decode ctx=  128   6.794 ms/token
+  compile+first run ctx=1024: 23 s
+torch.compile decode ctx= 1024   8.507 ms/token
+torch.compile prefill T=  128     13.09 ms
+torch.compile prefill T=  512     20.36 ms
+torch.compile prefill T= 2000     73.75 ms
+wrote results/baselines/colab_NVIDIA_A100-SXM4-40GB/llama32-3b/torch_compile.json

@@ -1,0 +1,13 @@
+{
+ "model": "mistralai/Mistral-7B-v0.3",
+ "gpu": "NVIDIA A100-SXM4-40GB",
+ "tp": 1,
+ "seq": 1024,
+ "windows": 8,
+ "tokens": 8184,
+ "ppl_hf": 7.326661383101119,
+ "ppl_hipinfer": 7.326925851484191,
+ "top1_agreement": 0.9987781036168133,
+ "mean_kl_hf_to_hipinfer": 4.174612267186387e-06,
+ "max_logit_diff": 0.17724609375
+}
