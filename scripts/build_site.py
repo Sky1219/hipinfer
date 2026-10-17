@@ -94,7 +94,177 @@ def collect(root):
                             "pass": None, "ppl_hi": pp["ppl_hipinfer"], "ppl_hf": pp["ppl_hf"],
                             "top1": pp["top1_agreement"], "kl": pp["mean_kl_hf_to_hipinfer"]})
     return {"gpu": t, "decode": decode, "prefill": prefill, "ctx": ctx_lines, "batched": batched, "tp": tp, "ar": ar,
-            "correct": correct}
+            "correct": correct, "a100": collect_a100(root, gpus)}
+
+
+ENGINES = [("hipinfer", "hipinfer"), ("llamacpp", "llama.cpp"), ("vllm", "vLLM"), ("torch_compile", "torch.compile")]
+
+
+def collect_a100(root, gpus):
+    """Same-session engine comparison on the A100 from results/baselines/a100/<model>/<engine>.json. A missing file
+    is an engine that didn't run; a baseline whose greedy tokens differ from HF computes another model (not valid)."""
+    bdir = os.path.join(root, "baselines", "a100")
+    rows, gpu, vllm = [], None, None
+    for m in MODEL_ORDER:
+        if not os.path.isdir(os.path.join(bdir, m)):
+            continue
+        row = {"label": name(m), "decode": {}, "prefill": {}, "why": {}}
+        for eng, _ in ENGINES:
+            r = jload(os.path.join(bdir, m, eng + ".json"))
+            match = (r or {}).get("greedy_match_vs_hf")
+            if r is None or (match and match.split("/")[0] != match.split("/")[1]):
+                row["why"][eng] = "not run" if r is None else f"not valid ({match} tokens match HF)"
+                continue
+            if eng == "hipinfer":
+                e = r["e2e"]
+                gpu = r["gpu"]
+                row["decode"][eng] = at(e["decode_b1"], "ctx", 128, "ours_ms")
+                row["prefill"][eng] = at(e["prefill"], "T", 2000, "ours_ms")
+                row["floor"] = at(e["decode_b1"], "ctx", 128, "bw_floor_ms")
+            else:
+                row["decode"][eng] = at(r.get("decode_b1"), "ctx", 128, "ms")
+                row["prefill"][eng] = at(r.get("prefill"), "T", 2000, "ms")  # vLLM's includes 1 generated token
+                vllm = vllm or r.get("vllm")
+        rows.append(row)
+    if not rows:
+        return None
+    big = (gpus.get(gpu, {}).get("mistral-7b") or {}).get("bench")  # hipinfer only, no other engines
+    big = big and {"label": name("mistral-7b"), "ms": at(big["e2e"]["decode_b1"], "ctx", 128, "ours_ms"),
+                   "util": at(big["e2e"]["decode_b1"], "ctx", 128, "bw_util")}
+    return {"gpu": gpu, "vllm": vllm, "rows": rows, "big": big}
+
+
+def ratios(rows, kind, engines, faster):
+    """engine/hipinfer time ratios (faster=False) or hipinfer/engine (faster=True) over every valid pair"""
+    out = []
+    for r in rows:
+        h = r[kind].get("hipinfer")
+        for e in engines:
+            v = r[kind].get(e)
+            if h and v:
+                out.append(h / v if faster else v / h)
+    return out
+
+
+WHY = {("qwen25-1.5b", "torch_compile"): "my torch.compile baseline left out Qwen2's QKV bias, so its greedy tokens "
+                                         "didn't match HF (0/32) and its numbers are excluded. The bias is fixed in "
+                                         "scripts/bench_baselines.py but hasn't been re-run",
+       ("llama32-3b", "vllm"): "the Colab disk filled before vLLM could load Llama-3.2-3B"}
+
+
+def span(v, d=2, unit="×"):
+    return f"{min(v):.{d}f}–{max(v):.{d}f}{unit}" if v else "–"
+
+
+def a100_facts(a, root):
+    """the A100 numbers the page's text quotes, all computed from the result files"""
+    rows = a["rows"]
+    util = [r["floor"] / r["decode"]["hipinfer"] for r in rows if r.get("floor") and r["decode"].get("hipinfer")]
+    others = [r["floor"] / r["decode"][e] for r in rows for e in ("llamacpp", "vllm")
+              if r.get("floor") and r["decode"].get(e)]
+    gemm, hf = [], []
+    tags = {name(m): m for m in MODEL_ORDER}
+    for r in rows:
+        b = jload(os.path.join(root, "a100", tags[r["label"]], "bench.json"))
+        gemm += [k["speedup"] for k in (b or {}).get("kernels", []) if k["kernel"] == "gemm" and k["M"] == 2048]
+        h = jload(os.path.join(root, "baselines", "a100", tags[r["label"]], "hipinfer.json"))
+        hf += [x["ours_ms"] / x["hf_ms"] for x in (h or {}).get("e2e", {}).get("prefill", []) if x["T"] == 2000]
+    return {"util": util, "others": others, "gemm": gemm, "hf": hf,
+            "lc_dec": ratios(rows, "decode", ["llamacpp"], False), "vl_dec": ratios(rows, "decode", ["vllm"], False),
+            "tc_dec": ratios(rows, "decode", ["torch_compile"], False),
+            "lc_pf": ratios(rows, "prefill", ["llamacpp"], False),
+            "fast_pf": ratios(rows, "prefill", ["vllm", "torch_compile"], True)}
+
+
+def a100_tables(a):
+    engs = ENGINES[1:]
+
+    def cell(r, kind, e, d):
+        v, h = r[kind].get(e), r[kind].get("hipinfer")
+        if e in r["why"]:
+            return r["why"][e].split(" (")[0]
+        if not (v and h):
+            return fnum(v, d)
+        return f"{v:.{d}f} ({v / h:.2f}× slower)" if v > h else f"{v:.{d}f} ({h / v:.2f}× faster)"
+
+    vl = f"vLLM {a['vllm']}" if a["vllm"] else "vLLM"
+    dec = table(["model", "hipinfer ms/token", "% of floor"] + [n.replace("vLLM", vl) + ", vs hipinfer" for _, n in engs],
+                [[r["label"], fnum(r["decode"].get("hipinfer")),
+                  f"{100 * r['floor'] / r['decode']['hipinfer']:.0f}%" if r.get("floor") and r["decode"].get("hipinfer") else "–"]
+                 + [cell(r, "decode", e, 2) for e, _ in engs] for r in a["rows"]])
+    pf = table(["model", "hipinfer ms"] + [n.replace("vLLM", vl + " (incl. 1 generated token)") + ", vs hipinfer"
+                                           for _, n in engs],
+               [[r["label"], fnum(r["prefill"].get("hipinfer"), 1)] + [cell(r, "prefill", e, 1) for e, _ in engs]
+                for r in a["rows"]])
+    return dec, pf
+
+
+def a100_section(d, root):
+    a = d["a100"]
+    if not a:
+        return ""
+    f = a100_facts(a, root)
+    dec_tbl, pf_tbl = a100_tables(a)
+    gpu = html.escape(a["gpu"].replace("NVIDIA ", ""))
+    vl = f"vLLM {html.escape(a['vllm'])}" if a["vllm"] else "vLLM"
+    ti = [r["util"] for r in d["decode"] if r["util"] and r["label"] != name("qwen25-0.5b")]
+    notes = []
+    tags = {name(m): m for m in MODEL_ORDER}
+    for r in a["rows"]:
+        for e, n in ENGINES:
+            if e in r["why"]:
+                why = WHY.get((tags[r["label"]], e), r["why"][e])
+                notes.append(f"<li><b>{html.escape(n)}, {html.escape(r['label'])}: {html.escape(r['why'][e].split(' (')[0])}.</b> "
+                             f"{html.escape(why[0].upper() + why[1:])}.</li>")
+    big = a.get("big")
+    big_txt = f" {html.escape(big['label'])} also ran on the A100 (no other engines): {big['ms']:.2f} ms/token, " \
+              f"{100 * big['util']:.0f}% of the floor." if big and big["ms"] and big["util"] else ""
+    return f"""
+<h2>On an A100</h2>
+<p>{gpu} (1,555 GB/s) on Google Colab, with llama.cpp, {vl} and torch.compile run in the same session and no thermal
+throttling (<a href="%%REPO%%/blob/main/results/a100/THERMAL.md">THERMAL.md</a>). hipinfer was re-run next to the other
+engines, so every row compares runs a few minutes apart. fp16 weights, batch 1. llama.cpp is <code>llama-bench</code> on
+an F16 GGUF, best of flash-attention on and off; vLLM uses its V1 engine with CUDA graphs; torch.compile is a
+gpt-fast-style static KV cache in <code>reduce-overhead</code> mode. A baseline counts only if its greedy tokens match
+HF transformers.</p>
+<div class="card"><div class="ctitle">Decode latency per token on an A100 (lower is better)</div>
+<div class="csub">ms/token at a 128-token context</div>
+<div class="legend"><span><i class="sw" style="background:var(--s1)"></i>hipinfer</span>
+<span><i class="sw" style="background:var(--s2)"></i>llama.cpp</span><span><i class="sw" style="background:var(--s3)"></i>{vl}</span>
+<span><i class="sw" style="background:var(--s4)"></i>torch.compile</span><span><i class="mk"></i>bandwidth floor</span></div>
+<div class="chart" id="c-a100-decode"></div>
+<details><summary>Data table</summary>{dec_tbl}</details></div>
+<div class="card"><div class="ctitle">Prefill time for 2,000 tokens on an A100 (lower is better)</div>
+<div class="csub">ms; vLLM's time is an end-to-end <code>generate()</code> call, so it includes one generated token</div>
+<div class="legend"><span><i class="sw" style="background:var(--s1)"></i>hipinfer</span>
+<span><i class="sw" style="background:var(--s2)"></i>llama.cpp</span><span><i class="sw" style="background:var(--s3)"></i>{vl}</span>
+<span><i class="sw" style="background:var(--s4)"></i>torch.compile</span></div>
+<div class="chart" id="c-a100-prefill"></div>
+<details><summary>Data table</summary>{pf_tbl}</details></div>
+<div class="note"><ul>{"".join(notes)}</ul></div>
+<p><b>Decode:</b> hipinfer is {span(f["lc_dec"])} faster than llama.cpp, {span(f["vl_dec"])} faster than vLLM and
+{span(f["tc_dec"])} faster than torch.compile on the models each one ran. It is further from the floor than on the
+2080 Ti ({span([100 * u for u in f["util"]], 0, "%")} on these 1–3B models, against {span([100 * u for u in ti], 0, "%")}).
+The weights stream about 2.5× faster, but each kernel launch costs about the same, so the fixed per-launch time is a
+bigger share of a token.{big_txt} llama.cpp and vLLM sit further below the floor still
+({span([100 * u for u in f["others"]], 0, "%")}).</p>
+<p><b>Long prompts are where hipinfer loses.</b> It is {span(f["lc_pf"])} faster than llama.cpp at 2,000 tokens, but
+vLLM and torch.compile are {span(f["fast_pf"])} faster than hipinfer there, and HF transformers is
+{span(f["hf"])} faster too. All three use cuBLAS and FlashAttention-2, and on the A100 my
+GEMMs run at only {span(f["gemm"])} cuBLAS (2,048-row prefill shapes of these four models).</p>
+"""
+
+
+def a100_limit(d, root):
+    a = d["a100"]
+    if not a:
+        return ""
+    f = a100_facts(a, root)
+    return (f"<li><b>Launch overhead on the A100.</b> Batch-1 decode reaches only {span([100 * u for u in f['util']], 0, '%')} "
+            f"of the bandwidth floor on the 1–3B models: the A100 streams weights fast enough that fixed per-launch time "
+            f"is a large share of each token.</li>"
+            f"<li><b>Long-prompt prefill on the A100.</b> At 2,000 tokens vLLM and torch.compile are {span(f['fast_pf'])} "
+            f"faster than hipinfer; hipinfer's GEMMs run at {span(f['gemm'])} cuBLAS on that GPU.</li>")
 
 
 def git_info():
@@ -134,6 +304,10 @@ def tiles(d):
         out.append(("Two GPUs vs one, batch-1 decode", f"up to {max(tps):.2f}× faster", "tensor parallelism, 2× RTX 2080 Ti"))
     if big and big["two"]:
         out.append(("Llama-3.1-8B on two 11 GB cards", f"{big['two']:.1f} ms/token", "16 GB of weights; doesn't fit one card"))
+    vl = ratios(d["a100"]["rows"], "decode", ["vllm"], False) if d["a100"] else []
+    if vl:
+        out.append(("Batch-1 decode on an A100 vs vLLM", f"{min(vl):.2f}–{max(vl):.2f}× faster",
+                    f"{len(vl)} models, one session; slower on long-prompt prefill"))
     if ppl:
         out.append(("WikiText-2 perplexity vs HF transformers", f"within {max(ppl):.3f}%", f"{len(ppl)} model/GPU checks"))
     return "".join(f'<div class="tile"><div class="tl">{html.escape(a)}</div><div class="tv">{html.escape(b)}</div>'
@@ -167,10 +341,11 @@ def build(root, out_dir):
                     [[r["model"], r["gpu"], r["setup"], r["gate"] or "–", fnum(r["ppl_hi"], 4), fnum(r["ppl_hf"], 4),
                       f"{100 * r['top1']:.2f}%" if r["top1"] else "–", f"{r['kl']:.1e}" if r["kl"] else "–"]
                      for r in d["correct"]])
-    data = json.dumps({k: d[k] for k in ("decode", "prefill", "ctx", "tp")}).replace("</", "<\\/")
+    data = json.dumps({k: d[k] for k in ("decode", "prefill", "ctx", "tp", "a100")}).replace("</", "<\\/")
     page = PAGE
     for k, v in {"%%TILES%%": tiles(d), "%%GPU%%": html.escape(gpu), "%%DEC_TBL%%": dec_tbl, "%%CTX_TBL%%": ctx_tbl,
                  "%%PF_TBL%%": pf_tbl, "%%TP_TBL%%": tp_tbl, "%%AR_TBL%%": ar_tbl, "%%COR_TBL%%": cor_tbl,
+                 "%%A100%%": a100_section(d, root), "%%A100_LIMIT%%": a100_limit(d, root),
                  "%%DATA%%": data, "%%REPO%%": REPO, "%%SHA%%": sha, "%%DATE%%": date}.items():
         page = page.replace(k, v)
     os.makedirs(out_dir, exist_ok=True)
@@ -286,6 +461,7 @@ benchmark suite, where the 2080 Ti's power cap holds it at 1.4–1.55 GHz; a sho
 <span><i class="sw" style="background:var(--s2)"></i>llama.cpp</span></div>
 <div class="chart" id="c-prefill"></div>
 <details><summary>Data table</summary>%%PF_TBL%%</details></div>
+%%A100%%
 
 <h2>Two GPUs: tensor parallelism</h2>
 <p>Each layer is split across both GPUs, Megatron-style, with an all-reduce after the attention and MLP outputs. These
@@ -313,7 +489,9 @@ logits are tied or one fp16 step apart. <b>Perplexity</b>: WikiText-2, 1,024-tok
 overheating. The RTX A6000 reaches 90–93 °C under sustained load and throttles its SM clock to as low as 210 MHz: its
 Llama-3.2-1B, Qwen2.5-1.5B, Llama-3.2-3B and Mistral-7B-v0.3 benchmarks ran partly throttled (listed in the
 <a href="%%REPO%%#thermal-throttling">README</a> and <a href="%%REPO%%/blob/main/results/a6000/THERMAL.md">THERMAL.md</a>),
-so the charts here use the RTX 2080 Ti. Correctness results are unaffected.</li>
+so the main charts here use the RTX 2080 Ti. The A100 ran in one Colab session with no throttling
+(<a href="%%REPO%%/blob/main/results/a100/THERMAL.md">THERMAL.md</a>). Correctness results are unaffected.</li>
+%%A100_LIMIT%%
 <li><b>AMD.</b> The code compiles for MI200, MI300 and RDNA3, but it hasn't run on AMD hardware.</li>
 <li><b>Peer-to-peer multi-GPU.</b> The P2P all-reduce path is implemented but untested; only two GPUs have been tested.</li>
 </ul></div>
@@ -386,7 +564,7 @@ Akash Dasarraju.</footer>
       series.forEach((s, j) => {
         const v = r.values[s.key], y = y0 + j * (bh + gap);
         if (v == null) {
-          txt(opts.missing || "–", { x: X(0) + 6, y: y + bh - 3, class: "ax", "font-style": "italic" }, svg);
+          txt((r.missing && r.missing[s.key]) || opts.missing || "–", { x: (r.marker ? X(r.marker) : X(0)) + 6, y: y + bh - 3, class: "ax", "font-style": "italic" }, svg);
           return;
         }
         const x0 = X(0), x1 = Math.max(X(v), x0 + 2), rr = Math.min(4, x1 - x0);
@@ -460,11 +638,23 @@ Akash Dasarraju.</footer>
          D.tp.map(r => ({ label: r.label, values: { a: r.one, b: r.two } })),
          [{ key: "a", label: "1 GPU", color: "--s1" }, { key: "b", label: "2 GPUs", color: "--s3" }],
          { unit: "ms", digits: 2, missing: "doesn't fit one card", aria: "Decode latency per token, one GPU vs two" });
+    if (D.a100) {
+      const ser = [["hipinfer", "hipinfer", "--s1"], ["llamacpp", "llama.cpp", "--s2"], ["vllm", "vLLM", "--s3"],
+                   ["torch_compile", "torch.compile", "--s4"]].map(([key, label, color]) => ({ key, label, color }));
+      const miss = r => Object.fromEntries(Object.entries(r.why).map(([k, v]) => [k, v.split(" (")[0]]));
+      bars(document.getElementById("c-a100-decode"),
+           D.a100.rows.map(r => ({ label: r.label, values: r.decode, marker: r.floor, missing: miss(r) })), ser,
+           { unit: "ms", digits: 2, markerLabel: "bandwidth floor", aria: "A100 decode latency per token, four engines" });
+      bars(document.getElementById("c-a100-prefill"),
+           D.a100.rows.map(r => ({ label: r.label, values: r.prefill, missing: miss(r) })), ser,
+           { unit: "ms", digits: 1, aria: "A100 prefill time for 2,000 tokens, four engines" });
+    }
   }
   render();
   // redraw at the new width whenever a chart's box changes size (window resize, late layout, zoom)
   let raf, widths = "";
-  const hosts = ["c-decode", "c-ctx", "c-prefill", "c-tp"].map(id => document.getElementById(id));
+  const hosts = ["c-decode", "c-ctx", "c-prefill", "c-tp", "c-a100-decode", "c-a100-prefill"]
+    .map(id => document.getElementById(id)).filter(Boolean);
   const key = () => hosts.map(h => h.clientWidth).join(",");
   widths = key();
   new ResizeObserver(() => {
