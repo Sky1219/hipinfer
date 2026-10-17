@@ -223,26 +223,26 @@ Decode: 256 greedy tokens after a ctx-token prompt, ms/token (% BW = weight+KV b
 | | RTX 2080 Ti | RTX A6000 |
 |---|---|---|
 | decode ms/token, decode 128: **hipinfer** | 4.14 ms, 81% BW | 3.42 ms, 79% BW |
-| decode ms/token, decode 128: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 4.77 ms, 71% BW (hipinfer 1.15x faster) | 3.78 ms, 72% BW (hipinfer 1.10x faster) |
+| decode ms/token, decode 128: llama.cpp (F16 GGUF, CUDA or HIP backend, best of FA on/off) | 4.77 ms, 71% BW (hipinfer 1.15x faster) | 3.78 ms, 72% BW (hipinfer 1.10x faster) |
 | decode ms/token, decode 128: torch.compile, gpt-fast style (reduce-overhead + static KV) | 5.24 ms, 64% BW (hipinfer 1.27x faster) | 4.23 ms, 64% BW (hipinfer 1.24x faster) |
 | decode ms/token, decode 128: HF transformers, StaticCache + torch.compile | 5.51 ms, 61% BW (hipinfer 1.33x faster) | 4.34 ms, 62% BW (hipinfer 1.27x faster) |
-| decode ms/token, decode 128: vLLM (V1 engine, CUDA graphs) | - | 3.98 ms, 68% BW (hipinfer 1.16x faster) |
+| decode ms/token, decode 128: vLLM (V1 engine, GPU graphs) | - | 3.98 ms, 68% BW (hipinfer 1.16x faster) |
 | decode ms/token, decode 1024: **hipinfer** | 4.22 ms, 81% BW | 3.49 ms, 78% BW |
-| decode ms/token, decode 1024: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 4.79 ms, 71% BW (hipinfer 1.14x faster) | 3.79 ms, 72% BW (hipinfer 1.09x faster) |
+| decode ms/token, decode 1024: llama.cpp (F16 GGUF, CUDA or HIP backend, best of FA on/off) | 4.79 ms, 71% BW (hipinfer 1.14x faster) | 3.79 ms, 72% BW (hipinfer 1.09x faster) |
 | decode ms/token, decode 1024: torch.compile, gpt-fast style (reduce-overhead + static KV) | 6.84 ms, 50% BW (hipinfer 1.62x faster) | 5.47 ms, 50% BW (hipinfer 1.57x faster) |
 | decode ms/token, decode 1024: HF transformers, StaticCache + torch.compile | 7.09 ms, 48% BW (hipinfer 1.68x faster) | 5.56 ms, 49% BW (hipinfer 1.59x faster) |
-| decode ms/token, decode 1024: vLLM (V1 engine, CUDA graphs) | - | 3.98 ms, 69% BW (hipinfer 1.14x faster) |
+| decode ms/token, decode 1024: vLLM (V1 engine, GPU graphs) | - | 3.98 ms, 69% BW (hipinfer 1.14x faster) |
 
 | | RTX 2080 Ti | RTX A6000 |
 |---|---|---|
 | prefill ms, prefill 128: **hipinfer** | 8.3 ms | 6.3 ms |
-| prefill ms, prefill 128: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 11.2 ms (hipinfer 1.34x faster) | 9.8 ms (hipinfer 1.56x faster) |
+| prefill ms, prefill 128: llama.cpp (F16 GGUF, CUDA or HIP backend, best of FA on/off) | 11.2 ms (hipinfer 1.34x faster) | 9.8 ms (hipinfer 1.56x faster) |
 | prefill ms, prefill 128: torch.compile, gpt-fast style (reduce-overhead + static KV) | 16.2 ms (hipinfer 1.94x faster) | 8.9 ms (hipinfer 1.42x faster) |
 | prefill ms, prefill 512: **hipinfer** | 26.6 ms | 16.7 ms |
-| prefill ms, prefill 512: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 29.0 ms (hipinfer 1.09x faster) | 24.5 ms (hipinfer 1.46x faster) |
+| prefill ms, prefill 512: llama.cpp (F16 GGUF, CUDA or HIP backend, best of FA on/off) | 29.0 ms (hipinfer 1.09x faster) | 24.5 ms (hipinfer 1.46x faster) |
 | prefill ms, prefill 512: torch.compile, gpt-fast style (reduce-overhead + static KV) | 34.8 ms (hipinfer 1.31x faster) | 19.5 ms (hipinfer 1.16x faster) |
 | prefill ms, prefill 2000: **hipinfer** | 100.5 ms | 57.9 ms |
-| prefill ms, prefill 2000: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 114.8 ms (hipinfer 1.14x faster) | 89.7 ms (hipinfer 1.55x faster) |
+| prefill ms, prefill 2000: llama.cpp (F16 GGUF, CUDA or HIP backend, best of FA on/off) | 114.8 ms (hipinfer 1.14x faster) | 89.7 ms (hipinfer 1.55x faster) |
 | prefill ms, prefill 2000: torch.compile, gpt-fast style (reduce-overhead + static KV) | 125.4 ms (hipinfer 1.25x faster) | 59.6 ms (hipinfer 1.03x faster) |
 
 
@@ -251,18 +251,18 @@ Decode: 256 greedy tokens after a ctx-token prompt, ms/token (% BW = weight+KV b
 | | RTX 2080 Ti |
 |---|---|
 | decode ms/token, decode 128: **hipinfer** | 2.34 ms, 69% BW |
-| decode ms/token, decode 128: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 3.45 ms, 47% BW (hipinfer 1.47x faster) |
+| decode ms/token, decode 128: llama.cpp (F16 GGUF, CUDA or HIP backend, best of FA on/off) | 3.45 ms, 47% BW (hipinfer 1.47x faster) |
 | decode ms/token, decode 1024: **hipinfer** | 2.42 ms, 67% BW |
-| decode ms/token, decode 1024: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 3.46 ms, 47% BW (hipinfer 1.43x faster) |
+| decode ms/token, decode 1024: llama.cpp (F16 GGUF, CUDA or HIP backend, best of FA on/off) | 3.46 ms, 47% BW (hipinfer 1.43x faster) |
 
 | | RTX 2080 Ti |
 |---|---|
 | prefill ms, prefill 128: **hipinfer** | 5.1 ms |
-| prefill ms, prefill 128: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 8.4 ms (hipinfer 1.64x faster) |
+| prefill ms, prefill 128: llama.cpp (F16 GGUF, CUDA or HIP backend, best of FA on/off) | 8.4 ms (hipinfer 1.64x faster) |
 | prefill ms, prefill 512: **hipinfer** | 12.1 ms |
-| prefill ms, prefill 512: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 18.5 ms (hipinfer 1.53x faster) |
+| prefill ms, prefill 512: llama.cpp (F16 GGUF, CUDA or HIP backend, best of FA on/off) | 18.5 ms (hipinfer 1.53x faster) |
 | prefill ms, prefill 2000: **hipinfer** | 43.1 ms |
-| prefill ms, prefill 2000: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 67.3 ms (hipinfer 1.56x faster) |
+| prefill ms, prefill 2000: llama.cpp (F16 GGUF, CUDA or HIP backend, best of FA on/off) | 67.3 ms (hipinfer 1.56x faster) |
 
 
 ### Llama-3.2-1B
@@ -270,18 +270,18 @@ Decode: 256 greedy tokens after a ctx-token prompt, ms/token (% BW = weight+KV b
 | | RTX 2080 Ti |
 |---|---|
 | decode ms/token, decode 128: **hipinfer** | 4.75 ms, 85% BW |
-| decode ms/token, decode 128: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 5.23 ms, 77% BW (hipinfer 1.10x faster) |
+| decode ms/token, decode 128: llama.cpp (F16 GGUF, CUDA or HIP backend, best of FA on/off) | 5.23 ms, 77% BW (hipinfer 1.10x faster) |
 | decode ms/token, decode 1024: **hipinfer** | 4.84 ms, 84% BW |
-| decode ms/token, decode 1024: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 5.27 ms, 77% BW (hipinfer 1.09x faster) |
+| decode ms/token, decode 1024: llama.cpp (F16 GGUF, CUDA or HIP backend, best of FA on/off) | 5.27 ms, 77% BW (hipinfer 1.09x faster) |
 
 | | RTX 2080 Ti |
 |---|---|
 | prefill ms, prefill 128: **hipinfer** | 8.6 ms |
-| prefill ms, prefill 128: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 10.4 ms (hipinfer 1.21x faster) |
+| prefill ms, prefill 128: llama.cpp (F16 GGUF, CUDA or HIP backend, best of FA on/off) | 10.4 ms (hipinfer 1.21x faster) |
 | prefill ms, prefill 512: **hipinfer** | 26.1 ms |
-| prefill ms, prefill 512: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 27.0 ms (hipinfer 1.03x faster) |
+| prefill ms, prefill 512: llama.cpp (F16 GGUF, CUDA or HIP backend, best of FA on/off) | 27.0 ms (hipinfer 1.03x faster) |
 | prefill ms, prefill 2000: **hipinfer** | 101.1 ms |
-| prefill ms, prefill 2000: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 100.9 ms (**1.00x faster than hipinfer**) |
+| prefill ms, prefill 2000: llama.cpp (F16 GGUF, CUDA or HIP backend, best of FA on/off) | 100.9 ms (**1.00x faster than hipinfer**) |
 
 
 ### Qwen2.5-1.5B
@@ -289,18 +289,18 @@ Decode: 256 greedy tokens after a ctx-token prompt, ms/token (% BW = weight+KV b
 | | RTX 2080 Ti |
 |---|---|
 | decode ms/token, decode 128: **hipinfer** | 6.21 ms, 81% BW |
-| decode ms/token, decode 128: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 7.19 ms, 70% BW (hipinfer 1.16x faster) |
+| decode ms/token, decode 128: llama.cpp (F16 GGUF, CUDA or HIP backend, best of FA on/off) | 7.19 ms, 70% BW (hipinfer 1.16x faster) |
 | decode ms/token, decode 1024: **hipinfer** | 6.32 ms, 80% BW |
-| decode ms/token, decode 1024: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 7.22 ms, 70% BW (hipinfer 1.14x faster) |
+| decode ms/token, decode 1024: llama.cpp (F16 GGUF, CUDA or HIP backend, best of FA on/off) | 7.22 ms, 70% BW (hipinfer 1.14x faster) |
 
 | | RTX 2080 Ti |
 |---|---|
 | prefill ms, prefill 128: **hipinfer** | 13.4 ms |
-| prefill ms, prefill 128: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 17.3 ms (hipinfer 1.29x faster) |
+| prefill ms, prefill 128: llama.cpp (F16 GGUF, CUDA or HIP backend, best of FA on/off) | 17.3 ms (hipinfer 1.29x faster) |
 | prefill ms, prefill 512: **hipinfer** | 37.8 ms |
-| prefill ms, prefill 512: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 40.1 ms (hipinfer 1.06x faster) |
+| prefill ms, prefill 512: llama.cpp (F16 GGUF, CUDA or HIP backend, best of FA on/off) | 40.1 ms (hipinfer 1.06x faster) |
 | prefill ms, prefill 2000: **hipinfer** | 140.9 ms |
-| prefill ms, prefill 2000: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 156.7 ms (hipinfer 1.11x faster) |
+| prefill ms, prefill 2000: llama.cpp (F16 GGUF, CUDA or HIP backend, best of FA on/off) | 156.7 ms (hipinfer 1.11x faster) |
 
 
 ### Llama-3.2-3B
@@ -308,18 +308,18 @@ Decode: 256 greedy tokens after a ctx-token prompt, ms/token (% BW = weight+KV b
 | | RTX 2080 Ti |
 |---|---|
 | decode ms/token, decode 128: **hipinfer** | 12.11 ms, 87% BW |
-| decode ms/token, decode 128: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 12.70 ms, 83% BW (hipinfer 1.05x faster) |
+| decode ms/token, decode 128: llama.cpp (F16 GGUF, CUDA or HIP backend, best of FA on/off) | 12.70 ms, 83% BW (hipinfer 1.05x faster) |
 | decode ms/token, decode 1024: **hipinfer** | 12.54 ms, 85% BW |
-| decode ms/token, decode 1024: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 12.92 ms, 82% BW (hipinfer 1.03x faster) |
+| decode ms/token, decode 1024: llama.cpp (F16 GGUF, CUDA or HIP backend, best of FA on/off) | 12.92 ms, 82% BW (hipinfer 1.03x faster) |
 
 | | RTX 2080 Ti |
 |---|---|
 | prefill ms, prefill 128: **hipinfer** | 24.3 ms |
-| prefill ms, prefill 128: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 25.8 ms (hipinfer 1.06x faster) |
+| prefill ms, prefill 128: llama.cpp (F16 GGUF, CUDA or HIP backend, best of FA on/off) | 25.8 ms (hipinfer 1.06x faster) |
 | prefill ms, prefill 512: **hipinfer** | 76.7 ms |
-| prefill ms, prefill 512: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 65.4 ms (**1.17x faster than hipinfer**) |
+| prefill ms, prefill 512: llama.cpp (F16 GGUF, CUDA or HIP backend, best of FA on/off) | 65.4 ms (**1.17x faster than hipinfer**) |
 | prefill ms, prefill 2000: **hipinfer** | 289.7 ms |
-| prefill ms, prefill 2000: llama.cpp (F16 GGUF, CUDA, best of FA on/off) | 261.8 ms (**1.11x faster than hipinfer**) |
+| prefill ms, prefill 2000: llama.cpp (F16 GGUF, CUDA or HIP backend, best of FA on/off) | 261.8 ms (**1.11x faster than hipinfer**) |
 
 
 ## Tensor parallelism (multi-GPU)

@@ -252,10 +252,10 @@ def main():
 
 
 ENGINES = [("hipinfer", "**hipinfer**"),
-           ("llamacpp", "llama.cpp (F16 GGUF, CUDA, best of FA on/off)"),
+           ("llamacpp", "llama.cpp (F16 GGUF, CUDA or HIP backend, best of FA on/off)"),
            ("torch_compile", "torch.compile, gpt-fast style (reduce-overhead + static KV)"),
            ("hf_static", "HF transformers, StaticCache + torch.compile"),
-           ("vllm", "vLLM (V1 engine, CUDA graphs)")]
+           ("vllm", "vLLM (V1 engine, GPU graphs)")]
 
 
 def baselines(gpus, bdir):
