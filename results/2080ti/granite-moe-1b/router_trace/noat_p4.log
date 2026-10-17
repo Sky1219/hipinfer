@@ -1,0 +1,31 @@
+Loading weights:   0%|          | 0/218 [00:00<?, ?it/s]Loading weights:  42%|████▏     | 92/218 [00:00<00:00, 839.37it/s]Loading weights:  88%|████████▊ | 191/218 [00:00<00:00, 885.65it/s]Loading weights: 100%|██████████| 218/218 [00:00<00:00, 911.47it/s]
+ibm-granite/granite-3.1-1b-a400m-base: prompt 4 (len 18), 24 layers, 32 experts top-8, GPU NVIDIA GeForce RTX 2080 Ti, HIPINFER_GEMM_AUTOTUNE=0
+traced engine run equals the graph-captured run (first diff None); torch recompute of the engine's router sets disagrees with hi_moe_router at 0 points
+tokens diverge at step 43: HF 14822 (gap 0.0469), engine 706
+1464 (position, layer) router points feed the compared tokens. Engine vs HF router logits, max |diff| per point: median 0.0039, p99 0.0381, max 0.0558. HF margins: 2 exact ties, 25 < 0.002, 107 < 0.01
+expert sets differ at 15 points (each side on its own routing history)
+  pos 10 layer 3: HF margin 0.00012, engine margin 0.00250, HF-only [7], engine-only [11]
+  pos 3 layer 5: HF margin 0.00104, engine margin 0.00104, HF-only [7], engine-only [8]
+  pos 11 layer 5: HF margin 0.00537, engine margin 0.00049, HF-only [0], engine-only [9]
+  pos 7 layer 7: HF margin 0.00278, engine margin 0.00055, HF-only [0], engine-only [13]
+  pos 3 layer 10: HF margin 0.00305, engine margin 0.00159, HF-only [26], engine-only [17]
+  pos 7 layer 10: HF margin 0.01953, engine margin 0.00720, HF-only [3], engine-only [4]
+  pos 21 layer 7: HF margin 0.00134, engine margin 0.00018, HF-only [22], engine-only [29]
+  pos 23 layer 8: HF margin 0.00107, engine margin 0.00452, HF-only [29], engine-only [23]
+  pos 23 layer 16: HF margin 0.00000, engine margin 0.00391, HF-only [15], engine-only [16]
+  pos 24 layer 13: HF margin 0.00035, engine margin 0.00093, HF-only [6], engine-only [8]
+  pos 24 layer 23: HF margin 0.00049, engine margin 0.00049, HF-only [2], engine-only [24]
+  pos 25 layer 2: HF margin 0.00079, engine margin 0.00021, HF-only [28], engine-only [25]
+  pos 37 layer 14: HF margin 0.00317, engine margin 0.00000, HF-only [29], engine-only [26]
+  pos 43 layer 23: HF margin 0.00000, engine margin 0.00049, HF-only [1], engine-only [24]
+  pos 60 layer 21: HF margin 0.00049, engine margin 0.00195, HF-only [29], engine-only [12]
+router near-tie check (router tie 1.0, token tie 0.05):
+    router difference at pos 10 (prompt token 10) layer 3: HF-only [7] engine-only [11], HF margin 0.00012 (2 ulp), engine margin 0.00250 -> adopt
+    router difference at pos 3 (prompt token 3) layer 5: HF-only [7] engine-only [8], HF margin 0.00104 (17 ulp), engine margin 0.00104 -> adopt
+    router difference at pos 20 (decode input of step 3) layer 8: HF-only [8] engine-only [29], HF margin 0.00049 (4 ulp), engine margin 0.00024 -> adopt
+    router difference at pos 25 (decode input of step 8) layer 2: HF-only [28] engine-only [25], HF margin 0.00079 (26 ulp), engine margin 0.00021 -> adopt
+    router difference at pos 37 (decode input of step 20) layer 14: HF-only [29] engine-only [26], HF margin 0.00049 (2 ulp), engine margin 0.00000 -> adopt
+    router difference at pos 43 (decode input of step 26) layer 23: HF-only [1] engine-only [24], HF margin 0.00000 (0 ulp), engine margin 0.00049 -> adopt
+  -> EXPLAINED: HF with 6 adopted router near-ties gives the engine's tokens through step 43; HF top-2 gap at step 43 now 0.1094
+  engine vs HF router logits on that run, max |diff| per point: median 0.0020, p99 0.0050, max 0.0078
+  adopted 6 points, HF margins max 0.00104, in ulps max 26

@@ -282,11 +282,16 @@ in three ways.
   Every divergence happens at a step where HF's own top two logits are exactly tied (gap 0) or one
   fp16 step apart (0.0156); one A6000 Llama-3.2-1B run also diverges at a gap of 0.0313. At such a step either token is a correct greedy choice. Llama-3.2-1B
   hits several of those near-ties in the first 128 tokens of its prompts, which is why it shows 13/20.
-  ✝ The MoE model is the exception: it passes in 3 of 5 runs. The result depends on which GEMM
-  configs the autotuner picks, and in the other two runs one prompt diverges at a gap of 0.06–0.11.
-  Its KL is also more than 10× the dense models'. My guess, not yet checked, is router near-ties: a
-  different expert choice moves the logits more than rounding in a dense layer does
-  ([details](docs/moe-design.md)).
+  ✝ The MoE model needs one more rule. Its router's top-8 is a second discrete choice that rounding
+  can flip at a near-tie, and a different expert moves the logits more than rounding does. Without
+  the rule the gate passed in 3 of 5 runs, depending on the GEMM configs the autotuner picked.
+  [scripts/moe_router_trace.py](scripts/moe_router_trace.py) shows that every divergence found
+  comes from router near-ties: once HF is given the engine's expert choice at the differing points
+  (HF margins of at most 0.0042), HF produces the engine's tokens. The gate now accepts an MoE
+  divergence only under that condition, with a router tolerance of 0.01. It passes in all 6 runs
+  made with the rule: 3 autotuned, autotuning off, and split-K 2 and 4 forced on every GEMM
+  ([details](docs/moe-design.md#router-near-ties-and-the-token-gate)). Its KL is
+  also more than 10× the dense models'.
 - **Perplexity** ([tests/ppl.py](tests/ppl.py)): WikiText-2 test, 16 windows of 1,024 tokens, both
   engines on the same tokens. This checks the whole distribution at every position, not just the
   top token. hipinfer's perplexity is within 0.003 % of HF's on the single-GPU 2080 Ti runs above,

@@ -1,0 +1,5 @@
+Loading weights:   0%|          | 0/218 [00:00<?, ?it/s]Loading weights:  14%|█▍        | 30/218 [00:00<00:00, 294.39it/s]Loading weights:  34%|███▍      | 74/218 [00:00<00:00, 364.67it/s]Loading weights:  59%|█████▊    | 128/218 [00:00<00:00, 428.65it/s]Loading weights:  92%|█████████▏| 200/218 [00:00<00:00, 532.44it/s]Loading weights: 100%|██████████| 218/218 [00:00<00:00, 510.36it/s]
+ibm-granite/granite-3.1-1b-a400m-base: 40392 router evaluations on HF's own inputs (7 gate prompts, prefill + 127 decode steps), GPU NVIDIA GeForce RTX 2080 Ti
+router logits, fp32-accumulate-then-fp16 (the kernel's rounding) vs HF's F.linear: max |diff| 0.007812
+hi_moe_router expert set differs from HF's at 5 points; HF margins there: max 0.003906 (8.0 fp16 ulp)
+routing weights where the sets agree: max |diff| 2.44e-03

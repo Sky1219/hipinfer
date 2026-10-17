@@ -63,6 +63,9 @@ if hasattr(lib, "hi_prefill_debug"):  # debug dump (scripts/layer_diff.py); abse
     lib.hi_debug_bytes.restype = C.c_size_t
     lib.hi_prefill_debug.argtypes = [P, I, IP, I, I, P]
     lib.hi_prefill_debug.restype = I
+if hasattr(lib, "hi_decode_debug"):
+    lib.hi_decode_debug.argtypes = [P, I, P]
+    lib.hi_decode_debug.restype = I
 
 
 def _s():
@@ -256,6 +259,15 @@ class Engine:
         arr = (C.c_int * len(tokens))(*tokens)
         out = torch.empty(lib.hi_debug_bytes(self.h, len(tokens)) // 2, dtype=torch.float16, device=self.device)
         self._ok(lib.hi_prefill_debug(self.h, slot, arr, len(tokens), p0, C.c_void_p(out.data_ptr())), "prefill_debug")
+        return out
+
+    def decode_debug(self, B):
+        """One decode step on slots [0, B) without a graph; returns its dump in the prefill_debug
+        layout with B rows (only MoE layers fill theirs: mlp_norm, the router's input, and down)."""
+        if not hasattr(lib, "hi_decode_debug"):
+            raise RuntimeError("this libhipinfer.so has no hi_decode_debug; rebuild it (make)")
+        out = torch.empty(lib.hi_debug_bytes(self.h, B) // 2, dtype=torch.float16, device=self.device)
+        self._ok(lib.hi_decode_debug(self.h, B, C.c_void_p(out.data_ptr())), "decode_debug")
         return out
 
     def decode(self, B, steps, graph=True):

@@ -197,8 +197,14 @@ out-of-range slots, tokens, batch sizes and positions are rejected.
 **Near-tie tolerance:** a run may diverge from HF only at a step where HF's own top-2 logit gap is
 below `--tie` (default 0.05). At such a step the summation order legitimately decides the argmax, and
 the run is counted as "near-tie, OK". Any other divergence fails the gate (exit code 1). Every committed
-divergence is at a gap of 0, 0.0156 or 0.0313 (one A6000 Llama-3.2-1B run). The tolerance never had
-to stretch to 0.05.
+dense-model divergence is at a gap of 0, 0.0156 or 0.0313 (one A6000 Llama-3.2-1B run). The tolerance
+never had to stretch to 0.05 for a dense model.
+
+**MoE models** have a second discrete choice that rounding can flip: the router's top-k. When an MoE
+run diverges at a gap of `--tie` or more, the gate checks whether router near-ties explain it. HF is
+re-run with the engine's expert set at each differing (position, layer) point where HF's own k-th vs
+(k+1)-th router logit margin is at most `--router-tie` (default 0.01). The run passes only if HF then
+gives the engine's tokens. See [moe-design.md](moe-design.md#router-near-ties-and-the-token-gate).
 
 **What it catches:** wrong weight order, a missing bias, a wrong RoPE layout, broken
 batching/slot indexing, graph-capture bugs. **What it misses:** errors that change logits without
