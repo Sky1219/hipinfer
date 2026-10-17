@@ -147,7 +147,7 @@ row compares runs a few minutes apart.
 | batch-1 decode, ms/token, ctx 128 | hipinfer | % of floor | llama.cpp | vLLM 0.31 | torch.compile |
 |---|---|---|---|---|---|
 | TinyLlama-1.1B | **2.18** | 61 % | 2.57 (1.18× slower) | 2.83 (1.30×) | 3.14 (1.44×) |
-| Llama-3.2-1B | **2.32** | 69 % | 2.63 (1.14×) | 2.86 (1.23×) | 3.08 (1.33×) |
+| Llama-3.2-1B | **2.31** | 69 % | 2.63 (1.14×) | 2.86 (1.23×) | 3.08 (1.33×) |
 | Qwen2.5-1.5B | **3.21** | 62 % | 4.08 (1.27×) | 4.19 (1.31×) | not valid ✝ |
 | Llama-3.2-3B | **5.60** | 74 % | 6.17 (1.10×) | not run ✱ | 6.79 (1.21×) |
 
@@ -207,7 +207,7 @@ separately on the same machines.
   length, but at 2,000 tokens vLLM and torch.compile are 1.02–1.22× faster, and HF transformers
   itself pulls ahead on long prompts (from 512 to 4,096 tokens depending on the model, after which
   hipinfer runs at 0.79–0.95× HF). All three use cuBLAS and FlashAttention-2, and on the A100 my
-  GEMMs run at only 0.50–0.72× cuBLAS.
+  GEMMs run at only 0.49–0.72× cuBLAS.
 - **Keep the scope in mind.** These are batch-1 latency numbers on small models. vLLM and llama.cpp
   are built for far more: many concurrent requests, quantization, hundreds of architectures. Batch 1
   is just where a small engine can be checked against a hard floor.
@@ -402,7 +402,7 @@ each product explicitly.
 - **Prefill GEMM on Turing: 0.92–0.95× cuBLAS** at 2,048 rows on Llama-3.2-3B's shapes. This decides
   prefill on 3B-and-up models, and it's why Llama-3.2-3B is still 1.04–1.11× behind llama.cpp. Most
   of what's left is each GEMM's last wave: one 256×128 block per SM on 68 SMs.
-- **Prefill GEMM on Ampere: 0.71–0.85× cuBLAS** on the A6000 and **0.50–0.72×** on the A100 at the
+- **Prefill GEMM on Ampere: 0.71–0.85× cuBLAS** on the A6000 and **0.49–0.72×** on the A100 at the
   same shapes. The Ampere `cp.async` path is less tuned than the Turing one, and on the A100 it is
   the reason long-prompt prefill trails vLLM, torch.compile and HF.
 - **Batched decode at 16–64 sequences:** the projections at these shapes haven't been timed against
