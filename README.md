@@ -288,8 +288,9 @@ in three ways.
   [scripts/moe_router_trace.py](scripts/moe_router_trace.py) shows that every divergence found
   comes from router near-ties: once HF is given the engine's expert choice at the differing points
   (HF margins of at most 0.0042), HF produces the engine's tokens. The gate now accepts an MoE
-  divergence only under that condition, with a router tolerance of 0.01, and it passes in both runs
-  made with the rule ([details](docs/moe-design.md#router-near-ties-and-the-token-gate)). Its KL is
+  divergence only under that condition, with a router tolerance of 0.01. It passes in all 6 runs
+  made with the rule: 3 autotuned, autotuning off, and split-K 2 and 4 forced on every GEMM
+  ([details](docs/moe-design.md#router-near-ties-and-the-token-gate)). Its KL is
   also more than 10× the dense models'.
 - **Perplexity** ([tests/ppl.py](tests/ppl.py)): WikiText-2 test, 16 windows of 1,024 tokens, both
   engines on the same tokens. This checks the whole distribution at every position, not just the

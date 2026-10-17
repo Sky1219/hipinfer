@@ -7,7 +7,7 @@ Status: runs on one GPU, checked on an RTX 2080 Ti against HF transformers on Gr
 | check | result |
 |---|---|
 | `tests/test_kernels.py` `test_moe()`: router, top-k, GEMV and grouped expert paths vs PyTorch | all pass |
-| token gate (`tests/gate.py`): 7 prompts with and without CUDA graphs, plus batched B=6 | **passes in both runs made with the router near-tie rule** (below): autotuning off, 15/20 token-identical, 2 runs accepted by the router rule; autotuned, 12/20. Without the rule it passed in 3 of 5 runs, depending on the GEMM configs. Both failures are router near-ties |
+| token gate (`tests/gate.py`): 7 prompts with and without CUDA graphs, plus batched B=6 | **passes in all 6 runs made with the router near-tie rule** (below), with the same weights: 3 autotuned runs (12/20 token-identical each), autotuning off (15/20, 2 runs accepted by the router rule), forced split-K 2 (13/20) and forced split-K 4 (9/20, 3 accepted by the router rule). Without the rule it passed in 3 of 5 runs, depending on the GEMM configs. Both failures are router near-ties |
 | WikiText-2 perplexity (`tests/ppl.py`, 16 windows) | 7.7292 vs HF's 7.7294, top-1 agreement 99.4 % |
 | dense models unchanged (TinyLlama token gate) | 20/20 token-identical |
 | decode, B=1, ctx 128 | 2.26 ms/token, 30× HF; **63 % of the weight-read floor** (dense models: 81–87 %) |
@@ -60,6 +60,22 @@ routed the engine's way, HF gives the engine's tokens through step 70. On that r
 and HF's router logits differ by at most 0.0078 (median 0.0020) at any point. That is ordinary
 fp16 rounding. So the hypothesis is confirmed: the engine's attention, experts and combine agree
 with HF to rounding, and the token divergence comes from router choices that were ties or near-ties.
+
+**Is there an engine rounding mismatch to fix instead?** No.
+[`scripts/moe_router_check_inputs.py`](../scripts/moe_router_check_inputs.py) feeds HF's own router
+inputs to `hi_moe_router`. That covers 40,392 router evaluations over the gate's 7 prompts: prefill
+plus 127 greedy decode steps each
+([`router_trace/router_kernel_on_hf_inputs.log`](../results/2080ti/granite-moe-1b/router_trace/router_kernel_on_hf_inputs.log)).
+
+* The kernel rounds at the same points as HF: fp32 accumulation, then one fp16 rounding of each
+  logit. Its logits differ from HF's `F.linear` by at most 0.0078. Only the summation order differs,
+  and that is cuBLAS's to choose, per GPU and per shape.
+* The expert sets differ at 5 of the 40,392 evaluations, all at HF margins of at most 0.0039.
+* The expert combine is covered by the transplant above: with the engine's experts, HF reproduces
+  all 128 of the engine's tokens.
+
+So the router flips are unavoidable near-ties, not a mismatch the engine could remove. The gate is
+the thing to change, and only for router choices that are ties at fp16 resolution.
 
 The same holds for every divergence found on the 2080 Ti
 ([`router_trace/`](../results/2080ti/granite-moe-1b/router_trace/)). That includes the ones the
@@ -125,10 +141,24 @@ layer 20, HF's tokens through step 70 do not change at all, so no token-level ga
 faults. The check explains the divergence as before (12 and 8 adopted points, margins at most
 0.0039). Use `scripts/layer_diff.py` to find faults that small.
 
-Results with the rule ([`gate_runs/router_check_*.log`](../results/2080ti/granite-moe-1b/gate_runs/)):
-with autotuning off, the gate now passes: prompt 1's two single-sequence runs are accepted by the
-router check. The autotuned run passes with the token rule alone (12/20). TinyLlama still passes
-20/20; the router check runs only for MoE models.
+Results with the rule, all with the same weights file
+([`gate_runs/router_check_*.log`](../results/2080ti/granite-moe-1b/gate_runs/)):
+
+| GEMM configs | token-identical | accepted by the router check | result |
+|---|---|---|---|
+| autotuned, run 1 | 12/20 | 0 | pass |
+| autotuned, run 2 | 12/20 | 0 | pass |
+| autotuned, run 3 | 12/20 | 0 | pass |
+| autotuning off | 15/20 | 2 (prompt 1, step 70) | pass (failed without the rule) |
+| split-K 2 forced on every GEMM | 13/20 | 0 | pass |
+| split-K 4 forced on every GEMM | 9/20 | 3 (prompt 3 single and batched, step 36) | pass (the old autotuned prompt 3 failure) |
+
+All other divergences in these runs are token near-ties (HF gap below 0.05). The three autotuned
+runs gave the same gate results (same divergences at the same steps), so they likely cover only one point of the config space;
+autotuning off and the forced split-K runs cover three more. The kernel tests pass on the same
+build (991 checks, [`test_kernels.log`](../results/2080ti/granite-moe-1b/test_kernels.log)), and
+TinyLlama's gate is unchanged at 20/20 ([`gate_runs/tinyllama_router_check_build.log`](../results/2080ti/granite-moe-1b/gate_runs/tinyllama_router_check_build.log));
+the router check runs only for MoE models.
 
 Limits: the check needs the HF model in memory, so `--hf-first` skips it. The hook expects HF's
 router modules to return `(top_k_index, top_k_weights, router_logits)`, as Granite MoE's do in

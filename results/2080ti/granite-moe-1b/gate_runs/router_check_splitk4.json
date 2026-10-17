@@ -1,0 +1,612 @@
+{
+ "model": "ibm-granite/granite-3.1-1b-a400m-base",
+ "gpu": "NVIDIA GeForce RTX 2080 Ti",
+ "new_tokens": 128,
+ "pass": true,
+ "identical": 9,
+ "runs": 20,
+ "router_accepted": 3,
+ "router_tie": 0.01,
+ "max_prefill_logit_diff": 0.15625,
+ "prompt_lens": [
+  5,
+  19,
+  16,
+  21,
+  18,
+  15,
+  700
+ ],
+ "log": [
+  {
+   "run": "prompt 0 single graph=True",
+   "identical": false,
+   "step": 29,
+   "hf_gap": 0.03125,
+   "accepted": true
+  },
+  {
+   "run": "prompt 0 single graph=False",
+   "identical": false,
+   "step": 29,
+   "hf_gap": 0.03125,
+   "accepted": true
+  },
+  {
+   "run": "prompt 1 single graph=True",
+   "identical": false,
+   "step": 75,
+   "hf_gap": 0.0,
+   "accepted": true
+  },
+  {
+   "run": "prompt 1 single graph=False",
+   "identical": false,
+   "step": 75,
+   "hf_gap": 0.0,
+   "accepted": true
+  },
+  {
+   "run": "prompt 2 single graph=True",
+   "identical": true
+  },
+  {
+   "run": "prompt 2 single graph=False",
+   "identical": true
+  },
+  {
+   "run": "prompt 3 single graph=True",
+   "identical": false,
+   "step": 36,
+   "hf_gap": 0.109375,
+   "router_check": {
+    "adopted": [
+     {
+      "pos": 12,
+      "layer": 11,
+      "hf_margin": 0.000244140625,
+      "engine_margin": 0.0009765625,
+      "hf_only": [
+       24
+      ],
+      "engine_only": [
+       30
+      ],
+      "hf_logits": {
+       "24": 0.299560546875,
+       "30": 0.29931640625
+      },
+      "engine_logits": {
+       "24": 0.29931640625,
+       "30": 0.30029296875
+      },
+      "fp16_ulp": 0.000244140625
+     },
+     {
+      "pos": 6,
+      "layer": 14,
+      "hf_margin": 0.000732421875,
+      "engine_margin": 0.00067138671875,
+      "hf_only": [
+       25
+      ],
+      "engine_only": [
+       14
+      ],
+      "hf_logits": {
+       "14": 0.10003662109375,
+       "25": 0.10076904296875
+      },
+      "engine_logits": {
+       "14": 0.09979248046875,
+       "25": 0.09912109375
+      },
+      "fp16_ulp": 6.103515625e-05
+     },
+     {
+      "pos": 6,
+      "layer": 20,
+      "hf_margin": 0.0003662109375,
+      "engine_margin": 0.001708984375,
+      "hf_only": [
+       11
+      ],
+      "engine_only": [
+       3
+      ],
+      "hf_logits": {
+       "3": 0.1790771484375,
+       "11": 0.179443359375
+      },
+      "engine_logits": {
+       "3": 0.1800537109375,
+       "11": 0.1783447265625
+      },
+      "fp16_ulp": 0.0001220703125
+     },
+     {
+      "pos": 31,
+      "layer": 20,
+      "hf_margin": 0.00030517578125,
+      "engine_margin": 0.000579833984375,
+      "hf_only": [
+       28
+      ],
+      "engine_only": [
+       24
+      ],
+      "hf_logits": {
+       "24": -0.057708740234375,
+       "28": -0.057403564453125
+      },
+      "engine_logits": {
+       "24": -0.056640625,
+       "28": -0.057220458984375
+      },
+      "fp16_ulp": 3.0517578125e-05
+     },
+     {
+      "pos": 55,
+      "layer": 2,
+      "hf_margin": 0.0,
+      "engine_margin": 0.0009765625,
+      "hf_only": [
+       8
+      ],
+      "engine_only": [
+       14
+      ],
+      "hf_logits": {
+       "8": 0.302734375,
+       "14": 0.302734375
+      },
+      "engine_logits": {
+       "8": 0.302490234375,
+       "14": 0.303466796875
+      },
+      "fp16_ulp": 0.000244140625
+     },
+     {
+      "pos": 56,
+      "layer": 0,
+      "hf_margin": 0.0,
+      "engine_margin": 0.00390625,
+      "hf_only": [
+       2
+      ],
+      "engine_only": [
+       19
+      ],
+      "hf_logits": {
+       "2": 4.015625,
+       "19": 4.015625
+      },
+      "engine_logits": {
+       "2": 4.01171875,
+       "19": 4.015625
+      },
+      "fp16_ulp": 0.00390625
+     },
+     {
+      "pos": 56,
+      "layer": 23,
+      "hf_margin": 0.00146484375,
+      "engine_margin": 0.0,
+      "hf_only": [
+       19
+      ],
+      "engine_only": [
+       9
+      ],
+      "hf_logits": {
+       "9": 0.9033203125,
+       "19": 0.90478515625
+      },
+      "engine_logits": {
+       "9": 0.9033203125,
+       "19": 0.9033203125
+      },
+      "fp16_ulp": 0.00048828125
+     }
+    ],
+    "hf_gap": 0.0,
+    "router_logit_max_diff": {
+     "median": 0.001953125,
+     "p99": 0.0052490234375,
+     "max": 0.0078125
+    },
+    "reason": "HF with 7 adopted router near-ties gives the engine's tokens through step 36; max adopted HF router margin 0.0015",
+    "explained": true
+   },
+   "accepted": true
+  },
+  {
+   "run": "prompt 3 single graph=False",
+   "identical": false,
+   "step": 36,
+   "hf_gap": 0.109375,
+   "router_check": {
+    "adopted": [
+     {
+      "pos": 12,
+      "layer": 11,
+      "hf_margin": 0.000244140625,
+      "engine_margin": 0.0009765625,
+      "hf_only": [
+       24
+      ],
+      "engine_only": [
+       30
+      ],
+      "hf_logits": {
+       "24": 0.299560546875,
+       "30": 0.29931640625
+      },
+      "engine_logits": {
+       "24": 0.29931640625,
+       "30": 0.30029296875
+      },
+      "fp16_ulp": 0.000244140625
+     },
+     {
+      "pos": 6,
+      "layer": 14,
+      "hf_margin": 0.000732421875,
+      "engine_margin": 0.00067138671875,
+      "hf_only": [
+       25
+      ],
+      "engine_only": [
+       14
+      ],
+      "hf_logits": {
+       "14": 0.10003662109375,
+       "25": 0.10076904296875
+      },
+      "engine_logits": {
+       "14": 0.09979248046875,
+       "25": 0.09912109375
+      },
+      "fp16_ulp": 6.103515625e-05
+     },
+     {
+      "pos": 6,
+      "layer": 20,
+      "hf_margin": 0.0003662109375,
+      "engine_margin": 0.001708984375,
+      "hf_only": [
+       11
+      ],
+      "engine_only": [
+       3
+      ],
+      "hf_logits": {
+       "3": 0.1790771484375,
+       "11": 0.179443359375
+      },
+      "engine_logits": {
+       "3": 0.1800537109375,
+       "11": 0.1783447265625
+      },
+      "fp16_ulp": 0.0001220703125
+     },
+     {
+      "pos": 31,
+      "layer": 20,
+      "hf_margin": 0.00030517578125,
+      "engine_margin": 0.000579833984375,
+      "hf_only": [
+       28
+      ],
+      "engine_only": [
+       24
+      ],
+      "hf_logits": {
+       "24": -0.057708740234375,
+       "28": -0.057403564453125
+      },
+      "engine_logits": {
+       "24": -0.056640625,
+       "28": -0.057220458984375
+      },
+      "fp16_ulp": 3.0517578125e-05
+     },
+     {
+      "pos": 55,
+      "layer": 2,
+      "hf_margin": 0.0,
+      "engine_margin": 0.0009765625,
+      "hf_only": [
+       8
+      ],
+      "engine_only": [
+       14
+      ],
+      "hf_logits": {
+       "8": 0.302734375,
+       "14": 0.302734375
+      },
+      "engine_logits": {
+       "8": 0.302490234375,
+       "14": 0.303466796875
+      },
+      "fp16_ulp": 0.000244140625
+     },
+     {
+      "pos": 56,
+      "layer": 0,
+      "hf_margin": 0.0,
+      "engine_margin": 0.00390625,
+      "hf_only": [
+       2
+      ],
+      "engine_only": [
+       19
+      ],
+      "hf_logits": {
+       "2": 4.015625,
+       "19": 4.015625
+      },
+      "engine_logits": {
+       "2": 4.01171875,
+       "19": 4.015625
+      },
+      "fp16_ulp": 0.00390625
+     },
+     {
+      "pos": 56,
+      "layer": 23,
+      "hf_margin": 0.00146484375,
+      "engine_margin": 0.0,
+      "hf_only": [
+       19
+      ],
+      "engine_only": [
+       9
+      ],
+      "hf_logits": {
+       "9": 0.9033203125,
+       "19": 0.90478515625
+      },
+      "engine_logits": {
+       "9": 0.9033203125,
+       "19": 0.9033203125
+      },
+      "fp16_ulp": 0.00048828125
+     }
+    ],
+    "hf_gap": 0.0,
+    "router_logit_max_diff": {
+     "median": 0.001953125,
+     "p99": 0.0052490234375,
+     "max": 0.0078125
+    },
+    "reason": "HF with 7 adopted router near-ties gives the engine's tokens through step 36; max adopted HF router margin 0.0015",
+    "explained": true
+   },
+   "accepted": true
+  },
+  {
+   "run": "prompt 4 single graph=True",
+   "identical": false,
+   "step": 43,
+   "hf_gap": 0.046875,
+   "accepted": true
+  },
+  {
+   "run": "prompt 4 single graph=False",
+   "identical": false,
+   "step": 43,
+   "hf_gap": 0.046875,
+   "accepted": true
+  },
+  {
+   "run": "prompt 5 single graph=True",
+   "identical": true
+  },
+  {
+   "run": "prompt 5 single graph=False",
+   "identical": true
+  },
+  {
+   "run": "prompt 6 single graph=True",
+   "identical": true
+  },
+  {
+   "run": "prompt 6 single graph=False",
+   "identical": true
+  },
+  {
+   "run": "batched B=6 slot 0",
+   "identical": false,
+   "step": 29,
+   "hf_gap": 0.03125,
+   "accepted": true
+  },
+  {
+   "run": "batched B=6 slot 1",
+   "identical": true
+  },
+  {
+   "run": "batched B=6 slot 2",
+   "identical": true
+  },
+  {
+   "run": "batched B=6 slot 3",
+   "identical": false,
+   "step": 36,
+   "hf_gap": 0.109375,
+   "router_check": {
+    "adopted": [
+     {
+      "pos": 12,
+      "layer": 11,
+      "hf_margin": 0.000244140625,
+      "engine_margin": 0.0009765625,
+      "hf_only": [
+       24
+      ],
+      "engine_only": [
+       30
+      ],
+      "hf_logits": {
+       "24": 0.299560546875,
+       "30": 0.29931640625
+      },
+      "engine_logits": {
+       "24": 0.29931640625,
+       "30": 0.30029296875
+      },
+      "fp16_ulp": 0.000244140625
+     },
+     {
+      "pos": 6,
+      "layer": 14,
+      "hf_margin": 0.000732421875,
+      "engine_margin": 0.00067138671875,
+      "hf_only": [
+       25
+      ],
+      "engine_only": [
+       14
+      ],
+      "hf_logits": {
+       "14": 0.10003662109375,
+       "25": 0.10076904296875
+      },
+      "engine_logits": {
+       "14": 0.09979248046875,
+       "25": 0.09912109375
+      },
+      "fp16_ulp": 6.103515625e-05
+     },
+     {
+      "pos": 6,
+      "layer": 20,
+      "hf_margin": 0.0003662109375,
+      "engine_margin": 0.001708984375,
+      "hf_only": [
+       11
+      ],
+      "engine_only": [
+       3
+      ],
+      "hf_logits": {
+       "3": 0.1790771484375,
+       "11": 0.179443359375
+      },
+      "engine_logits": {
+       "3": 0.1800537109375,
+       "11": 0.1783447265625
+      },
+      "fp16_ulp": 0.0001220703125
+     },
+     {
+      "pos": 45,
+      "layer": 21,
+      "hf_margin": 0.000732421875,
+      "engine_margin": 0.0008544921875,
+      "hf_only": [
+       13
+      ],
+      "engine_only": [
+       1
+      ],
+      "hf_logits": {
+       "1": 0.189208984375,
+       "13": 0.18994140625
+      },
+      "engine_logits": {
+       "1": 0.1904296875,
+       "13": 0.1895751953125
+      },
+      "fp16_ulp": 0.0001220703125
+     },
+     {
+      "pos": 55,
+      "layer": 2,
+      "hf_margin": 0.0,
+      "engine_margin": 0.001708984375,
+      "hf_only": [
+       8
+      ],
+      "engine_only": [
+       14
+      ],
+      "hf_logits": {
+       "8": 0.302734375,
+       "14": 0.302734375
+      },
+      "engine_logits": {
+       "8": 0.30126953125,
+       "14": 0.302978515625
+      },
+      "fp16_ulp": 0.000244140625
+     },
+     {
+      "pos": 56,
+      "layer": 0,
+      "hf_margin": 0.0,
+      "engine_margin": 0.00390625,
+      "hf_only": [
+       2
+      ],
+      "engine_only": [
+       19
+      ],
+      "hf_logits": {
+       "2": 4.015625,
+       "19": 4.015625
+      },
+      "engine_logits": {
+       "2": 4.01171875,
+       "19": 4.015625
+      },
+      "fp16_ulp": 0.00390625
+     },
+     {
+      "pos": 56,
+      "layer": 23,
+      "hf_margin": 0.0009765625,
+      "engine_margin": 0.0,
+      "hf_only": [
+       19
+      ],
+      "engine_only": [
+       9
+      ],
+      "hf_logits": {
+       "9": 0.9033203125,
+       "19": 0.904296875
+      },
+      "engine_logits": {
+       "9": 0.904296875,
+       "19": 0.904296875
+      },
+      "fp16_ulp": 0.00048828125
+     }
+    ],
+    "hf_gap": 0.0,
+    "router_logit_max_diff": {
+     "median": 0.001953125,
+     "p99": 0.0052490234375,
+     "max": 0.0078125
+    },
+    "reason": "HF with 7 adopted router near-ties gives the engine's tokens through step 36; max adopted HF router margin 0.0010",
+    "explained": true
+   },
+   "accepted": true
+  },
+  {
+   "run": "batched B=6 slot 4",
+   "identical": false,
+   "step": 43,
+   "hf_gap": 0.046875,
+   "accepted": true
+  },
+  {
+   "run": "batched B=6 slot 5",
+   "identical": true
+  }
+ ]
+}

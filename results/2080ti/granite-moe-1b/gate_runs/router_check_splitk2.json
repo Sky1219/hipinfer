@@ -1,0 +1,123 @@
+{
+ "model": "ibm-granite/granite-3.1-1b-a400m-base",
+ "gpu": "NVIDIA GeForce RTX 2080 Ti",
+ "new_tokens": 128,
+ "pass": true,
+ "identical": 13,
+ "runs": 20,
+ "router_accepted": 0,
+ "router_tie": 0.01,
+ "max_prefill_logit_diff": 0.3828125,
+ "prompt_lens": [
+  5,
+  19,
+  16,
+  21,
+  18,
+  15,
+  700
+ ],
+ "log": [
+  {
+   "run": "prompt 0 single graph=True",
+   "identical": false,
+   "step": 29,
+   "hf_gap": 0.03125,
+   "accepted": true
+  },
+  {
+   "run": "prompt 0 single graph=False",
+   "identical": false,
+   "step": 29,
+   "hf_gap": 0.03125,
+   "accepted": true
+  },
+  {
+   "run": "prompt 1 single graph=True",
+   "identical": true
+  },
+  {
+   "run": "prompt 1 single graph=False",
+   "identical": true
+  },
+  {
+   "run": "prompt 2 single graph=True",
+   "identical": true
+  },
+  {
+   "run": "prompt 2 single graph=False",
+   "identical": true
+  },
+  {
+   "run": "prompt 3 single graph=True",
+   "identical": true
+  },
+  {
+   "run": "prompt 3 single graph=False",
+   "identical": true
+  },
+  {
+   "run": "prompt 4 single graph=True",
+   "identical": false,
+   "step": 43,
+   "hf_gap": 0.046875,
+   "accepted": true
+  },
+  {
+   "run": "prompt 4 single graph=False",
+   "identical": false,
+   "step": 43,
+   "hf_gap": 0.046875,
+   "accepted": true
+  },
+  {
+   "run": "prompt 5 single graph=True",
+   "identical": true
+  },
+  {
+   "run": "prompt 5 single graph=False",
+   "identical": true
+  },
+  {
+   "run": "prompt 6 single graph=True",
+   "identical": true
+  },
+  {
+   "run": "prompt 6 single graph=False",
+   "identical": true
+  },
+  {
+   "run": "batched B=6 slot 0",
+   "identical": false,
+   "step": 29,
+   "hf_gap": 0.03125,
+   "accepted": true
+  },
+  {
+   "run": "batched B=6 slot 1",
+   "identical": false,
+   "step": 75,
+   "hf_gap": 0.0,
+   "accepted": true
+  },
+  {
+   "run": "batched B=6 slot 2",
+   "identical": true
+  },
+  {
+   "run": "batched B=6 slot 3",
+   "identical": true
+  },
+  {
+   "run": "batched B=6 slot 4",
+   "identical": false,
+   "step": 43,
+   "hf_gap": 0.046875,
+   "accepted": true
+  },
+  {
+   "run": "batched B=6 slot 5",
+   "identical": true
+  }
+ ]
+}
