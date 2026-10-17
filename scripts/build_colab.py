@@ -161,6 +161,11 @@ elif mem_gb >= 22:
     MODELS = "tinyllama llama32-1b qwen25-0.5b qwen25-1.5b llama32-3b"
 else:
     MODELS = "tinyllama llama32-1b qwen25-0.5b qwen25-1.5b"
+try:  # the HF_TOKEN Colab secret, exported so the scripts' own processes see it too
+    from google.colab import userdata
+    os.environ["HF_TOKEN"] = userdata.get("HF_TOKEN")
+except Exception:
+    print("no HF_TOKEN Colab secret (or notebook access to it is off)")
 try:  # Mistral's checkpoint is gated: needs its terms accepted on HF and an HF_TOKEN Colab secret
     from huggingface_hub import auth_check
     auth_check("mistralai/Mistral-7B-v0.3")
