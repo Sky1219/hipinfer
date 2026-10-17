@@ -7,6 +7,7 @@ changing any source file.
 python scripts/build_colab.py
 """
 import base64
+import gzip
 import io
 import json
 import os
@@ -30,9 +31,14 @@ def code(text):
 
 def source_blob():
     buf = io.BytesIO()
-    with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+    # LF line endings whatever the checkout uses (a Windows checkout may have CRLF), and fixed
+    # metadata, so the same sources always give the same notebook
+    with gzip.GzipFile(fileobj=buf, mode="wb", mtime=0) as gz, tarfile.open(fileobj=gz, mode="w") as tar:
         for f in FILES:
-            tar.add(os.path.join(ROOT, f), arcname=f)
+            data = open(os.path.join(ROOT, f), "rb").read().replace(b"\r\n", b"\n")
+            info = tarfile.TarInfo(f)
+            info.size, info.mode = len(data), 0o755 if f.endswith(".sh") else 0o644
+            tar.addfile(info, io.BytesIO(data))
     return base64.b64encode(buf.getvalue()).decode()
 
 
