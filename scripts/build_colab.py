@@ -17,7 +17,8 @@ ROOT = os.path.join(os.path.dirname(__file__), "..")
 FILES = ["Makefile", "src/hip_compat.h", "src/kernels.cuh", "src/api.cu", "scripts/hipinfer.py",
          "scripts/export.py", "scripts/bench.py", "scripts/run_all.sh", "scripts/summarize.py",
          "tests/test_kernels.py", "tests/gate.py", "tests/ppl.py", "tests/test_tp.py", "scripts/bench_tp.py",
-         "scripts/run_baselines.sh", "scripts/bench_baselines.py", "scripts/moe_router_trace.py", "scripts/layer_diff.py"]
+         "scripts/run_baselines.sh", "scripts/bench_baselines.py", "scripts/moe_router_trace.py", "scripts/layer_diff.py",
+         "scripts/ref_engine.py"]
 
 
 def md(text):

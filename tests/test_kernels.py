@@ -354,7 +354,7 @@ def test_decode_work_reuse():
 
 
 def test_moe():
-    """MoE router + experts (kernels written 2026-10-16 without a GPU; this is their first run)
+    """MoE router + experts
     against the MoE math of scripts/ref_engine.py, which matches HF on CPU (tests/test_moe_ref.py).
     Router: expert indices and order on rows without a near-tie among the top k+1 logits, weights;
     an exact tie goes to the lower expert index. Experts: both paths (GEMV, grouped GEMM) and auto,
