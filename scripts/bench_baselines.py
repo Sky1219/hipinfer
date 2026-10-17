@@ -115,6 +115,9 @@ def build_gptfast(hf):
                 self.layers.append(dict(
                     wqkv=torch.cat([g(p + "self_attn.q_proj.weight"), g(p + "self_attn.k_proj.weight"),
                                     g(p + "self_attn.v_proj.weight")]),
+                    # QKV bias (Qwen2); None for Llama
+                    bqkv=torch.cat([g(p + f"self_attn.{n}_proj.bias") for n in "qkv"])
+                    if p + "self_attn.q_proj.bias" in sd else None,
                     wo=g(p + "self_attn.o_proj.weight"),
                     w13=torch.cat([g(p + "mlp.gate_proj.weight"), g(p + "mlp.up_proj.weight")]),
                     w2=g(p + "mlp.down_proj.weight"),
@@ -139,7 +142,7 @@ def build_gptfast(hf):
             mask = self.mask[pos][None, None]
             for i, l in enumerate(self.layers):
                 h = norm(x, l["n1"])
-                q, k, v = F.linear(h, l["wqkv"]).split([Hq * D, Hkv * D, Hkv * D], -1)
+                q, k, v = F.linear(h, l["wqkv"], l["bqkv"]).split([Hq * D, Hkv * D, Hkv * D], -1)
                 q = q.view(1, T, Hq, D).transpose(1, 2)
                 k = k.view(1, T, Hkv, D).transpose(1, 2)
                 v = v.view(1, T, Hkv, D).transpose(1, 2)

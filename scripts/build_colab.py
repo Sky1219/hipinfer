@@ -208,7 +208,9 @@ sh = get_ipython().system
 if RUN_BASELINES:
     # llama.cpp's converter needs only these (its requirements file would replace Colab's PyTorch)
     sh("pip install -q --no-cache-dir sentencepiece protobuf ninja")
-    sh("[ -x /content/vllm_env/bin/python ] || (python -m venv /content/vllm_env && /content/vllm_env/bin/pip install -q --no-cache-dir vllm)")
+    # virtualenv, not venv: Colab's Python has no ensurepip
+    sh("[ -x /content/vllm_env/bin/python ] || (pip install -q --no-cache-dir virtualenv && python -m virtualenv -q /content/vllm_env "
+       "&& /content/vllm_env/bin/pip install -q --no-cache-dir vllm)")
     sh("/content/vllm_env/bin/python -c 'import vllm; print(\\"vllm\\", vllm.__version__)'")
 sh("pip cache purge -q 2>/dev/null; df -h /content | tail -1")
 """),

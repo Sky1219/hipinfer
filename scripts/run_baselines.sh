@@ -61,5 +61,6 @@ want torch_compile && { run torch_compile $PY scripts/bench_baselines.py torch_c
 want hf_static && { run hf_static $PY scripts/bench_baselines.py hf_static --model "$MODEL" --out "$OUT/hf_static.json" || echo "hf_static failed (see log)"; }
 if [ -n "${VLLM_PY:-}" ] && want vllm; then
   # greedy only: skip the FlashInfer sampler (JIT-compiled with nvcc on first use)
-  VLLM_USE_FLASHINFER_SAMPLER=0 XDG_CACHE_HOME=$SCRATCH/cache PATH="$(dirname "$VLLM_PY"):$PATH" run vllm "$VLLM_PY" scripts/bench_baselines.py vllm --model "$MODEL" --out "$OUT/vllm.json" || echo "vllm failed (see log)"
+  # HF_HOME pinned so vLLM reuses the HF download already on disk (XDG_CACHE_HOME alone would move it)
+  VLLM_USE_FLASHINFER_SAMPLER=0 HF_HOME=${HF_HOME:-$HOME/.cache/huggingface} XDG_CACHE_HOME=$SCRATCH/cache PATH="$(dirname "$VLLM_PY"):$PATH" run vllm "$VLLM_PY" scripts/bench_baselines.py vllm --model "$MODEL" --out "$OUT/vllm.json" || echo "vllm failed (see log)"
 fi
