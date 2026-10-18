@@ -77,8 +77,12 @@ EXPORT void hi_rmsnorm(const void* x, const void* w, void* y, int M, int H, floa
   rmsnorm_kernel<<<M, 256, 0, ST(s)>>>((const half*)x, (const half*)w, (half*)y, H, eps);
 }
 
-template <int MR, bool NORM, int EPI>
-static void gemv_launch(const half* x, int ldx, const half* nw, float eps, const half* W,
+// A projection weight [N, K] (row n produces output n): fp16, or int8 with one fp16 scale per row
+// (W8A16, weight-file version 4) when s is non-null: W[n, k] = q[n, k] * s[n].
+struct Wt { const void* w = nullptr; const half* s = nullptr; };
+
+template <int MR, bool NORM, int EPI, bool Q8>
+static void gemv_launch(const half* x, int ldx, const half* nw, float eps, Wt W,
                         half* out, int ldo, int N, int K, hipStream_t s, RopeArgs ra = {}) {
   const int warps = 256 / g_warp, n_out = EPI >= 2 ? N / 2 : N;
   const size_t sm = NORM ? (size_t)MR * K * sizeof(half) : 0;
@@ -95,110 +99,143 @@ static void gemv_launch(const half* x, int ldx, const half* nw, float eps, const
                 sm + 1024, g_smem_optin);
         exit(1);
       }
-      HI_CHECK(hipFuncSetAttribute((const void*)gemv_kernel<MR, NORM, EPI>,
+      HI_CHECK(hipFuncSetAttribute((const void*)gemv_kernel<MR, NORM, EPI, Q8>,
                                    hipFuncAttributeMaxDynamicSharedMemorySize, (int)sm));
     }
-    HI_CHECK(hipOccupancyMaxActiveBlocksPerMultiprocessor(&per_sm, gemv_kernel<MR, NORM, EPI>, 256, sm));
+    HI_CHECK(hipOccupancyMaxActiveBlocksPerMultiprocessor(&per_sm, gemv_kernel<MR, NORM, EPI, Q8>, 256, sm));
     if (per_sm < 1) per_sm = 1;
     per_sm_key[g_dev] = sm + 1;
   }
   const int slots = per_sm * g_sms * warps;
   const int rows_per_warp = (n_out + slots - 1) / slots;
   const int grid = (n_out + warps * rows_per_warp - 1) / (warps * rows_per_warp);
-  gemv_kernel<MR, NORM, EPI><<<grid, 256, sm, s>>>(x, ldx, nw, eps, W, N, K, out, ldo, ra);
+  gemv_kernel<MR, NORM, EPI, Q8><<<grid, 256, sm, s>>>(x, ldx, nw, eps, W.w, W.s, N, K, out, ldo, ra);
+}
+
+template <int MR, int EPI, bool Q8>
+static void gemv_norm(const half* x, int ldx, const half* nw, float eps, Wt W, half* out, int ldo, int N, int K,
+                      hipStream_t s, RopeArgs ra = {}) {
+  if (nw) gemv_launch<MR, true, EPI, Q8>(x, ldx, nw, eps, W, out, ldo, N, K, s, ra);
+  else gemv_launch<MR, false, EPI, Q8>(x, ldx, nw, eps, W, out, ldo, N, K, s, ra);
+}
+
+template <int MR, int EPI>
+static void gemv_q(const half* x, int ldx, const half* nw, float eps, Wt W, half* out, int ldo, int N, int K,
+                   hipStream_t s, RopeArgs ra = {}) {
+  if (W.s) gemv_norm<MR, EPI, true>(x, ldx, nw, eps, W, out, ldo, N, K, s, ra);
+  else gemv_norm<MR, EPI, false>(x, ldx, nw, eps, W, out, ldo, N, K, s, ra);
 }
 
 template <int MR>
-static void gemv_mr(const half* x, int ldx, const half* nw, float eps, const half* W, half* out,
+static void gemv_mr(const half* x, int ldx, const half* nw, float eps, Wt W, half* out,
                     int ldo, int N, int K, int epi, hipStream_t s) {
-  if (nw) {
-    if (epi == 0) gemv_launch<MR, true, 0>(x, ldx, nw, eps, W, out, ldo, N, K, s);
-    else if (epi == 1) gemv_launch<MR, true, 1>(x, ldx, nw, eps, W, out, ldo, N, K, s);
-    else gemv_launch<MR, true, 2>(x, ldx, nw, eps, W, out, ldo, N, K, s);
-  } else {
-    if (epi == 0) gemv_launch<MR, false, 0>(x, ldx, nw, eps, W, out, ldo, N, K, s);
-    else if (epi == 1) gemv_launch<MR, false, 1>(x, ldx, nw, eps, W, out, ldo, N, K, s);
-    else gemv_launch<MR, false, 2>(x, ldx, nw, eps, W, out, ldo, N, K, s);
-  }
+  if (epi == 0) gemv_q<MR, 0>(x, ldx, nw, eps, W, out, ldo, N, K, s);
+  else if (epi == 1) gemv_q<MR, 1>(x, ldx, nw, eps, W, out, ldo, N, K, s);
+  else gemv_q<MR, 2>(x, ldx, nw, eps, W, out, ldo, N, K, s);
 }
 
 // out[M, *] (epi) x[M, K] @ W[N, K]^T for small M, optionally RMSNorm-ing x first (normw != null)
+static void gemv(const half* x, int ldx, const half* nw, float eps, Wt W, half* out, int ldo, int M, int N, int K,
+                 int epi, hipStream_t s) {
+  for (int m0 = 0; m0 < M; m0 += 8) {
+    const int mr = M - m0 < 8 ? M - m0 : 8;
+    const half* xp = x + (size_t)m0 * ldx;
+    half* op = out + (size_t)m0 * ldo;
+    switch (mr) {
+      case 1: gemv_mr<1>(xp, ldx, nw, eps, W, op, ldo, N, K, epi, s); break;
+      case 2: gemv_mr<2>(xp, ldx, nw, eps, W, op, ldo, N, K, epi, s); break;
+      case 3: gemv_mr<3>(xp, ldx, nw, eps, W, op, ldo, N, K, epi, s); break;
+      case 4: gemv_mr<4>(xp, ldx, nw, eps, W, op, ldo, N, K, epi, s); break;
+      case 5: gemv_mr<5>(xp, ldx, nw, eps, W, op, ldo, N, K, epi, s); break;
+      case 6: gemv_mr<6>(xp, ldx, nw, eps, W, op, ldo, N, K, epi, s); break;
+      case 7: gemv_mr<7>(xp, ldx, nw, eps, W, op, ldo, N, K, epi, s); break;
+      default: gemv_mr<8>(xp, ldx, nw, eps, W, op, ldo, N, K, epi, s); break;
+    }
+  }
+}
 EXPORT void hi_gemv(const void* x, int ldx, const void* normw, float eps, const void* W, void* out,
                     int ldo, int M, int N, int K, int epi, void* s) {
   hi_init();
-  for (int m0 = 0; m0 < M; m0 += 8) {
-    const int mr = M - m0 < 8 ? M - m0 : 8;
-    const half* xp = (const half*)x + (size_t)m0 * ldx;
-    half* op = (half*)out + (size_t)m0 * ldo;
-    const half* nw = (const half*)normw;
-    switch (mr) {
-      case 1: gemv_mr<1>(xp, ldx, nw, eps, (const half*)W, op, ldo, N, K, epi, ST(s)); break;
-      case 2: gemv_mr<2>(xp, ldx, nw, eps, (const half*)W, op, ldo, N, K, epi, ST(s)); break;
-      case 3: gemv_mr<3>(xp, ldx, nw, eps, (const half*)W, op, ldo, N, K, epi, ST(s)); break;
-      case 4: gemv_mr<4>(xp, ldx, nw, eps, (const half*)W, op, ldo, N, K, epi, ST(s)); break;
-      case 5: gemv_mr<5>(xp, ldx, nw, eps, (const half*)W, op, ldo, N, K, epi, ST(s)); break;
-      case 6: gemv_mr<6>(xp, ldx, nw, eps, (const half*)W, op, ldo, N, K, epi, ST(s)); break;
-      case 7: gemv_mr<7>(xp, ldx, nw, eps, (const half*)W, op, ldo, N, K, epi, ST(s)); break;
-      default: gemv_mr<8>(xp, ldx, nw, eps, (const half*)W, op, ldo, N, K, epi, ST(s)); break;
-    }
-  }
+  gemv((const half*)x, ldx, (const half*)normw, eps, Wt{W, nullptr}, (half*)out, ldo, M, N, K, epi, ST(s));
+}
+// The same with int8 weights W [N, K] and fp16 row scales [N].
+EXPORT void hi_gemv_w8(const void* x, int ldx, const void* normw, float eps, const void* W, const void* scales,
+                       void* out, int ldo, int M, int N, int K, int epi, void* s) {
+  hi_init();
+  gemv((const half*)x, ldx, (const half*)normw, eps, Wt{W, (const half*)scales}, (half*)out, ldo, M, N, K, epi, ST(s));
 }
 
 // QKV projection (RMSNorm fused) with bias, RoPE and the KV-cache write fused into the epilogue.
 // q goes to out[m, 0:Hq*D]; k/v go to cache slot m at position pos[m].
-EXPORT void hi_gemv_qkv_rope(const void* x, int ldx, const void* normw, float eps, const void* W, const void* bias,
-                             void* out, int ldo, int M, int K, int Hq, int Hkv, int D, const void* cs, const int* pos,
-                             void* kc, void* vc, int max_seq, void* s) {
-  hi_init();
+static void gemv_qkv_rope(const half* x, int ldx, const half* nw, float eps, Wt W, const half* bias, half* out, int ldo,
+                          int M, int K, int Hq, int Hkv, int D, const __half2* cs, const int* pos, half* kc, half* vc,
+                          int max_seq, hipStream_t s) {
   const int N = (Hq + 2 * Hkv) * D;
-  RopeArgs ra{(const __half2*)cs, pos, (half*)kc, (half*)vc, (const half*)bias, max_seq, Hq, Hkv, D};
-  const half* xp = (const half*)x; const half* nw = (const half*)normw; const half* w = (const half*)W;
-  half* o = (half*)out;
-#define HI_QKV(mr) case mr: if (nw) gemv_launch<mr, true, 3>(xp, ldx, nw, eps, w, o, ldo, N, K, ST(s), ra); \
-                            else gemv_launch<mr, false, 3>(xp, ldx, nw, eps, w, o, ldo, N, K, ST(s), ra); break
+  RopeArgs ra{cs, pos, kc, vc, bias, max_seq, Hq, Hkv, D};
+#define HI_QKV(mr) case mr: gemv_q<mr, 3>(x, ldx, nw, eps, W, out, ldo, N, K, s, ra); break
   switch (M) {
     HI_QKV(1); HI_QKV(2); HI_QKV(3); HI_QKV(4); HI_QKV(5); HI_QKV(6); HI_QKV(7); HI_QKV(8);
     default: fprintf(stderr, "hi_gemv_qkv_rope: M must be 1..8\n"); exit(1);
   }
 #undef HI_QKV
 }
+EXPORT void hi_gemv_qkv_rope(const void* x, int ldx, const void* normw, float eps, const void* W, const void* bias,
+                             void* out, int ldo, int M, int K, int Hq, int Hkv, int D, const void* cs, const int* pos,
+                             void* kc, void* vc, int max_seq, void* s) {
+  hi_init();
+  gemv_qkv_rope((const half*)x, ldx, (const half*)normw, eps, Wt{W, nullptr}, (const half*)bias, (half*)out, ldo, M, K,
+                Hq, Hkv, D, (const __half2*)cs, pos, (half*)kc, (half*)vc, max_seq, ST(s));
+}
+// The same with int8 weights and fp16 row scales.
+EXPORT void hi_gemv_qkv_rope_w8(const void* x, int ldx, const void* normw, float eps, const void* W, const void* scales,
+                                const void* bias, void* out, int ldo, int M, int K, int Hq, int Hkv, int D, const void* cs,
+                                const int* pos, void* kc, void* vc, int max_seq, void* s) {
+  hi_init();
+  gemv_qkv_rope((const half*)x, ldx, (const half*)normw, eps, Wt{W, (const half*)scales}, (const half*)bias, (half*)out,
+                ldo, M, K, Hq, Hkv, D, (const __half2*)cs, pos, (half*)kc, (half*)vc, max_seq, ST(s));
+}
 
-template <int BM, int BN, int BK, int WGM, int WGN, int EPI>
-static void gemm_launch(const half* A, int lda, const half* W, const half* bias, half* C, int ldc, int M, int N, int K,
+template <int BM, int BN, int BK, int WGM, int WGN, int EPI, bool Q8>
+static void gemm_launch(const half* A, int lda, Wt W, const half* bias, half* C, int ldc, int M, int N, int K,
                         int splits, float* ws, hipStream_t s) {
   constexpr int smem = 2 * (BM + BN) * (BK + 8) * 2;
   static thread_local unsigned long long attr = 0;  // bit d: set on device d (never inside graph capture: warmed up eagerly)
   if (!(attr >> g_dev & 1) && smem > 48 * 1024) {
-    HI_CHECK(hipFuncSetAttribute((const void*)gemm_kernel<BM, BN, BK, WGM, WGN, EPI>,
+    HI_CHECK(hipFuncSetAttribute((const void*)gemm_kernel<BM, BN, BK, WGM, WGN, EPI, Q8>,
                                  hipFuncAttributeMaxDynamicSharedMemorySize, smem));
   }
   attr |= 1ull << g_dev;
   dim3 grid(((N + BN - 1) / BN) * ((M + BM - 1) / BM), 1, splits);
-  gemm_kernel<BM, BN, BK, WGM, WGN, EPI><<<grid, 8 * g_warp, smem, s>>>(A, lda, W, bias, C, ldc, M, N, K, ws, g_split.cnt);
+  gemm_kernel<BM, BN, BK, WGM, WGN, EPI, Q8><<<grid, 8 * g_warp, smem, s>>>(A, lda, W.w, W.s, bias, C, ldc, M, N, K, ws,
+                                                                          g_split.cnt);
 }
 
 #if !defined(HI_AMD)
-// mma.sync GEMM: 3-stage cp.async pipeline on sm_80+, register double buffering on Turing.
-static int gemm_mma_stages() { return g_cc >= 80 ? 3 : 2; }
+// mma.sync GEMM: 3-stage cp.async pipeline on sm_80+, register double buffering on Turing and
+// for int8 weights (which are converted on the way to shared memory, where cp.async cannot).
+static int gemm_mma_stages(bool q8) { return g_cc >= 80 && !q8 ? 3 : 2; }
 
-template <int BM, int BN, int BK, int WGM, int WGN, int STAGES, int EPI>
-static void gemm_mma_launch_st(const half* A, int lda, const half* W, const half* bias, half* C, int ldc, int M, int N,
+template <int BM, int BN, int BK, int WGM, int WGN, int STAGES, int EPI, bool Q8>
+static void gemm_mma_launch_st(const half* A, int lda, Wt W, const half* bias, half* C, int ldc, int M, int N,
                                int K, int splits, float* ws, hipStream_t s) {
   constexpr int smem = STAGES * (BM + BN) * (BK + 8) * 2;
   static thread_local unsigned long long attr = 0;  // bit d: set on device d
   if (!(attr >> g_dev & 1) && smem > 48 * 1024) {
-    HI_CHECK(hipFuncSetAttribute((const void*)gemm_mma_kernel<BM, BN, BK, WGM, WGN, STAGES, EPI>,
+    HI_CHECK(hipFuncSetAttribute((const void*)gemm_mma_kernel<BM, BN, BK, WGM, WGN, STAGES, EPI, Q8>,
                                  hipFuncAttributeMaxDynamicSharedMemorySize, smem));
   }
   attr |= 1ull << g_dev;
   dim3 grid(((N + BN - 1) / BN) * ((M + BM - 1) / BM), 1, splits);
-  gemm_mma_kernel<BM, BN, BK, WGM, WGN, STAGES, EPI><<<grid, WGM * WGN * 32, smem, s>>>(A, lda, W, bias, C, ldc, M, N, K, ws, g_split.cnt);
+  gemm_mma_kernel<BM, BN, BK, WGM, WGN, STAGES, EPI, Q8><<<grid, WGM * WGN * 32, smem, s>>>(A, lda, W.w, W.s, bias, C, ldc, M,
+                                                                                          N, K, ws, g_split.cnt);
 }
-template <int BM, int BN, int BK, int WGM, int WGN, int EPI>
-static void gemm_mma_launch(const half* A, int lda, const half* W, const half* bias, half* C, int ldc, int M, int N, int K,
+template <int BM, int BN, int BK, int WGM, int WGN, int EPI, bool Q8>
+static void gemm_mma_launch(const half* A, int lda, Wt W, const half* bias, half* C, int ldc, int M, int N, int K,
                             int splits, float* ws, hipStream_t s) {
-  if (gemm_mma_stages() >= 3) gemm_mma_launch_st<BM, BN, BK, WGM, WGN, 3, EPI>(A, lda, W, bias, C, ldc, M, N, K, splits, ws, s);
-  else gemm_mma_launch_st<BM, BN, BK, WGM, WGN, 2, EPI>(A, lda, W, bias, C, ldc, M, N, K, splits, ws, s);
+  if constexpr (Q8) gemm_mma_launch_st<BM, BN, BK, WGM, WGN, 2, EPI, true>(A, lda, W, bias, C, ldc, M, N, K, splits, ws, s);
+  else if (gemm_mma_stages(false) >= 3)
+    gemm_mma_launch_st<BM, BN, BK, WGM, WGN, 3, EPI, false>(A, lda, W, bias, C, ldc, M, N, K, splits, ws, s);
+  else gemm_mma_launch_st<BM, BN, BK, WGM, WGN, 2, EPI, false>(A, lda, W, bias, C, ldc, M, N, K, splits, ws, s);
 }
 #endif
 
@@ -234,13 +271,14 @@ EXPORT void hi_gemm_config_desc(int c, char* out, int n) {
   else snprintf(out, n, "%s %dx%dx%d warps %dx%d", k.mma ? "mma.sync" : "wmma", k.bm, k.bn, k.bk, k.wgm, k.wgn);
 }
 
-static size_t cfg_smem(int c) {
+static size_t cfg_smem(int c, bool q8 = false) {
   const GemmCfg& k = kCfg[c];
   if (k.skinny) return 0;
 #if defined(HI_AMD)
   const int stages = 2;
+  (void)q8;
 #else
-  const int stages = k.mma ? gemm_mma_stages() : 2;
+  const int stages = k.mma ? gemm_mma_stages(q8) : 2;
 #endif
   return (size_t)stages * (k.bm + k.bn) * (k.bk + 8) * 2;
 }
@@ -285,11 +323,13 @@ static int gemm_pick(int M, int N, int K, int epi) {
 #endif
 }
 
-template <int EPI>
-static void gemm_cfg(int cfg, int sp, float* ws, const half* A, int lda, const half* W, const half* bias, half* C, int ldc,
+// Tile config cfg with split-K factor sp; Q8: int8 weights (W.s holds the row scales), which the
+// skinny configs (fp16 weight fragments straight from global memory) do not take.
+template <int EPI, bool Q8>
+static void gemm_cfg(int cfg, int sp, float* ws, const half* A, int lda, Wt W, const half* bias, half* C, int ldc,
                      int M, int N, int K, hipStream_t s) {
-#define HI_G(BM, BN, BK, GM, GN) gemm_launch<BM, BN, BK, GM, GN, EPI>(A, lda, W, bias, C, ldc, M, N, K, sp, ws, s)
-#define HI_M(BM, BN, BK, GM, GN) gemm_mma_launch<BM, BN, BK, GM, GN, EPI>(A, lda, W, bias, C, ldc, M, N, K, sp, ws, s)
+#define HI_G(BM, BN, BK, GM, GN) gemm_launch<BM, BN, BK, GM, GN, EPI, Q8>(A, lda, W, bias, C, ldc, M, N, K, sp, ws, s)
+#define HI_M(BM, BN, BK, GM, GN) gemm_mma_launch<BM, BN, BK, GM, GN, EPI, Q8>(A, lda, W, bias, C, ldc, M, N, K, sp, ws, s)
   switch (cfg) {
     case 0: HI_G(128, 128, 32, 2, 4); break;
     case 1: HI_G(64, 128, 32, 2, 4); break;
@@ -310,15 +350,15 @@ static void gemm_cfg(int cfg, int sp, float* ws, const half* A, int lda, const h
     case 15: HI_M(64, 64, 32, 2, 2); break;
     case 16: HI_M(64, 128, 32, 1, 4); break;
     case 17: HI_M(128, 64, 32, 2, 2); break;
-#define HI_S(NW, KS) gemm_skinny_launch<NW, KS, EPI>(A, lda, W, bias, C, ldc, M, N, K, sp, ws, s)
-    case 18: if constexpr (EPI != 2) HI_S(8, 1); break;
-    case 19: if constexpr (EPI != 2) HI_S(16, 1); break;
-    case 20: HI_S(32, 1); break;
-    case 21: if constexpr (EPI != 2) HI_S(8, 2); break;
-    case 22: if constexpr (EPI != 2) HI_S(16, 2); break;
-    case 23: HI_S(32, 2); break;
-    case 24: if constexpr (EPI != 2) HI_S(8, 4); break;
-    case 25: if constexpr (EPI != 2) HI_S(16, 4); break;
+#define HI_S(NW, KS) gemm_skinny_launch<NW, KS, EPI>(A, lda, (const half*)W.w, bias, C, ldc, M, N, K, sp, ws, s)
+    case 18: if constexpr (!Q8 && EPI != 2) HI_S(8, 1); break;
+    case 19: if constexpr (!Q8 && EPI != 2) HI_S(16, 1); break;
+    case 20: if constexpr (!Q8) HI_S(32, 1); break;
+    case 21: if constexpr (!Q8 && EPI != 2) HI_S(8, 2); break;
+    case 22: if constexpr (!Q8 && EPI != 2) HI_S(16, 2); break;
+    case 23: if constexpr (!Q8) HI_S(32, 2); break;
+    case 24: if constexpr (!Q8 && EPI != 2) HI_S(8, 4); break;
+    case 25: if constexpr (!Q8 && EPI != 2) HI_S(16, 4); break;
 #undef HI_S
     case 26: HI_M(256, 128, 32, 2, 4); break;
 #endif
@@ -326,6 +366,15 @@ static void gemm_cfg(int cfg, int sp, float* ws, const half* A, int lda, const h
   }
 #undef HI_G
 #undef HI_M
+}
+
+// gemm_cfg for a runtime epilogue (the bias applies to epilogue 0 only)
+template <bool Q8>
+static void gemm_epi(int epi, int cfg, int sp, float* ws, const half* A, int lda, Wt W, const half* bias, half* C, int ldc,
+                     int M, int N, int K, hipStream_t s) {
+  if (epi == 0) gemm_cfg<0, Q8>(cfg, sp, ws, A, lda, W, bias, C, ldc, M, N, K, s);
+  else if (epi == 1) gemm_cfg<1, Q8>(cfg, sp, ws, A, lda, W, nullptr, C, ldc, M, N, K, s);
+  else gemm_cfg<2, Q8>(cfg, sp, ws, A, lda, W, nullptr, C, ldc, M, N, K, s);
 }
 
 static size_t split_ws_bytes(int cfg, int sp, int M, int N) {
@@ -360,38 +409,39 @@ static bool ensure_ws(size_t bytes, hipStream_t s) {
 }
 static bool split_valid(int cfg, int sp, int K) { return (K / kCfg[cfg].bk) % sp == 0; }
 
-static bool cfg_valid(int cfg, int M, int N, int K, int epi) {
+static bool cfg_valid(int cfg, int M, int N, int K, int epi, bool q8 = false) {
   if (cfg < 0 || cfg >= kNumCfg) return false;
   const GemmCfg& k = kCfg[cfg];
   if (K % k.bk) return false;                      // whole K tiles only
-  if (k.skinny) return M <= 64 && ((M + 15) / 16) * k.ksplit <= 4 && N % k.skinny == 0 && (epi != 2 || k.skinny == 32);
+  if (k.skinny) return !q8 && M <= 64 && ((M + 15) / 16) * k.ksplit <= 4 && N % k.skinny == 0 && (epi != 2 || k.skinny == 32);
   if (epi == 2 && k.bn / k.wgn != 32) return false; // SwiGLU pairing needs 32-column warp tiles
-  if (cfg_smem(cfg) + 1024 > (size_t)g_smem_optin) return false;
+  if (cfg_smem(cfg, q8) + 1024 > (size_t)g_smem_optin) return false;
   return true;
 }
 // configs appended after the original 18 are never the last-resort fallback, so stored sweeps keep their meaning
 static constexpr int kFallbackMaxCfg = 17;
-static int cfg_fallback(int M, int N, int K, int epi) {
-  for (int c = kFallbackMaxCfg; c >= 0; c--) if (cfg_valid(c, M, N, K, epi) && kCfg[c].bk == 32 && !kCfg[c].skinny) return c;
+static int cfg_fallback(int M, int N, int K, int epi, bool q8 = false) {
+  for (int c = kFallbackMaxCfg; c >= 0; c--) if (cfg_valid(c, M, N, K, epi, q8) && kCfg[c].bk == 32 && !kCfg[c].skinny) return c;
   return 2;
 }
 
 static int g_split_force = -1;  // benchmarking hook
 EXPORT void hi_gemm_force_splits(int sp) { g_split_force = sp; }
 
-// Per-GPU autotuning: the first call for a (M bucket, N, K, swiglu) key times every valid
+// Per-GPU autotuning: the first call for a (M bucket, N, K, swiglu, int8) key times every valid
 // (tile config, split-K factor) on the real operands (into a scratch buffer, with the
 // calling epilogue; epi 0 and 1 share a key) and caches the fastest. Small-M shapes (batched
 // decode) need split-K to put enough weight-streaming blocks on the GPU. Calls during graph
 // capture, or with HIPINFER_GEMM_AUTOTUNE=0, use gemm_pick with no split.
 struct GemmChoice { int cfg, splits; };
-static thread_local std::map<std::tuple<int, int, int, bool>, GemmChoice> g_tuned_dev[kMaxDev];
-static GemmChoice gemm_choose(const half* A, int lda, const half* W, int M, int N, int K, int epi, hipStream_t s) {
+static thread_local std::map<std::tuple<int, int, int, bool, bool>, GemmChoice> g_tuned_dev[kMaxDev];
+static GemmChoice gemm_choose(const half* A, int lda, Wt W, int M, int N, int K, int epi, hipStream_t s) {
   int mb = 16;
   while (mb < M && mb < 4096) mb *= 2;
-  const auto key = std::make_tuple(mb, N, K, epi == 2);
+  const bool q8 = W.s != nullptr;
+  const auto key = std::make_tuple(mb, N, K, epi == 2, q8);
   GemmChoice ch{gemm_pick(M, N, K, epi), 1};
-  if (!cfg_valid(ch.cfg, M, N, K, epi)) ch.cfg = cfg_fallback(M, N, K, epi);
+  if (!cfg_valid(ch.cfg, M, N, K, epi, q8)) ch.cfg = cfg_fallback(M, N, K, epi, q8);
   if (g_gemm_force >= 0 || g_split_force >= 1) {
     if (g_gemm_force >= 0) ch.cfg = g_gemm_force;
     if (g_split_force >= 1) ch.splits = g_split_force;
@@ -414,9 +464,8 @@ static GemmChoice gemm_choose(const half* A, int lda, const half* W, int M, int 
   // timed with the shape's own epilogue (into scratch; SwiGLU writes N / 2 columns), since the
   // epilogue's cost differs between tile configs
   auto run = [&](int c, int sp) {
-    if (epi == 0) gemm_cfg<0>(c, sp, g_split.ws, A, lda, W, nullptr, scratch, N, M, N, K, s);
-    else if (epi == 1) gemm_cfg<1>(c, sp, g_split.ws, A, lda, W, nullptr, scratch, N, M, N, K, s);
-    else gemm_cfg<2>(c, sp, g_split.ws, A, lda, W, nullptr, scratch, N / 2, M, N, K, s);
+    if (q8) gemm_epi<true>(epi, c, sp, g_split.ws, A, lda, W, nullptr, scratch, epi == 2 ? N / 2 : N, M, N, K, s);
+    else gemm_epi<false>(epi, c, sp, g_split.ws, A, lda, W, nullptr, scratch, epi == 2 ? N / 2 : N, M, N, K, s);
   };
   auto time8 = [&](int c, int sp) {
     for (int r = 0; r < 2; r++) run(c, sp);  // warm-up
@@ -433,7 +482,7 @@ static GemmChoice gemm_choose(const half* A, int lda, const half* W, int M, int 
   // keeps each one's best; the winner is decided on that like-for-like comparison.
   std::vector<std::pair<float, GemmChoice>> timed;  // every candidate: {ms, choice}
   for (int c = 0; c < hi_gemm_num_configs(); c++) {
-    if (!cfg_valid(c, M, N, K, epi)) continue;
+    if (!cfg_valid(c, M, N, K, epi, q8)) continue;
     const int tiles = kCfg[c].skinny ? (N + kCfg[c].bn - 1) / kCfg[c].bn
                                       : ((M + kCfg[c].bm - 1) / kCfg[c].bm) * ((N + kCfg[c].bn - 1) / kCfg[c].bn);
     for (int sp = 1; sp <= 16; sp *= 2) {
@@ -461,27 +510,36 @@ static GemmChoice gemm_choose(const half* A, int lda, const half* W, int M, int 
   g_tuned[key] = ch;
   if (verbose) {
     char d[64]; hi_gemm_config_desc(ch.cfg, d, 64);
-    fprintf(stderr, "gemm autotune M=%d N=%d K=%d epi=%d -> cfg %d (%s) splits %d: %.1f us, %.1f TFLOPs, %.0f GB/s of weights\n",
-            M, N, K, epi, ch.cfg, d, ch.splits, best_ms / 8 * 1e3f, 2.0 * M * N * K / (best_ms / 8 * 1e-3) / 1e12,
-            2.0 * N * K / (best_ms / 8 * 1e-3) / 1e9);
+    fprintf(stderr, "gemm autotune M=%d N=%d K=%d epi=%d%s -> cfg %d (%s) splits %d: %.1f us, %.1f TFLOPs, %.0f GB/s of weights\n",
+            M, N, K, epi, q8 ? " int8" : "", ch.cfg, d, ch.splits, best_ms / 8 * 1e3f,
+            2.0 * M * N * K / (best_ms / 8 * 1e-3) / 1e12, (q8 ? 1.0 : 2.0) * N * K / (best_ms / 8 * 1e-3) / 1e9);
   }
   return ch;
 }
 
 // C (epi) A[M, K] @ W[N, K]^T (+ bias[N] for epi 0 when non-null). K % 32 == 0, N % 16 == 0 (N % 32 for epi 2).
+static void gemm(const half* A, int lda, Wt W, const half* bias, half* C, int ldc, int M, int N, int K, int epi,
+                 hipStream_t s) {
+  if (K % 32 || N % (epi == 2 ? 32 : 16)) { fprintf(stderr, "hi_gemm: unsupported shape N=%d K=%d epi=%d\n", N, K, epi); exit(1); }
+  const bool q8 = W.s != nullptr;
+  GemmChoice ch = gemm_choose(A, lda, W, M, N, K, epi, s);
+  if (!cfg_valid(ch.cfg, M, N, K, epi, q8)) ch.cfg = cfg_fallback(M, N, K, epi, q8);
+  if (ch.splits > 1 && (!split_valid(ch.cfg, ch.splits, K) || !ensure_ws(split_ws_bytes(ch.cfg, ch.splits, M, N), s)))
+    ch.splits = 1;
+  if (q8) gemm_epi<true>(epi, ch.cfg, ch.splits, g_split.ws, A, lda, W, bias, C, ldc, M, N, K, s);
+  else gemm_epi<false>(epi, ch.cfg, ch.splits, g_split.ws, A, lda, W, bias, C, ldc, M, N, K, s);
+}
 EXPORT void hi_gemm(const void* A, int lda, const void* W, const void* bias, void* C, int ldc, int M, int N, int K, int epi,
                     void* s) {
   hi_init();
-  if (K % 32 || N % (epi == 2 ? 32 : 16)) { fprintf(stderr, "hi_gemm: unsupported shape N=%d K=%d epi=%d\n", N, K, epi); exit(1); }
-  GemmChoice ch = gemm_choose((const half*)A, lda, (const half*)W, M, N, K, epi, ST(s));
-  if (!cfg_valid(ch.cfg, M, N, K, epi)) ch.cfg = cfg_fallback(M, N, K, epi);
-  if (ch.splits > 1 && (!split_valid(ch.cfg, ch.splits, K) || !ensure_ws(split_ws_bytes(ch.cfg, ch.splits, M, N), ST(s))))
-    ch.splits = 1;
-  const half* a = (const half*)A; const half* w = (const half*)W; const half* b = (const half*)bias; half* c = (half*)C;
-  float* ws = g_split.ws;
-  if (epi == 0) gemm_cfg<0>(ch.cfg, ch.splits, ws, a, lda, w, b, c, ldc, M, N, K, ST(s));
-  else if (epi == 1) gemm_cfg<1>(ch.cfg, ch.splits, ws, a, lda, w, nullptr, c, ldc, M, N, K, ST(s));
-  else gemm_cfg<2>(ch.cfg, ch.splits, ws, a, lda, w, nullptr, c, ldc, M, N, K, ST(s));
+  gemm((const half*)A, lda, Wt{W, nullptr}, (const half*)bias, (half*)C, ldc, M, N, K, epi, ST(s));
+}
+// The same with int8 weights W [N, K] and fp16 row scales [N] (each W tile dequantized to fp16 on its
+// way to shared memory).
+EXPORT void hi_gemm_w8(const void* A, int lda, const void* W, const void* scales, const void* bias, void* C, int ldc, int M,
+                       int N, int K, int epi, void* s) {
+  hi_init();
+  gemm((const half*)A, lda, Wt{W, (const half*)scales}, (const half*)bias, (half*)C, ldc, M, N, K, epi, ST(s));
 }
 
 EXPORT void hi_rope_cache(void* qkv, int ldq, int M, int Hq, int Hkv, int D, const void* cs, const int* pos,
@@ -806,13 +864,17 @@ struct Config {
   int window;  // sliding-window attention span (0: none); the engine needs max_seq <= window
   float eps, attn_scaling;
   bool tied, qkv_bias;
+  int quant = 0;  // projection weights: 0 fp16, 1 int8 with fp16 row scales (weight-file version 4)
   // MoE (weight-file version 3): inter is per expert
   bool moe = false, qk_norm = false;
   int n_experts = 0, top_k = 0, moe_flags = 0;
   float moe_scale = 1.f;
 };
 // Dense layers use wgu / wdown; MoE layers router [E, H], ewgu [E][2I, H], ewdown [E][H, I].
-struct Layer { half *attn_norm, *wqkv, *bqkv, *wo, *mlp_norm, *wgu, *wdown, *router, *ewgu, *ewdown; };
+struct Layer {
+  half *attn_norm, *bqkv, *mlp_norm, *router, *ewgu, *ewdown;
+  Wt wqkv, wo, wgu, wdown;  // fp16, or int8 + row scales
+};
 
 // One engine per GPU. With tensor parallelism each rank holds its shard (hq query heads, hkv kv
 // heads, il intermediate units, vocabulary rows [v0, v0 + vl)); with one GPU those are the
@@ -824,7 +886,8 @@ struct Engine {
   TPGroup* g = nullptr;
   int hq, hkv, il, vl, v0;
   std::vector<void*> wallocs;
-  half *embed, *final_norm, *lm_head;
+  half *embed, *final_norm;
+  Wt lm_head;  // this rank's vocabulary rows; fp16 (the embedding itself when tied) or int8
   std::vector<Layer> L;
   int maxB, max_seq, max_pf, Mmax, qkv_dim;
   half *kc, *vc, *x, *xn, *qkv, *att, *act, *logits;  // logits [maxB, vl]
@@ -953,8 +1016,10 @@ static void* dalloc(size_t bytes) { void* p; HI_CHECK(hipMalloc(&p, bytes)); HI_
 static void* walloc(Engine* e, size_t bytes) { void* p; HI_CHECK(hipMalloc(&p, bytes)); e->wallocs.push_back(p); return p; }
 
 // Weight file (written by scripts/export.py, version 2): 64-byte header, then inv_freq (fp32)
-// and fp16 tensors, each starting on a 256-byte boundary, in the order consumed below. Rank
-// `rank` of `world` reads only its shard (row ranges directly, column ranges via a 2-D copy).
+// and fp16 tensors, each starting on a 256-byte boundary, in the order consumed below. Version
+// 4 (int8) is the same layout with every projection (and an always-present lm_head) stored as int8
+// rows followed by their fp16 scales. Rank `rank` of `world` reads only its shard (row ranges
+// directly, column ranges via a 2-D copy).
 // Returns null (after a message on stderr) for a bad file or an unsupported model / setting.
 static Engine* load_shard(const char* path, int rank, int world, int maxB, int max_seq, int max_pf) {
   hi_init();
@@ -966,7 +1031,11 @@ static Engine* load_shard(const char* path, int rank, int world, int maxB, int m
   if (!f) { fprintf(stderr, "cannot open %s\n", path); return nullptr; }
   int32_t hdr[32] = {0};
   if (fread(hdr, 4, 16, f) != 16 || hdr[0] != 0x48495046) { fprintf(stderr, "bad weight file\n"); fclose(f); return nullptr; }
-  if (hdr[1] != 2 && hdr[1] != 3) { fprintf(stderr, "weight file version %d; re-export with scripts/export.py (version 2, or 3 for MoE)\n", hdr[1]); fclose(f); return nullptr; }
+  if (hdr[1] < 2 || hdr[1] > 4) {
+    fprintf(stderr, "weight file version %d; re-export with scripts/export.py (version 2, 3 for MoE, 4 for int8)\n", hdr[1]);
+    fclose(f);
+    return nullptr;
+  }
   // version 3 (MoE): a 128-byte header, MoE fields at bytes 64..79
   if (hdr[1] == 3 && fread(hdr + 16, 4, 16, f) != 16) { fprintf(stderr, "bad weight file\n"); fclose(f); return nullptr; }
   Engine* e = new Engine();
@@ -981,6 +1050,11 @@ static Engine* load_shard(const char* path, int rank, int world, int maxB, int m
   c.moe = (hdr[12] & 4) != 0; c.qk_norm = (hdr[12] & 8) != 0;
   if (c.moe) { c.n_experts = hdr[16]; c.top_k = hdr[17]; c.moe_flags = hdr[18]; memcpy(&c.moe_scale, &hdr[19], 4); }
   auto fail = [&]() -> Engine* { fclose(f); delete e; return nullptr; };
+  if (hdr[1] == 4) {  // int8 projections: header int32 at byte 56 = quantization type (1: int8, one scale per row)
+    if (hdr[14] != 1) { fprintf(stderr, "hi_load: unknown quantization type %d\n", hdr[14]); return fail(); }
+    if (c.moe || c.tied) { fprintf(stderr, "hi_load: version-4 file with the MoE or tied flag set\n"); return fail(); }
+    c.quant = 1;
+  }
   if (c.moe != (hdr[1] == 3)) { fprintf(stderr, "hi_load: MoE flag does not match file version %d\n", hdr[1]); return fail(); }
   if (c.moe) {
     if (world > 1) {
@@ -1031,21 +1105,41 @@ static Engine* load_shard(const char* path, int rank, int world, int maxB, int m
     if (fseek(f, (long)o, SEEK_SET) || fread(hb.data(), 1, n, f) != n) throw std::runtime_error("weight file too small");
     return hb.data();
   };
-  // rows [r0, r0 + nr) of a [*, cols] fp16 tensor at file offset o
-  auto rows_to = [&](half* dst, size_t o, size_t cols, size_t r0, size_t nr) {
-    HI_CHECK(hipMemcpy(dst, read_at(o + r0 * cols * 2, nr * cols * 2), nr * cols * 2, hipMemcpyHostToDevice));
+  // rows [r0, r0 + nr) of a [*, cols] tensor of esz-byte elements at file offset o
+  auto rows_to = [&](void* dst, size_t o, size_t cols, size_t r0, size_t nr, size_t esz = 2) {
+    HI_CHECK(hipMemcpy(dst, read_at(o + r0 * cols * esz, nr * cols * esz), nr * cols * esz, hipMemcpyHostToDevice));
   };
-  auto rows = [&](size_t o, size_t cols, size_t r0, size_t nr) {
+  auto rows = [&](size_t o, size_t cols, size_t r0, size_t nr) {  // fp16
     half* p = (half*)walloc(e, nr * cols * 2);
     rows_to(p, o, cols, r0, nr);
     return p;
   };
-  // columns [c0, c0 + nc) of a [nrows, cols] tensor
-  auto columns = [&](size_t o, size_t nrows, size_t cols, size_t c0, size_t nc) {
-    half* p = (half*)walloc(e, nrows * nc * 2);
-    const char* h = read_at(o, nrows * cols * 2);
-    HI_CHECK(hipMemcpy2D(p, nc * 2, h + c0 * 2, cols * 2, nc * 2, nrows, hipMemcpyHostToDevice));
-    return p;
+  // A projection [N, K] at the next offsets: fp16 weights, or int8 weights followed by N fp16 row
+  // scales (each on its own 256-byte boundary). Loads this rank's rows `rr` ({first, count}
+  // ranges, concatenated) and columns [c0, c0 + nc). A column split (row-parallel layer) keeps
+  // each loaded row's whole scale: it belongs to the output row, and every rank's partial dot
+  // product is scaled by it before the all-reduce sums them.
+  const size_t wsz = c.quant ? 1 : 2;
+  auto proj = [&](size_t N, size_t K, std::initializer_list<std::pair<size_t, size_t>> rr, size_t c0, size_t nc) {
+    const size_t ow = next(N * K * wsz), os = c.quant ? next(N * 2) : 0;
+    size_t n = 0;
+    for (const auto& r : rr) n += r.second;
+    char* w = (char*)walloc(e, n * nc * wsz);
+    size_t at = 0;
+    for (const auto& r : rr) {
+      const char* h = read_at(ow + r.first * K * wsz, r.second * K * wsz);
+      if (nc == K) HI_CHECK(hipMemcpy(w + at * K * wsz, h, r.second * K * wsz, hipMemcpyHostToDevice));
+      else HI_CHECK(hipMemcpy2D(w + at * nc * wsz, nc * wsz, h + c0 * wsz, K * wsz, nc * wsz, r.second, hipMemcpyHostToDevice));
+      at += r.second;
+    }
+    Wt t{w, nullptr};
+    if (c.quant) {
+      half* sc = (half*)walloc(e, n * 2);
+      at = 0;
+      for (const auto& r : rr) { rows_to(sc + at, os, 1, r.first, r.second); at += r.second; }
+      t.s = sc;
+    }
+    return t;
   };
 
   std::vector<float> inv(D / 2);  // fp32 RoPE frequencies
@@ -1053,26 +1147,29 @@ static Engine* load_shard(const char* path, int rank, int world, int maxB, int m
     memcpy(inv.data(), read_at(next((D / 2) * 4), (D / 2) * 4), (D / 2) * 4);
     e->embed = rows(next((size_t)V * H * 2), H, 0, V);
     e->final_norm = rows(next((size_t)H * 2), H, 0, 1);
-    e->lm_head = c.tied ? e->embed + (size_t)e->v0 * H : rows(next((size_t)V * H * 2), H, e->v0, e->vl);
+    e->lm_head = c.tied ? Wt{e->embed + (size_t)e->v0 * H, nullptr} : proj(V, H, {{(size_t)e->v0, (size_t)e->vl}}, 0, H);
     e->L.resize(c.layers);
     const size_t QKV = (size_t)(Hq + 2 * Hkv) * D;
-    // this rank's q, k and v rows of the [q; k; v] projection (or bias)
-    auto qkv_rows = [&](half* dst, size_t o, size_t cols) {
-      rows_to(dst, o, cols, (size_t)rank * hq * D, (size_t)hq * D);
-      rows_to(dst + (size_t)hq * D * cols, o, cols, (size_t)Hq * D + (size_t)rank * hkv * D, (size_t)hkv * D);
-      rows_to(dst + (size_t)(hq + hkv) * D * cols, o, cols, (size_t)(Hq + Hkv) * D + (size_t)rank * hkv * D, (size_t)hkv * D);
-    };
+    // this rank's q, k and v rows ({first, count}) of the [q; k; v] projection or bias
+    const std::initializer_list<std::pair<size_t, size_t>> qkv_rr = {
+        {(size_t)rank * hq * D, (size_t)hq * D},
+        {(size_t)Hq * D + (size_t)rank * hkv * D, (size_t)hkv * D},
+        {(size_t)(Hq + Hkv) * D + (size_t)rank * hkv * D, (size_t)hkv * D}};
     for (auto& l : e->L) {
       l.attn_norm = rows(next((size_t)H * 2), H, 0, 1);
-      l.wqkv = (half*)walloc(e, (size_t)e->qkv_dim * H * 2);
-      qkv_rows(l.wqkv, next(QKV * H * 2), H);
+      l.wqkv = proj(QKV, H, qkv_rr, 0, H);
       l.bqkv = nullptr;
-      if (c.qkv_bias) { l.bqkv = (half*)walloc(e, (size_t)e->qkv_dim * 2); qkv_rows(l.bqkv, next(QKV * 2), 1); }
-      l.wo = columns(next((size_t)H * Hq * D * 2), H, (size_t)Hq * D, (size_t)rank * hq * D, (size_t)hq * D);
+      if (c.qkv_bias) {
+        l.bqkv = (half*)walloc(e, (size_t)e->qkv_dim * 2);
+        const size_t o = next(QKV * 2);
+        size_t at = 0;
+        for (const auto& r : qkv_rr) { rows_to(l.bqkv + at, o, 1, r.first, r.second); at += r.second; }
+      }
+      l.wo = proj(H, (size_t)Hq * D, {{0, (size_t)H}}, (size_t)rank * hq * D, (size_t)hq * D);
       l.mlp_norm = rows(next((size_t)H * 2), H, 0, 1);
       l.router = l.ewgu = l.ewdown = nullptr;
       if (c.moe) {  // one GPU (checked above): every expert, stacked as in the file
-        l.wgu = l.wdown = nullptr;
+        l.wgu = l.wdown = Wt{};
         const size_t E = c.n_experts;
         l.router = rows(next(E * H * 2), H, 0, E);
         l.ewgu = rows(next(E * 2 * I * H * 2), H, 0, E * 2 * I);
@@ -1080,8 +1177,8 @@ static Engine* load_shard(const char* path, int rank, int world, int maxB, int m
         continue;
       }
       // gate/up rows are interleaved in groups of 16 units, so a rank's units are a contiguous row range
-      l.wgu = rows(next((size_t)2 * I * H * 2), H, (size_t)rank * 2 * il, (size_t)2 * il);
-      l.wdown = columns(next((size_t)H * I * 2), H, I, (size_t)rank * il, il);
+      l.wgu = proj((size_t)2 * I, H, {{(size_t)rank * 2 * il, (size_t)2 * il}}, 0, H);
+      l.wdown = proj(H, I, {{0, (size_t)H}}, (size_t)rank * il, il);
     }
   } catch (const std::exception& ex) {
     fprintf(stderr, "hi_load: %s: %s\n", path, ex.what());
@@ -1202,15 +1299,24 @@ EXPORT void hi_moe_config(Engine* e, int* out) {
 }
 
 // Weight bytes one GPU reads per decode step (the roofline numerator; this rank's shard). For MoE:
-// one token's (B = 1) reads, the router plus its top_k experts.
+// one token's (B = 1) reads, the router plus its top_k experts. int8: the projections (and the
+// lm_head) at one byte per weight plus their fp16 row scales; norms and biases stay fp16.
 EXPORT size_t hi_weight_bytes(Engine* e) {
   const Config& c = e->c;
-  const size_t mlp = c.moe ? (size_t)c.n_experts * c.hidden + (size_t)c.top_k * 3 * c.inter * c.hidden
-                           : (size_t)3 * e->il * c.hidden;
-  size_t per_layer = (size_t)e->qkv_dim * c.hidden + (size_t)c.hidden * e->hq * c.head_dim +
-                     mlp + 2 * (size_t)c.hidden + (c.qkv_bias ? e->qkv_dim : 0);
-  return (per_layer * c.layers + (size_t)e->vl * c.hidden + c.hidden) * 2;
+  const size_t H = c.hidden, wsz = c.quant ? 1 : 2, ssz = c.quant ? 2 : 0;
+  if (c.moe) {
+    const size_t per_layer = (size_t)e->qkv_dim * H + H * e->hq * c.head_dim + (size_t)c.n_experts * H +
+                             (size_t)c.top_k * 3 * c.inter * H + 2 * H + (c.qkv_bias ? e->qkv_dim : 0);
+    return (per_layer * c.layers + (size_t)e->vl * H + H) * 2;
+  }
+  const size_t proj_w = (size_t)e->qkv_dim * H + H * e->hq * c.head_dim + (size_t)3 * e->il * H;  // weights
+  const size_t proj_r = (size_t)e->qkv_dim + H + (size_t)2 * e->il + H;                           // output rows
+  const size_t per_layer = proj_w * wsz + proj_r * ssz + (2 * H + (c.qkv_bias ? e->qkv_dim : 0)) * 2;
+  return per_layer * c.layers + (size_t)e->vl * H * wsz + (size_t)e->vl * ssz + H * 2;
 }
+
+// Projection weight format: 0 fp16, 1 int8 with fp16 row scales.
+EXPORT int hi_weight_quant(Engine* e) { return e->c.quant; }
 
 // {world, peer access between all GPUs, NCCL built in, backend (0 auto, 1 NCCL, 2 one-shot), auto threshold
 // bytes, prefill overlap}
@@ -1345,14 +1451,14 @@ static void attn_rows(Engine* e, const Layer& w, half* kc, half* vc, int slot, i
   half* q = e->qkv + (size_t)r0 * ld;
   hi_rmsnorm(e->x + (size_t)r0 * H, w.attn_norm, e->xn + (size_t)r0 * H, m, H, c.eps, s);
   dbg_step(e, w, kDbgAttnNorm, e->xn + (size_t)r0 * H, H, r0, m, s);
-  hi_gemm(e->xn + (size_t)r0 * H, H, w.wqkv, w.bqkv, q, ld, m, ld, H, 0, s);
+  gemm(e->xn + (size_t)r0 * H, H, w.wqkv, w.bqkv, q, ld, m, ld, H, 0, s);
   dbg_step(e, w, kDbgQkv, q, ld, r0, m, s);
   hi_rope_cache(q, ld, m, hq, hkv, D, e->rope, nullptr, pb + r0, slot, kc, vc, e->max_seq, s);
   dbg_rope(e, w, q, ld, kc, slot, r0, m, pb, s);
   hi_flash_prefill(q, ld, kc + (size_t)slot * hkv * e->max_seq * D, vc + (size_t)slot * hkv * e->max_seq * D, e->max_seq,
                    e->att + (size_t)r0 * HD, HD, m, pb + r0, hq, hkv, D, s);
   dbg_step(e, w, kDbgAttn, e->att + (size_t)r0 * HD, HD, r0, m, s);
-  hi_gemm(e->att + (size_t)r0 * HD, HD, w.wo, nullptr, e->x + (size_t)r0 * H, H, m, H, HD, ep, s);
+  gemm(e->att + (size_t)r0 * HD, HD, w.wo, nullptr, e->x + (size_t)r0 * H, H, m, H, HD, ep, s);
   dbg_step(e, w, kDbgO, e->x + (size_t)r0 * H, H, r0, m, s);
 }
 
@@ -1377,9 +1483,9 @@ static void mlp_rows(Engine* e, const Layer& w, int r0, int m, hipStream_t s) {
   const int H = c.hidden, il = e->il, ep = e->rank == 0 ? 1 : 0;
   hi_rmsnorm(e->x + (size_t)r0 * H, w.mlp_norm, e->xn + (size_t)r0 * H, m, H, c.eps, s);
   dbg_step(e, w, kDbgMlpNorm, e->xn + (size_t)r0 * H, H, r0, m, s);
-  hi_gemm(e->xn + (size_t)r0 * H, H, w.wgu, nullptr, e->act + (size_t)r0 * il, il, m, 2 * il, H, 2, s);
+  gemm(e->xn + (size_t)r0 * H, H, w.wgu, nullptr, e->act + (size_t)r0 * il, il, m, 2 * il, H, 2, s);
   dbg_step(e, w, kDbgGateUp, e->act + (size_t)r0 * il, il, r0, m, s);
-  hi_gemm(e->act + (size_t)r0 * il, il, w.wdown, nullptr, e->x + (size_t)r0 * H, H, m, H, il, ep, s);
+  gemm(e->act + (size_t)r0 * il, il, w.wdown, nullptr, e->x + (size_t)r0 * H, H, m, H, il, ep, s);
   dbg_step(e, w, kDbgDown, e->x + (size_t)r0 * H, H, r0, m, s);
 }
 
@@ -1450,19 +1556,19 @@ static int prefill(Engine* e, int slot, const int* tokens, int T, int p0, half* 
       hi_rmsnorm(e->x, e->final_norm, e->xn, n, H, c.eps, s);
       dbg_copy(e, dbg_planes(e) - 2, e->xn, H, 0, n, s);
       if (e->world == 1) {
-        hi_gemm(e->xn, H, e->lm_head, nullptr, all_logits + (size_t)t0 * V, V, n, V, H, 0, s);
+        gemm(e->xn, H, e->lm_head, nullptr, all_logits + (size_t)t0 * V, V, n, V, H, 0, s);
       } else {  // this rank's vocabulary columns (hi_prefill_logits requires T <= max_prefill: one chunk)
-        hi_gemm(e->xn, H, e->lm_head, nullptr, e->pf_logits, vl, n, vl, H, 0, s);
+        gemm(e->xn, H, e->lm_head, nullptr, e->pf_logits, vl, n, vl, H, 0, s);
         tp_export_logits(e, e->pf_logits, n, all_logits + e->v0, s);
       }
     }
     if (t0 + n >= T) {
       half* lg = e->logits + (size_t)slot * vl;
       if (norm_fits(1, H))
-        hi_gemv(e->x + (size_t)(n - 1) * H, H, e->final_norm, c.eps, e->lm_head, lg, vl, 1, vl, H, 0, s);
+        gemv(e->x + (size_t)(n - 1) * H, H, e->final_norm, c.eps, e->lm_head, lg, vl, 1, vl, H, 0, s);
       else {
         hi_rmsnorm(e->x + (size_t)(n - 1) * H, e->final_norm, e->xn, 1, H, c.eps, s);
-        hi_gemv(e->xn, H, nullptr, 0.f, e->lm_head, lg, vl, 1, vl, H, 0, s);
+        gemv(e->xn, H, nullptr, 0.f, e->lm_head, lg, vl, 1, vl, H, 0, s);
       }
       const int pm1 = p0 + T - 1;
       HI_CHECK(hipMemcpyAsync(e->d_pos + slot, &pm1, 4, hipMemcpyHostToDevice, s));
@@ -1555,44 +1661,44 @@ static void decode_step(Engine* e, int B) {
     half* kc = e->kc + e->layer_cache * l;
     half* vc = e->vc + e->layer_cache * l;
     if (small && fuse) {
-      hi_gemv_qkv_rope(e->x, H, w.attn_norm, c.eps, w.wqkv, w.bqkv, e->qkv, e->qkv_dim, B, H, hq, hkv, D, e->rope, e->d_pos,
-                       kc, vc, e->max_seq, s);
+      gemv_qkv_rope(e->x, H, w.attn_norm, c.eps, w.wqkv, w.bqkv, e->qkv, e->qkv_dim, B, H, hq, hkv, D, e->rope, e->d_pos,
+                    kc, vc, e->max_seq, s);
     } else if (small) {
       hi_rmsnorm(e->x, w.attn_norm, e->xn, B, H, c.eps, s);
-      hi_gemv_qkv_rope(e->xn, H, nullptr, c.eps, w.wqkv, w.bqkv, e->qkv, e->qkv_dim, B, H, hq, hkv, D, e->rope, e->d_pos,
-                       kc, vc, e->max_seq, s);
+      gemv_qkv_rope(e->xn, H, nullptr, c.eps, w.wqkv, w.bqkv, e->qkv, e->qkv_dim, B, H, hq, hkv, D, e->rope, e->d_pos,
+                    kc, vc, e->max_seq, s);
     } else {
       hi_rmsnorm(e->x, w.attn_norm, e->xn, B, H, c.eps, s);
-      hi_gemm(e->xn, H, w.wqkv, w.bqkv, e->qkv, e->qkv_dim, B, e->qkv_dim, H, 0, s);
+      gemm(e->xn, H, w.wqkv, w.bqkv, e->qkv, e->qkv_dim, B, e->qkv_dim, H, 0, s);
       hi_rope_cache(e->qkv, e->qkv_dim, B, hq, hkv, D, e->rope, e->d_pos, 0, 0, kc, vc, e->max_seq, s);
     }
     hi_decode_attn(e->qkv, e->qkv_dim, kc, vc, e->max_seq, e->d_pos, e->att, HD, B, hq, hkv, D, e->work, s);
     if (c.moe) {  // one GPU only (no all-reduce); GEMV experts for small B, grouped GEMMs above
-      if (small) hi_gemv(e->att, HD, nullptr, 0.f, w.wo, e->x, H, B, H, HD, ep, s);
-      else hi_gemm(e->att, HD, w.wo, nullptr, e->x, H, B, H, HD, ep, s);
+      if (small) gemv(e->att, HD, nullptr, 0.f, w.wo, e->x, H, B, H, HD, ep, s);
+      else gemm(e->att, HD, w.wo, nullptr, e->x, H, B, H, HD, ep, s);
       moe_rows(e, w, 0, B, s);
       continue;
     }
     if (small) {
-      hi_gemv(e->att, HD, nullptr, 0.f, w.wo, e->x, H, B, H, HD, ep, s);
+      gemv(e->att, HD, nullptr, 0.f, w.wo, e->x, H, B, H, HD, ep, s);
       tp_allreduce(e, e->x, (size_t)B * H, s);
-      if (fuse) hi_gemv(e->x, H, w.mlp_norm, c.eps, w.wgu, e->act, il, B, 2 * il, H, 2, s);
-      else { hi_rmsnorm(e->x, w.mlp_norm, e->xn, B, H, c.eps, s); hi_gemv(e->xn, H, nullptr, 0.f, w.wgu, e->act, il, B, 2 * il, H, 2, s); }
-      hi_gemv(e->act, il, nullptr, 0.f, w.wdown, e->x, H, B, H, il, ep, s);
+      if (fuse) gemv(e->x, H, w.mlp_norm, c.eps, w.wgu, e->act, il, B, 2 * il, H, 2, s);
+      else { hi_rmsnorm(e->x, w.mlp_norm, e->xn, B, H, c.eps, s); gemv(e->xn, H, nullptr, 0.f, w.wgu, e->act, il, B, 2 * il, H, 2, s); }
+      gemv(e->act, il, nullptr, 0.f, w.wdown, e->x, H, B, H, il, ep, s);
     } else {
-      hi_gemm(e->att, HD, w.wo, nullptr, e->x, H, B, H, HD, ep, s);
+      gemm(e->att, HD, w.wo, nullptr, e->x, H, B, H, HD, ep, s);
       tp_allreduce(e, e->x, (size_t)B * H, s);
       hi_rmsnorm(e->x, w.mlp_norm, e->xn, B, H, c.eps, s);
-      hi_gemm(e->xn, H, w.wgu, nullptr, e->act, il, B, 2 * il, H, 2, s);
-      hi_gemm(e->act, il, w.wdown, nullptr, e->x, H, B, H, il, ep, s);
+      gemm(e->xn, H, w.wgu, nullptr, e->act, il, B, 2 * il, H, 2, s);
+      gemm(e->act, il, w.wdown, nullptr, e->x, H, B, H, il, ep, s);
     }
     tp_allreduce(e, e->x, (size_t)B * H, s);
   }
-  if (small && fuse) hi_gemv(e->x, H, e->final_norm, c.eps, e->lm_head, e->logits, vl, B, vl, H, 0, s);
+  if (small && fuse) gemv(e->x, H, e->final_norm, c.eps, e->lm_head, e->logits, vl, B, vl, H, 0, s);
   else {
     hi_rmsnorm(e->x, e->final_norm, e->xn, B, H, c.eps, s);
-    if (small) hi_gemv(e->xn, H, nullptr, 0.f, e->lm_head, e->logits, vl, B, vl, H, 0, s);
-    else hi_gemm(e->xn, H, e->lm_head, nullptr, e->logits, vl, B, vl, H, 0, s);
+    if (small) gemv(e->xn, H, nullptr, 0.f, e->lm_head, e->logits, vl, B, vl, H, 0, s);
+    else gemm(e->xn, H, e->lm_head, nullptr, e->logits, vl, B, vl, H, 0, s);
   }
   greedy(e, e->logits, B, 0, s);
 }
