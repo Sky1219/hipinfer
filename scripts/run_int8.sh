@@ -73,10 +73,10 @@ for m in $MODELS; do
   if want llamacpp && [ -n "${LLAMA_CPP:-}" ]; then
     GGUF_DIR=${GGUF_DIR:-$WEIGHTS_DIR}
     step "$m llama.cpp Q8_0" "$out/run_baselines_q8_0.log" env OUT="$out" ONLY=llamacpp MODEL="$model" LLAMA_CPP="$LLAMA_CPP" \
-      GGUF="$GGUF_DIR/$m-q8_0.gguf" GGUF_TYPE=q8_0 LLAMA_NAME=llamacpp_q8_0 PY="$PY" scripts/run_baselines.sh "$TAG"
+      GGUF="$GGUF_DIR/$m-q8_0.gguf" GGUF_TYPE=q8_0 LLAMA_NAME=llamacpp_q8_0 PY="$PY" bash scripts/run_baselines.sh "$TAG"
     if [ -f "$GGUF_DIR/$m-f16.gguf" ] || [ "${LLAMA_F16:-0}" = 1 ]; then
       step "$m llama.cpp F16" "$out/run_baselines_f16.log" env OUT="$out" ONLY=llamacpp MODEL="$model" LLAMA_CPP="$LLAMA_CPP" \
-        GGUF="$GGUF_DIR/$m-f16.gguf" GGUF_TYPE=f16 LLAMA_NAME=llamacpp_f16 PY="$PY" scripts/run_baselines.sh "$TAG"
+        GGUF="$GGUF_DIR/$m-f16.gguf" GGUF_TYPE=f16 LLAMA_NAME=llamacpp_f16 PY="$PY" bash scripts/run_baselines.sh "$TAG"
     fi
   fi
 done

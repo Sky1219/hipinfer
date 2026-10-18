@@ -18,12 +18,12 @@ ONLY=${ONLY:-gate ppl bench llamacpp}
 export REMOTE_DIR=$R GPUS=0
 case "${1:-}" in
   start)
-    apps=$(NOSYNC=1 scripts/edmonds.sh "mkdir -p $R && nvidia-smi -i 0 --query-compute-apps=pid,process_name,used_memory --format=csv,noheader")
+    apps=$(NOSYNC=1 bash scripts/edmonds.sh "mkdir -p $R && nvidia-smi -i 0 --query-compute-apps=pid,process_name,used_memory --format=csv,noheader")
     if [ -n "$apps" ] && [ "${FORCE:-0}" != 1 ]; then
       echo "GPU 0 is in use, not starting (FORCE=1 to start anyway):"; echo "$apps"; exit 1
     fi
-    if NOSYNC=1 scripts/edmonds.sh "pgrep -f 'run_int8[.]sh 2080ti' >/dev/null"; then echo "a run is already going"; exit 1; fi
-    scripts/edmonds.sh "mkdir -p weights gguf tmp results/2080ti && \
+    if NOSYNC=1 bash scripts/edmonds.sh "pgrep -f 'run_int8[.]sh 2080ti' >/dev/null"; then echo "a run is already going"; exit 1; fi
+    bash scripts/edmonds.sh "mkdir -p weights gguf tmp results/2080ti && \
       (nohup nvidia-smi -i 0 --query-gpu=timestamp,clocks.sm,clocks.mem,temperature.gpu,power.draw,utilization.gpu \
          --format=csv -l 5 > results/2080ti/int8_gpu_log.csv 2>&1 < /dev/null & echo \$! > gpu_log.pid) && \
       nohup env HF_HUB_CACHE=/datastore/hub TMPDIR=$R/tmp PATH=/data/axd200066/envs/baselines/bin:\$PATH \
@@ -33,11 +33,11 @@ case "${1:-}" in
         > run_int8.log 2>&1 < /dev/null & echo started; sleep 5; tail -3 run_int8.log"
     ;;
   status)
-    NOSYNC=1 scripts/edmonds.sh "grep -E '^(== |FAILED|all int8|run_int8 exit)|ALL PASS|FAILURES|GATE|ppl HF' run_int8.log | tail -40; \
+    NOSYNC=1 bash scripts/edmonds.sh "grep -E '^(== |FAILED|all int8|run_int8 exit)|ALL PASS|FAILURES|GATE|ppl HF' run_int8.log | tail -40; \
       nvidia-smi -i 0 --query-gpu=clocks.sm,temperature.gpu,utilization.gpu,memory.used --format=csv"
     ;;
   fetch)
-    NOSYNC=1 scripts/edmonds.sh "tar -cf - results/2080ti run_int8.log" | tar -xf - -C .
+    NOSYNC=1 bash scripts/edmonds.sh "tar -cf - results/2080ti run_int8.log" | tar -xf - -C .
     mv run_int8.log results/2080ti/run_int8.log
     git status --short results/
     ;;
