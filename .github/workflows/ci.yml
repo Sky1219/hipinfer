@@ -1,5 +1,5 @@
-# CPU tests (no GPU: MoE reference engine and layer-diff tool vs HF transformers) and an NVIDIA
-# (nvcc) compile check on every push and pull request.
+# CPU tests (no GPU: MoE reference engine and layer-diff tool vs HF transformers) and compile checks
+# for NVIDIA (nvcc) and AMD (hipcc) on every push and pull request.
 name: CI
 
 on:
@@ -67,3 +67,17 @@ jobs:
           ldd build/libhipinfer.so | grep libnccl.so.2
           if ldd build/libhipinfer.so | grep "not found"; then exit 1; fi
           nm -D --defined-only build/libhipinfer.so | grep -c " T hi_"
+
+  amd-build:
+    name: AMD build (hipcc, gfx90a + gfx942 + gfx1100)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container: rocm/dev-ubuntu-24.04:7.2.4
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install rocWMMA headers
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends rocwmma-dev > /dev/null
+      - name: make hip
+        run: make hip HIPCC=/opt/rocm/bin/hipcc
