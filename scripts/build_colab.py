@@ -30,12 +30,12 @@ def code(text):
             "source": text.strip("\n").splitlines(True)}
 
 
-def source_blob():
+def source_blob(files=FILES):
     buf = io.BytesIO()
     # LF line endings whatever the checkout uses (a Windows checkout may have CRLF), and fixed
     # metadata, so the same sources always give the same notebook
     with gzip.GzipFile(fileobj=buf, mode="wb", mtime=0) as gz, tarfile.open(fileobj=gz, mode="w") as tar:
-        for f in FILES:
+        for f in files:
             data = open(os.path.join(ROOT, f), "rb").read().replace(b"\r\n", b"\n")
             info = tarfile.TarInfo(f)
             info.size, info.mode = len(data), 0o755 if f.endswith(".sh") else 0o644
