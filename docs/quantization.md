@@ -146,6 +146,17 @@ results will show how much that matters on these models.
 **Not measured yet.** The code compiles for sm_75 with CUDA 12.0, and `tests/test_int8_cpu.py`
 passes on CPU. No GPU has run any of it. Everything below is what the run will produce.
 
+Register spills, compared with main's build (`ptxas -warn-spills`, sm_75):
+
+- **fp16 kernels:** unchanged, except `gemv_kernel<4, no norm, QKV>`, which now spills 8 bytes.
+  The engine only uses it when the fused RMSNorm does not fit in shared memory, which none of the
+  tested models hit.
+- **int8 batch-1 GEMVs (MR = 1):** no spills.
+- **int8, other instantiations:** a few spill 4–28 bytes, the same order as their fp16 twins:
+  - QKV GEMVs at 2, 4 and 5 rows and SwiGLU at 6 and 8 rows
+  - the 256×128 mma.sync tile
+  - the 64×128×64 WMMA tile
+
 `scripts/edmonds_int8.sh start` runs `scripts/run_int8.sh` on the 2080 Ti (GPU 0) for TinyLlama,
 Llama-3.2-1B and Llama-3.2-3B, and `scripts/edmonds_int8.sh fetch` brings back:
 
