@@ -66,6 +66,29 @@ if hasattr(lib, "hi_prefill_debug"):  # debug dump (scripts/layer_diff.py); abse
 if hasattr(lib, "hi_decode_debug"):
     lib.hi_decode_debug.argtypes = [P, I, P]
     lib.hi_decode_debug.restype = I
+# Eviction scoring and selection (docs/eviction.md)
+LL = C.c_longlong
+lib.hi_flash_prefill_lse.argtypes = [P, I, P, P, I, P, I, I, I, I, I, I, P, P]
+lib.hi_prefill_scores.argtypes = [P, I, P, I, I, I, I, I, I, P, P, P, I, I, I, P, P]
+lib.hi_decode_attn_track.argtypes = [P, I, P, P, I, P, P, P, I, I, I, I, I, P, P, P, P, P, P, I, P, P]
+lib.hi_select_k.argtypes = [P, LL, LL, I, I, I, I, I, I, P, I, P]
+lib.hi_wfl_work_bytes.argtypes = [I, I, I]
+lib.hi_wfl_work_bytes.restype = C.c_size_t
+lib.hi_wfl_work_offset.argtypes = [I, I, I, I]
+lib.hi_wfl_work_offset.restype = C.c_size_t
+lib.hi_wfl_prune.argtypes = [P, P, LL, LL, P, LL, LL, I, P, P, I, I, I, I, I, F, I, I, I, I, I, P, P, P]
+lib.hi_wfl_prune.restype = I
+lib.hi_set_tracking.argtypes = [P, I, I]
+lib.hi_set_tracking.restype = I
+lib.hi_cache_len.argtypes = [P, I]
+lib.hi_cache_len.restype = I
+lib.hi_scores.argtypes = [P, I, I, I, I, P]
+lib.hi_scores.restype = I
+lib.hi_cache_read.argtypes = [P, I, I, I, P, P]
+lib.hi_cache_read.restype = I
+lib.hi_evict.argtypes = [P, I, I, I, I, I, F, I, I, F, I, IP, C.POINTER(F)]
+lib.hi_evict.restype = I
+EVICT_POLICIES = {"h2o": 0, "wfl": 1, "window": 2}
 
 
 def _s():
@@ -135,6 +158,101 @@ def decode_attn(q, kc, vc, pos, Hq, Hkv, out=None, work=None):
     lib.hi_decode_attn(_p(q), q.stride(0), _p(kc), _p(vc), kc.shape[2], _p(pos), _p(out), out.stride(0),
                        B, Hq, Hkv, D, _p(work), _s())
     return out
+
+
+def flash_prefill_lse(q, kc, vc, T, p0, Hq, Hkv, out=None, lse=None):
+    """flash_prefill that also returns each row's log2-domain log-sum-exp, lse [Hq, T] fp32."""
+    D = kc.shape[-1]
+    if out is None:
+        out = torch.empty(T, Hq * D, dtype=torch.float16, device=q.device)
+    if lse is None:
+        lse = torch.empty(Hq, T, dtype=torch.float32, device=q.device)
+    lib.hi_flash_prefill_lse(_p(q), q.stride(0), _p(kc), _p(vc), kc.shape[1], _p(out), out.stride(0), T, p0, Hq, Hkv, D,
+                             _p(lse), _s())
+    return out, lse
+
+
+def prefill_scores(q, kc, T, p0, Hq, Hkv, lse, score, win=None, win_r0=None, win_off=0, wscore=None):
+    """Add each key's attention mass from the T rows to score [Hkv, max_seq] fp32 (second prefill
+    pass; lse from flash_prefill_lse). Rows >= win_r0 are window rows: their softmax rows go to
+    win [Hq, W, max_seq] fp16 (row win_off + row - win_r0) and their mass is added to wscore."""
+    D = kc.shape[-1]
+    W = win.shape[1] if win is not None else 0
+    if win_r0 is None:
+        win_r0 = T
+    lib.hi_prefill_scores(_p(q), q.stride(0), _p(kc), kc.shape[1], T, p0, Hq, Hkv, D, _p(lse), _p(score), _p(win), win_r0,
+                          win_off, W, _p(wscore), _s())
+
+
+def decode_attn_track(q, kc, vc, pos, Hq, Hkv, score, shift=None, out=None, work=None, lg=None, lse=None, win=None,
+                      win_row=None, wscore=None):
+    """decode_attn over pos[b] - shift[b] + 1 cached keys, adding every key's attention weight
+    (summed over the query heads of its kv head) to score [B, Hkv, max_seq] fp32. Returns
+    (out, lg [B, Hq, max_seq] log2-domain logits, lse [B, Hq] log2-domain). Window: win_row [B]
+    int32 (-1 none); win [B, Hq, W, max_seq] fp16; wscore [B, Hkv, max_seq]."""
+    B, D, S = q.shape[0], kc.shape[-1], kc.shape[2]
+    dev = q.device
+    if out is None:
+        out = torch.empty(B, Hq * D, dtype=torch.float16, device=dev)
+    if work is None:
+        work = torch.zeros(lib.hi_decode_work_bytes(B, Hq, Hkv, D), dtype=torch.uint8, device=dev)
+    if lg is None:
+        lg = torch.empty(B, Hq, S, dtype=torch.float32, device=dev)
+    if lse is None:
+        lse = torch.empty(B, Hq, dtype=torch.float32, device=dev)
+    W = win.shape[2] if win is not None else 0
+    lib.hi_decode_attn_track(_p(q), q.stride(0), _p(kc), _p(vc), S, _p(pos), _p(shift), _p(out), out.stride(0), B, Hq, Hkv,
+                             D, _p(work), _p(lg), _p(lse), _p(score), _p(win), _p(win_row), W, _p(wscore), _s())
+    return out, lg, lse
+
+
+def select_k(score, lo, hi, k, largest=True, flags=None):
+    """score [P, n] fp32 -> flags [P, n] uint8 with 1 at the k slots of [lo, hi) with the largest
+    (or smallest) score per row; ties go to the lower slot."""
+    Pn, n = score.shape
+    if flags is None:
+        flags = torch.zeros(Pn, n, dtype=torch.uint8, device=score.device)
+    lib.hi_select_k(_p(score), score.stride(0), 0, 1, Pn, lo, hi, k, int(largest), _p(flags), flags.stride(0), _s())
+    return flags
+
+
+WFL_WORK = ("kn", "vn", "w", "best", "sec", "acc", "arg", "arg2", "hit", "rl", "rcount", "kept")
+
+
+def wfl_prune(k, v, score, status, m, mix=0.5, step=8, rounds=0, power=1, incremental=True, max_rounds=-1, gidx=None,
+              work=None):
+    """policies.wfl_prune on the GPU. k, v [P, n, D] fp16 (one problem per row; slot i of problem p
+    is k[p, gidx[p, i]] when gidx [P, n] int32 is given), score [P, n] fp32 (H2O weights, normalized
+    inside), status [P, n] uint8 (0 candidate, 1 held; every problem the same number of
+    candidates). Returns (kept candidates [P, n] bool, rounds, work)."""
+    Pn, L, D = k.shape
+    n = status.shape[1]
+    dev = k.device
+    ncand = int((status == 0).sum(1)[0])
+    if gidx is None:
+        gidx = torch.arange(n, dtype=torch.int32, device=dev).expand(Pn, n).contiguous()
+    if work is None:
+        work = torch.empty(lib.hi_wfl_work_bytes(Pn, n, D), dtype=torch.uint8, device=dev)
+    out = torch.zeros(Pn, n, dtype=torch.uint8, device=dev)
+    r = lib.hi_wfl_prune(_p(k), _p(v), L, 0, _p(score), score.stride(0), 0, 1, _p(gidx), _p(status), Pn, n, D,
+                         ncand, m, mix, step, rounds, power, int(incremental), max_rounds, _p(out), _p(work), _s())
+    if r < 0:
+        raise ValueError("hi_wfl_prune: bad arguments (see stderr)")
+    return out.bool(), r, work
+
+
+def wfl_work_view(work, P, n, D, name):
+    """A named array of the WFL workspace (WFL_WORK) as a tensor."""
+    i = WFL_WORK.index(name)
+    off = lib.hi_wfl_work_offset(P, n, D, i)
+    if name in ("kn", "vn"):
+        return work[off:off + P * n * D * 4].view(torch.float32).view(P, n, D)
+    if name == "rcount":
+        return work[off:off + P * 4].view(torch.int32)
+    if name == "kept":
+        return work[off:off + P * n].view(P, n)
+    dt = torch.float32 if name in ("w", "best", "sec", "acc") else torch.int32
+    return work[off:off + P * n * 4].view(dt).view(P, n)
 
 
 def moe_router(xn, Wr, k, flags):
@@ -288,6 +406,40 @@ class Engine:
         B = len(tokens)
         assert len(positions) == B
         self._ok(lib.hi_set_state(self.h, B, (C.c_int * B)(*tokens), (C.c_int * B)(*positions)), "set_state")
+
+    # ---- eviction (docs/eviction.md); one GPU only
+    def set_tracking(self, on=True, window=0):
+        """Eviction scoring on / off (off by default). window > 0 also keeps each key's mass from
+        the last `window` prompt tokens. Scores start at the next fresh prefill (p0 = 0)."""
+        self._ok(lib.hi_set_tracking(self.h, int(on), window), "set_tracking")
+
+    def cache_len(self, slot):
+        return self._ok(lib.hi_cache_len(self.h, slot), "cache_len")
+
+    def scores(self, layer, slot, n=None, window=False):
+        """[kv_heads, n] fp32 (on the GPU): H2O scores (or window scores) of cache indices [0, n)."""
+        n = self.cache_len(slot) if n is None else n
+        out = torch.empty(self.kv_heads, n, dtype=torch.float32, device=self.device)
+        self._ok(lib.hi_scores(self.h, int(window), layer, slot, n, C.c_void_p(out.data_ptr())), "scores")
+        return out
+
+    def cache_read(self, layer, slot, n=None):
+        """(k, v), each [kv_heads, n, head_dim] fp16 on the GPU, of cache indices [0, n)."""
+        n = self.cache_len(slot) if n is None else n
+        k = torch.empty(self.kv_heads, n, self.head_dim, dtype=torch.float16, device=self.device)
+        v = torch.empty_like(k)
+        self._ok(lib.hi_cache_read(self.h, layer, slot, n, C.c_void_p(k.data_ptr()), C.c_void_p(v.data_ptr())), "cache_read")
+        return k, v
+
+    def evict(self, slot, capacity, policy="h2o", sink=4, recent=0, mix=0.5, step=8, rounds=0, pool=0.0, power=1):
+        """Evict `slot` down to `capacity` cached slots per (layer, kv head); see hi_evict. Returns
+        (evicted per head, kept [layers, kv_heads, capacity] old cache indices, {select_ms, compact_ms})."""
+        kept = (C.c_int * (self.layers * self.kv_heads * capacity))()
+        ms = (C.c_float * 2)()
+        r = self._ok(lib.hi_evict(self.h, slot, capacity, EVICT_POLICIES[policy], sink, recent, mix, step, rounds, pool,
+                                  power, kept, ms), "evict")
+        kt = torch.tensor(list(kept), dtype=torch.int64).view(self.layers, self.kv_heads, capacity) if r > 0 else None
+        return r, kt, {"select_ms": ms[0], "compact_ms": ms[1]}
 
     def generate(self, prompt, n_new, graph=True):
         """Greedy: returns n_new tokens (first comes from prefill)."""
