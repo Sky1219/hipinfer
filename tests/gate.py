@@ -16,6 +16,12 @@ near-tie. Any router difference with a larger margin fails. docs/moe-design.md h
 
 python tests/gate.py --model unsloth/Llama-3.2-3B --weights llama32-3b.bin [--new 128] [--hf-first] [--out gate.json]
 
+int8 weights (weight-file version 4, docs/quantization.md) compute a different model, so against
+fp16 HF (--ref fp16, the default) their greedy tokens may diverge: each divergence is logged with
+its step and HF's gap and accepted, and the summary reports how many tokens matched before it.
+--ref int8 instead runs HF on the same int8 round-trip weights (scripts/export.py
+fake_quantize_hf), which the engine must then match exactly like an fp16 engine matches fp16 HF.
+
 --hf-first runs all HF generations first, keeps tokens, top-2 gaps and the prefill logits on the host,
 frees HF, then loads the engine: for models whose weights fit on the GPU once but not twice. The
 comparison is the same as without the flag, except that the MoE router check needs the HF model
@@ -59,8 +65,9 @@ def hf_greedy(model, ids, n):
     return out, gaps, first_logits
 
 
-def compare(name, got, ref, gaps, tie, log, explain=None):
-    """explain(step) -> (ok, info): the MoE router check, tried when the token gap is not a near-tie."""
+def compare(name, got, ref, gaps, tie, log, explain=None, allow=False):
+    """explain(step) -> (ok, info): the MoE router check, tried when the token gap is not a near-tie.
+    allow: a divergence that is not a near-tie is logged and accepted (int8 engine vs fp16 HF)."""
     for i, (a, b) in enumerate(zip(got, ref)):
         if a != b:
             ok = gaps[i] < tie
@@ -70,12 +77,15 @@ def compare(name, got, ref, gaps, tie, log, explain=None):
                 ok, info = explain(i)
                 entry["router_check"] = info
                 verdict = f"router near-tie, OK ({info['reason']})" if ok else f"MISMATCH (router check: {info['reason']})"
+            if not ok and allow:
+                ok = entry["allowed_divergence"] = True
+                verdict = "int8 weights vs the fp16 reference: allowed"
             print(f"  {name}: diverges at step {i} (hf gap {gaps[i]:.4f}) -> {verdict}")
             entry["accepted"] = ok
             log.append(entry)
             return ok
     print(f"  {name}: {len(ref)}/{len(ref)} tokens identical")
-    log.append({"run": name, "identical": True})
+    log.append({"run": name, "identical": True, "step": len(ref)})
     return True
 
 
@@ -115,11 +125,18 @@ def main():
     ap.add_argument("--router-tie", type=float, default=0.01, help="MoE: router k-th vs (k+1)-th logit margin "
                     "below which the engine's expert set may differ from HF's (see the docstring)")
     ap.add_argument("--hf-first", action="store_true", help="run HF generation first, free it, then load the engine")
+    ap.add_argument("--ref", choices=["fp16", "int8"], default="fp16",
+                    help="HF reference weights: fp16 (an int8 engine may then diverge), or the exporter's int8 round "
+                    "trip (fake-quantized HF; the gate is then as strict as for fp16)")
     ap.add_argument("--out", default=None, help="write a JSON summary here")
     a = ap.parse_args()
 
     tok = AutoTokenizer.from_pretrained(a.model)
-    model = AutoModelForCausalLM.from_pretrained(a.model, dtype=torch.float16).cuda().eval()
+    model = AutoModelForCausalLM.from_pretrained(a.model, dtype=torch.float16)
+    if a.ref == "int8":
+        from export import fake_quantize_hf
+        fake_quantize_hf(model)
+    model = model.cuda().eval()
     prompts = [tok(p).input_ids for p in PROMPTS]
     # one long prompt exercising multi-tile attention and chunked prefill (max_prefill=512)
     prompts.append(tok(" ".join(PROMPTS * 12)).input_ids[:700])
@@ -133,7 +150,13 @@ def main():
         print(f"HF phase done; free GPU memory {torch.cuda.mem_get_info()[0] / 2**30:.1f} GB", flush=True)
     eng = hi.Engine(a.weights, max_batch=8, max_seq=1024, max_prefill=512)
     print(f"{a.model}: layers {eng.layers} hidden {eng.hidden} heads {eng.heads}/{eng.kv_heads} head_dim {eng.head_dim} "
-          f"vocab {eng.vocab} tied={eng.tied} qkv_bias={eng.qkv_bias}")
+          f"vocab {eng.vocab} tied={eng.tied} qkv_bias={eng.qkv_bias} weights={'int8' if eng.quant else 'fp16'} "
+          f"HF reference={a.ref}")
+    if not eng.quant and a.ref == "int8":
+        raise SystemExit("--ref int8 needs an int8 (version 4) weight file")
+    allow = bool(eng.quant) and a.ref == "fp16"
+    if allow:
+        print("int8 engine vs fp16 HF: divergences are reported, not failed")
     moe = eng.n_experts > 0 and not hf_refs  # the router check needs the HF model
     if eng.n_experts and hf_refs:
         print("MoE: --hf-first frees the HF model, so the router near-tie check is skipped")
@@ -155,7 +178,7 @@ def main():
                 d = (eng.logits(1)[0].float().cpu() - ref_logits.float()).abs().max().item()
                 logit_diffs.append(d)
                 print(f"prompt {i} (len {len(ids)}): prefill logits max |diff| = {d:.4f}")
-            ok &= compare(f"prompt {i} single graph={graph}", got, ref, gaps, a.tie, log, explainer([i], 0, got))
+            ok &= compare(f"prompt {i} single graph={graph}", got, ref, gaps, a.tie, log, explainer([i], 0, got), allow)
 
     # batched decode: slots 0..B-1 hold different prompts at different positions
     B = 6
@@ -163,7 +186,7 @@ def main():
     eng.decode(B, a.new - 1)
     gots = [[firsts[b]] + eng.history(b, len(prompts[b]) + 1, a.new - 1) for b in range(B)]
     for b, got in enumerate(gots):
-        ok &= compare(f"batched B={B} slot {b}", got, refs[b][0], refs[b][1], a.tie, log, explainer(range(B), b, got))
+        ok &= compare(f"batched B={B} slot {b}", got, refs[b][0], refs[b][1], a.tie, log, explainer(range(B), b, got), allow)
 
     # argument checks: out-of-range slots, tokens, batch sizes and positions raise instead of
     # writing past the KV cache
@@ -183,13 +206,19 @@ def main():
     eng.close()
     n_ident = sum(1 for r in log if r["identical"])
     n_router = sum(1 for r in log if r.get("router_check", {}).get("explained"))
+    n_allowed = sum(1 for r in log if r.get("allowed_divergence"))
+    prefix = [r["step"] for r in log]  # tokens identical to HF before the first difference
     print(f"\n{n_ident}/{len(log)} runs token-identical, max prefill-logit |diff| {max(logit_diffs):.4f}"
-          + (f", {n_router} accepted by the router near-tie check" if n_router else ""))
+          + (f", {n_router} accepted by the router near-tie check" if n_router else "")
+          + (f", {n_allowed} allowed divergences (int8 vs fp16); tokens matched before the first difference: "
+             f"mean {sum(prefix) / len(prefix):.1f}, min {min(prefix)} of {a.new}" if allow else ""))
     print("GATE PASS" if ok else "GATE FAIL")
     if a.out:
         os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True)
         json.dump({"model": a.model, "gpu": torch.cuda.get_device_name(), "new_tokens": a.new, "pass": ok,
                    "identical": n_ident, "runs": len(log), "router_accepted": n_router, "router_tie": a.router_tie, "max_prefill_logit_diff": max(logit_diffs),
+                   "engine_weights": "int8" if eng.quant else "fp16", "hf_ref": a.ref, "allow_divergence": allow,
+                   "allowed_divergences": n_allowed, "matched_prefix": prefix,
                    "prompt_lens": [len(p) for p in prompts], "log": log}, open(a.out, "w"), indent=1)
     sys.exit(0 if ok else 1)
 

@@ -12,6 +12,12 @@ IP = C.POINTER(C.c_int)
 lib.hi_rmsnorm.argtypes = [P, P, P, I, I, F, P]
 lib.hi_gemv.argtypes = [P, I, P, F, P, P, I, I, I, I, I, P]
 lib.hi_gemv_qkv_rope.argtypes = [P, I, P, F, P, P, P, I, I, I, I, I, I, P, P, P, P, I, P]
+if hasattr(lib, "hi_gemv_w8"):  # int8 weights (W8A16); absent from builds that predate them
+    lib.hi_gemv_w8.argtypes = [P, I, P, F, P, P, P, I, I, I, I, I, P]
+    lib.hi_gemv_qkv_rope_w8.argtypes = [P, I, P, F, P, P, P, P, I, I, I, I, I, I, P, P, P, P, I, P]
+    lib.hi_gemm_w8.argtypes = [P, I, P, P, P, P, I, I, I, I, I, P]
+    lib.hi_weight_quant.argtypes = [P]
+    lib.hi_weight_quant.restype = I
 lib.hi_decode_work_bytes.argtypes = [I, I, I, I]
 lib.hi_decode_work_bytes.restype = C.c_size_t
 lib.hi_gemm_force_splits.argtypes = [I]
@@ -82,29 +88,48 @@ def rmsnorm(x, w, eps=1e-5):
     return y
 
 
-def gemv(x, W, out=None, normw=None, eps=1e-5, epi=0):
+# W [N, K]: fp16, or int8 with `scales` [N] fp16 (one per output row: W ~ W_int8 * scales[:, None]).
+def _w8(W, scales):
+    if scales is None:
+        assert W.dtype == torch.float16
+        return False
+    assert W.dtype == torch.int8 and scales.dtype == torch.float16 and scales.shape == (W.shape[0],)
+    return True
+
+
+def gemv(x, W, out=None, normw=None, eps=1e-5, epi=0, scales=None):
     M, K = x.shape
     N = W.shape[0]
     if out is None:
         out = torch.empty(M, N // 2 if epi == 2 else N, dtype=x.dtype, device=x.device)
-    lib.hi_gemv(_p(x), x.stride(0), _p(normw), eps, _p(W), _p(out), out.stride(0), M, N, K, epi, _s())
+    if _w8(W, scales):
+        lib.hi_gemv_w8(_p(x), x.stride(0), _p(normw), eps, _p(W), _p(scales), _p(out), out.stride(0), M, N, K, epi, _s())
+    else:
+        lib.hi_gemv(_p(x), x.stride(0), _p(normw), eps, _p(W), _p(out), out.stride(0), M, N, K, epi, _s())
     return out
 
 
-def gemv_qkv_rope(x, W, normw, Hq, Hkv, cs, pos, kc, vc, out, bias=None, eps=1e-5):
+def gemv_qkv_rope(x, W, normw, Hq, Hkv, cs, pos, kc, vc, out, bias=None, eps=1e-5, scales=None):
     """Fused RMSNorm + QKV GEMV (+ bias) + RoPE + KV-cache write. Row m -> cache slot m at pos[m]."""
     D = kc.shape[-1]
-    lib.hi_gemv_qkv_rope(_p(x), x.stride(0), _p(normw), eps, _p(W), _p(bias), _p(out), out.stride(0), x.shape[0],
-                         x.shape[1], Hq, Hkv, D, _p(cs), _p(pos), _p(kc), _p(vc), kc.shape[2], _s())
+    if _w8(W, scales):
+        lib.hi_gemv_qkv_rope_w8(_p(x), x.stride(0), _p(normw), eps, _p(W), _p(scales), _p(bias), _p(out), out.stride(0),
+                                x.shape[0], x.shape[1], Hq, Hkv, D, _p(cs), _p(pos), _p(kc), _p(vc), kc.shape[2], _s())
+    else:
+        lib.hi_gemv_qkv_rope(_p(x), x.stride(0), _p(normw), eps, _p(W), _p(bias), _p(out), out.stride(0), x.shape[0],
+                             x.shape[1], Hq, Hkv, D, _p(cs), _p(pos), _p(kc), _p(vc), kc.shape[2], _s())
     return out
 
 
-def gemm(A, W, out=None, epi=0, bias=None):
+def gemm(A, W, out=None, epi=0, bias=None, scales=None):
     M, K = A.shape
     N = W.shape[0]
     if out is None:
         out = torch.empty(M, N // 2 if epi == 2 else N, dtype=A.dtype, device=A.device)
-    lib.hi_gemm(_p(A), A.stride(0), _p(W), _p(bias), _p(out), out.stride(0), M, N, K, epi, _s())
+    if _w8(W, scales):
+        lib.hi_gemm_w8(_p(A), A.stride(0), _p(W), _p(scales), _p(bias), _p(out), out.stride(0), M, N, K, epi, _s())
+    else:
+        lib.hi_gemm(_p(A), A.stride(0), _p(W), _p(bias), _p(out), out.stride(0), M, N, K, epi, _s())
     return out
 
 
@@ -167,11 +192,11 @@ def read_config(path):
     with open(path, "rb") as f:
         raw = f.read(128)
     h = struct.unpack("<10i2f2i", raw[:56])
-    if h[0] != 0x48495046 or h[1] not in (2, 3):
-        raise ValueError(f"{path}: not a version-2/3 hipinfer weight file")
+    if h[0] != 0x48495046 or h[1] not in (2, 3, 4):
+        raise ValueError(f"{path}: not a version-2/3/4 hipinfer weight file")
     keys = ["vocab", "hidden", "inter", "layers", "heads", "kv_heads", "head_dim", "max_pos"]
     cfg = dict(zip(keys, h[2:10]), eps=h[10], tied=bool(h[12] & 1), qkv_bias=bool(h[12] & 2), window=h[13],
-               moe=bool(h[12] & 4))
+               moe=bool(h[12] & 4), quant=struct.unpack("<i", raw[56:60])[0] if h[1] == 4 else 0)
     if h[1] == 3:  # MoE (inter is per expert)
         cfg["n_experts"], cfg["top_k"], moe_flags, cfg["moe_scale"] = struct.unpack("<3if", raw[64:80])
     return cfg
@@ -207,6 +232,8 @@ class Engine:
         moe = (C.c_int * 3)()
         lib.hi_moe_config(self.h, moe)
         self.n_experts, self.top_k, self.moe_flags = list(moe)  # zeros for a dense model
+        # projection weights: 0 fp16, 1 int8 with fp16 row scales (weight-file version 4)
+        self.quant = lib.hi_weight_quant(self.h) if hasattr(lib, "hi_weight_quant") else 0
         self.max_seq, self.max_batch, self.max_prefill = max_seq, max_batch, max_prefill
         self.weight_bytes = lib.hi_weight_bytes(self.h)
         self.kv_bytes_per_token = 2 * self.layers * self.kv_heads * self.head_dim * 2  # whole model, all GPUs

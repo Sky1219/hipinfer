@@ -6,6 +6,10 @@ mean KL(HF || hipinfer) and the largest logit difference.
 
 python tests/ppl.py --model unsloth/Llama-3.2-1B --weights llama32-1b.bin [--windows 16] [--seq 1024] [--out ppl.json]
 
+int8 weights (version 4): with the default --ref fp16 the numbers are the quantization's cost (perplexity
+change and KL against fp16 HF); --ref int8 runs HF on the exporter's int8 round-trip weights
+(fake-quantized), which isolates the engine's own error from the quantization error.
+
 With --tp N the engine is sharded over N GPUs and HF runs first (device_map="auto" over the same
 GPUs), its logits parked in host memory, so a model too big for one GPU can be checked.
 --hf-first does the same on one GPU (HF, logits to the host, HF freed, then the engine), for models whose
@@ -41,8 +45,17 @@ def main():
     ap.add_argument("--windows", type=int, default=16, help="number of non-overlapping windows (0 = whole test set)")
     ap.add_argument("--tp", type=int, default=1, help="shard the engine over this many GPUs")
     ap.add_argument("--hf-first", action="store_true", help="tp=1: run HF first, park its logits on the host, free it, then load the engine")
+    ap.add_argument("--ref", choices=["fp16", "int8"], default="fp16",
+                    help="HF reference weights: fp16, or the exporter's int8 round trip (fake-quantized)")
     ap.add_argument("--out", default=None)
     a = ap.parse_args()
+
+    def hf_model(**kw):
+        m = AutoModelForCausalLM.from_pretrained(a.model, dtype=torch.float16, **kw)
+        if a.ref == "int8":
+            from export import fake_quantize_hf
+            fake_quantize_hf(m)
+        return m
 
     tok = AutoTokenizer.from_pretrained(a.model)
     ids = wikitext_ids(tok)
@@ -57,9 +70,9 @@ def main():
     phased = a.tp > 1 or a.hf_first
     if phased:  # two phases: HF over all visible GPUs first, logits kept on the host
         if a.tp > 1:
-            model = AutoModelForCausalLM.from_pretrained(a.model, dtype=torch.float16, device_map="auto").eval()
+            model = hf_model(device_map="auto").eval()
         else:
-            model = AutoModelForCausalLM.from_pretrained(a.model, dtype=torch.float16).cuda().eval()
+            model = hf_model().cuda().eval()
         dev0 = next(model.parameters()).device
         with torch.no_grad():
             hf_logits = [model(torch.tensor(c, device=dev0)[None], use_cache=False).logits[0].cpu() for c in windows]
@@ -70,7 +83,7 @@ def main():
         print("free GPU memory before the engine:", [f"{torch.cuda.mem_get_info(d)[0] / 2**30:.1f} GB"
                                                     for d in range(a.tp)], flush=True)
     else:
-        model = AutoModelForCausalLM.from_pretrained(a.model, dtype=torch.float16).cuda().eval()
+        model = hf_model().cuda().eval()
     eng = hi.Engine(a.weights, max_batch=1, max_seq=a.seq + 8, max_prefill=a.seq, tp=a.tp)
     nll_hf = nll_hi = 0.0
     n_tok = agree = 0
@@ -102,7 +115,9 @@ def main():
               f"top-1 agree {100 * agree / n_tok:.3f}%  mean KL {kl_sum / n_tok:.2e}  max |dlogit| {max_diff:.3f}", flush=True)
     eng.close()
     out = {"model": a.model, "gpu": torch.cuda.get_device_name(), "tp": a.tp, "seq": a.seq, "windows": n_win, "tokens": n_tok,
+           "engine_weights": "int8" if eng.quant else "fp16", "hf_ref": a.ref,
            "ppl_hf": math.exp(nll_hf / n_tok), "ppl_hipinfer": math.exp(nll_hi / n_tok),
+           "ppl_change_pct": 100 * (math.exp((nll_hi - nll_hf) / n_tok) - 1),
            "top1_agreement": agree / n_tok, "mean_kl_hf_to_hipinfer": kl_sum / n_tok, "max_logit_diff": max_diff}
     print(json.dumps(out, indent=1))
     if a.out:

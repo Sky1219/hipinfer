@@ -1,6 +1,6 @@
 """Strong baselines for the hipinfer end-to-end numbers (TinyLlama-1.1B, fp16, batch 1, greedy).
 
-  llamacpp       llama.cpp `llama-bench` on an F16 GGUF (no quantization): prefill (pp) at 128/512/2000
+  llamacpp       llama.cpp `llama-bench` on a GGUF (F16, or Q8_0 next to hipinfer's int8 weights): prefill (pp) at 128/512/2000
                  tokens and decode (tg256) at context depth 128/1024. Best of flash-attn on/off and
                  ubatch 512/2048 is reported.
   torch_compile  gpt-fast-style hand-written Llama forward with a static KV cache. Decode step is

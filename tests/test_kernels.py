@@ -353,6 +353,123 @@ def test_decode_work_reuse():
     report("decode attn, one work buffer for B=8,1,4,16,2", worst)
 
 
+def q8(W):
+    """int8 weights + fp16 row scales of W (the exporter's round-to-nearest) and the fp16 weights the
+    int8 GEMMs compute with, fp16(q * s)."""
+    from export import dequantize_rows, quantize_rows
+    q, s = quantize_rows(W)
+    return q, s, dequantize_rows(q, s)
+
+
+def test_quantize_rows():
+    """The exporter's int8 round trip: every row's largest |w| maps to +-127 and every weight is
+    within half a step (plus the fp16 rounding of the scale) of q * s; zero rows stay zero."""
+    W = torch.randn(300, 2048, device=dev, dtype=torch.float16) * 0.02
+    W[7] = 0
+    W[9, 5] = 3.0  # an outlier row: its other weights round to few levels
+    q, s, wd = q8(W)
+    nz = W.float().abs().amax(1) > 0
+    peak = q.abs().amax(1)
+    ok = bool((peak[nz] == 127).all()) and int(peak[~nz].max()) == 0 and int(q.abs().max()) <= 127
+    print(f"{'OK  ' if ok else 'FAIL'} int8 rows: max |q| = 127 per non-zero row, zero rows stay zero")
+    if not ok:
+        FAILS.append("int8 quantize peaks")
+    step = s.float()[:, None]
+    excess = ((W.float() - q.float() * step).abs() - step * (0.5 + 1e-3)).max().item()
+    report("int8 round-to-nearest: |w - q s| <= s / 2", excess)
+
+
+def test_gemv_int8():
+    """int8-weight GEMV against fp32 math on the dequantized weights q * s (exact in fp32), every
+    epilogue, fused norm and the fused QKV + RoPE + cache path."""
+    for H, I in [(2048, 5632), (896, 4864), (3072, 8192)]:
+        for M in [1, 3, 8, 11]:
+            x = torch.randn(M, H, device=dev, dtype=torch.float16)
+            q, s, _ = q8(torch.randn(2560, H, device=dev, dtype=torch.float16) * 0.02)
+            Wf = q.float() * s.float()[:, None]
+            check(f"gemv int8 M={M} N=2560 K={H}", hi.gemv(x, q, scales=s), x.float() @ Wf.T, 2e-3, 2e-3)
+            nw = torch.rand(H, device=dev, dtype=torch.float16) + 0.5
+            ref = hf_rmsnorm(x, nw, 1e-5).float() @ Wf.T
+            check(f"gemv int8+rmsnorm M={M} K={H}", hi.gemv(x, q, normw=nw, scales=s), ref, 3e-3, 3e-3)
+            res = torch.randn(M, H, device=dev, dtype=torch.float16)
+            q2, s2, _ = q8(torch.randn(H, I, device=dev, dtype=torch.float16) * 0.02)
+            a = torch.randn(M, I, device=dev, dtype=torch.float16)
+            out = res.clone()
+            hi.gemv(a, q2, out=out, epi=1, scales=s2)
+            ref = res + (a.float() @ (q2.float() * s2.float()[:, None]).T).half()
+            check(f"gemv int8+residual M={M} K={I}", out, ref, 4e-3, 2e-3)
+            qgu, sgu, _ = q8(interleave(torch.randn(I, H, device=dev, dtype=torch.float16) * 0.02,
+                                        torch.randn(I, H, device=dev, dtype=torch.float16) * 0.02))
+            y = x.float() @ (qgu.float() * sgu.float()[:, None]).T  # interleaved columns
+            g = y.view(M, I // 16, 2, 16)[:, :, 0].reshape(M, I)
+            u = y.view(M, I // 16, 2, 16)[:, :, 1].reshape(M, I)
+            ref = F.silu(g.half()) * u.half()
+            check(f"gemv int8+swiglu M={M} I={I}", hi.gemv(x, qgu, epi=2, scales=sgu), ref, 3e-3, 3e-3)
+    for D, Hq, Hkv, H, bias in [(64, 32, 4, 2048, False), (128, 24, 8, 3072, False), (64, 14, 2, 896, True)]:
+        S = 512
+        cs = rope_table(S, D)
+        for M in [1, 3, 8]:
+            x = torch.randn(M, H, device=dev, dtype=torch.float16)
+            q, s, _ = q8(torch.randn((Hq + 2 * Hkv) * D, H, device=dev, dtype=torch.float16) * 0.02)
+            b = torch.randn((Hq + 2 * Hkv) * D, device=dev, dtype=torch.float16) if bias else None
+            nw = (torch.rand(H, device=dev) + 0.5).half()
+            pos = torch.randint(0, S, (M,), device=dev, dtype=torch.int32)
+            qkv = hf_rmsnorm(x, nw, 1e-5).float() @ (q.float() * s.float()[:, None]).T
+            qkv = (qkv + (b.float() if bias else 0)).half()
+            kc_r = torch.zeros(M, Hkv, S, D, device=dev, dtype=torch.float16)
+            vc_r = torch.zeros_like(kc_r)
+            hi.rope_cache(qkv, Hq, Hkv, cs, kc_r, vc_r, pos=pos)
+            out = torch.zeros_like(qkv)
+            kc, vc = torch.zeros_like(kc_r), torch.zeros_like(vc_r)
+            hi.gemv_qkv_rope(x, q, nw, Hq, Hkv, cs, pos, kc, vc, out, bias=b, scales=s)
+            tag = f"D={D} G={Hq // Hkv}{' bias' if bias else ''} M={M}"
+            check(f"int8 fused qkv+rope+cache {tag}: q", out[:, :Hq * D], qkv[:, :Hq * D], 2e-2, 2e-3)
+            check(f"int8 fused qkv+rope+cache {tag}: k cache", kc, kc_r, 2e-2, 2e-3)
+            check(f"int8 fused qkv+rope+cache {tag}: v cache", vc, vc_r, 2e-2, 2e-3)
+
+
+def test_gemm_int8():
+    """int8-weight GEMM (tiles dequantized to fp16(q * s) in shared memory) against fp32 math on
+    those fp16 weights: every tile config (skinny ones are not int8-capable and fall back), split-K,
+    every epilogue, partial tiles."""
+    H, I = 2048, 5632
+    shapes = [(128, 2560, 2048), (77, 2048, 5632), (512, 32000, 2048), (300, 1152, 896), (2000, 3072, 8192), (9, 2560, 2048)]
+    weights = {(N, K): q8(torch.randn(N, K, device=dev, dtype=torch.float16) * 0.02) for _, N, K in shapes}
+    qgu, sgu, wgu = q8(interleave(torch.randn(I, H, device=dev, dtype=torch.float16) * 0.02,
+                                  torch.randn(I, H, device=dev, dtype=torch.float16) * 0.02))
+    qd, sd, wd = q8(torch.randn(H, I, device=dev, dtype=torch.float16) * 0.02)
+    b = torch.randn(2560, device=dev, dtype=torch.float16)
+    for cfg in [-1] + list(range(hi.lib.hi_gemm_num_configs())):
+        hi.lib.hi_gemm_force_config(cfg)
+        for M, N, K in shapes:
+            q, s, w = weights[(N, K)]
+            A = torch.randn(M, K, device=dev, dtype=torch.float16)
+            check(f"gemm int8 cfg={cfg} M={M} N={N} K={K}", hi.gemm(A, q, scales=s), A.float() @ w.float().T, 3e-3, 3e-3)
+        M = 200
+        A = torch.randn(M, H, device=dev, dtype=torch.float16)
+        q, s, w = weights[(2560, 2048)]
+        check(f"gemm int8+bias cfg={cfg} M={M}", hi.gemm(A, q, bias=b, scales=s), A.float() @ w.float().T + b.float(), 3e-3, 3e-3)
+        y = A.float() @ wgu.float().T
+        ref = F.silu(y.view(M, I // 16, 2, 16)[:, :, 0].reshape(M, I).half()) * y.view(M, I // 16, 2, 16)[:, :, 1].reshape(M, I).half()
+        check(f"gemm int8+swiglu cfg={cfg} M={M}", hi.gemm(A, qgu, epi=2, scales=sgu), ref, 4e-3, 4e-3)
+        res = torch.randn(M, H, device=dev, dtype=torch.float16)
+        a = torch.randn(M, I, device=dev, dtype=torch.float16)
+        out = res.clone()
+        hi.gemm(a, qd, out=out, epi=1, scales=sd)
+        check(f"gemm int8+residual cfg={cfg}", out, res + (a.float() @ wd.float().T).half(), 4e-3, 2e-3)
+    hi.lib.hi_gemm_force_config(-1)
+    for sp in [2, 4]:  # split-K (batched-decode shapes)
+        hi.lib.hi_gemm_force_splits(sp)
+        for M in [9, 64]:
+            q, s, w = weights[(2560, 2048)]
+            x = torch.randn(M, H, device=dev, dtype=torch.float16)
+            check(f"gemm int8 split-K={sp} M={M} +bias", hi.gemm(x, q, bias=b, scales=s), x.float() @ w.float().T + b.float(), 3e-3, 3e-3)
+            y = x.float() @ wgu.float().T
+            ref = F.silu(y.view(M, I // 16, 2, 16)[:, :, 0].reshape(M, I).half()) * y.view(M, I // 16, 2, 16)[:, :, 1].reshape(M, I).half()
+            check(f"gemm int8 split-K={sp} M={M} +swiglu", hi.gemm(x, qgu, epi=2, scales=sgu), ref, 4e-3, 4e-3)
+    hi.lib.hi_gemm_force_splits(-1)
+
+
 def test_moe():
     """MoE router + experts
     against the MoE math of scripts/ref_engine.py, which matches HF on CPU (tests/test_moe_ref.py).
@@ -415,5 +532,9 @@ if __name__ == "__main__":
     test_decode_attn()
     test_decode_work_reuse()
     test_moe()
+    if hasattr(hi.lib, "hi_gemv_w8"):
+        test_quantize_rows()
+        test_gemv_int8()
+        test_gemm_int8()
     print("\nALL PASS" if not FAILS else f"\n{len(FAILS)} FAILURES: {FAILS}")
     sys.exit(1 if FAILS else 0)

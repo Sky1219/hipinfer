@@ -307,6 +307,25 @@ python tests/test_tp.py --weights llama32-3b.bin --tp 2
 python scripts/bench_tp.py --weights llama31-8b.bin --tp 2 --no-single --out tp2.json
 ```
 
+## int8 weights (W8A16)
+
+`scripts/export.py --int8` stores the projections and the lm_head as int8 with one fp16 scale per
+output row (symmetric round-to-nearest). Activations, the KV cache, norms and the embedding stay
+fp16. Batch-1 decode reads every weight once per token, so int8 halves the bytes the GEMVs stream.
+
+- **Decode:** the GEMV converts the weights to fp32 in registers and applies the row scale once
+  after the reduction.
+- **Prefill:** each weight tile is dequantized to fp16 on its way into shared memory, and the
+  existing tensor-core GEMM runs unchanged.
+- **Tensor parallelism:** shards split the scales along with the rows.
+
+Design: [docs/quantization.md](docs/quantization.md).
+
+**Status: not yet measured on a GPU.** The code compiles for sm_75. CPU tests check the file
+layout, the rounding and the kernel's int8-to-fp32 conversion. The GPU kernel tests, token gates,
+perplexity and KL against fp16 HF, benchmarks and the llama.cpp Q8_0 comparison are written
+(`scripts/run_int8.sh`) but haven't run yet, so there are no int8 numbers here.
+
 ## Correctness
 
 Fast is only interesting if the answers are right, so every model is checked against HF transformers
@@ -421,7 +440,8 @@ each product explicitly.
 - **MoE decode runs at 63 % of the bandwidth floor** on Granite-3.1-1B-A400M (2.26 ms/token on the
   2080 Ti), against 81–87 % for the dense models. Each token reads 8 of 32 small experts, so the
   GEMVs are short and the reads scattered. MoE runs on one GPU only; there's no expert parallelism yet.
-- **Not supported:** quantization (it's fp16 only), a paged KV cache (each slot's cache is
+- **Not supported:** quantization beyond int8 weights (no int4, no int8 activations or KV cache;
+  int8 weights are [not yet measured](#int8-weights-w8a16)), a paged KV cache (each slot's cache is
   contiguous), sampling other than greedy, MoE models with shared experts or QK-norm (Qwen-MoE,
   DeepSeek, OLMoE) and sliding-window attention.
 - **Sliding-window models:** Mistral-7B-v0.1 (4,096-token window) loads only with `max_seq` within

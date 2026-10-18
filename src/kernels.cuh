@@ -50,6 +50,53 @@ __device__ __forceinline__ float dot8(const uint4 a, const uint4 b) {
   return s;
 }
 
+// ---------------------------------------------------------------------------------
+// int8 weights (W8A16, weight-file version 4): W[n, k] = q[n, k] * s[n], q in [-127, 127], one
+// fp16 scale per output row. docs/quantization.md has the design.
+// ---------------------------------------------------------------------------------
+// The four int8 of a 32-bit word (k order) as fp32, exactly. NVIDIA: each byte, biased by 128,
+// becomes the low mantissa byte of 2^23 with one byte permute, and one subtraction of 2^23 + 128
+// leaves the value (two full-rate instructions instead of an extract and a quarter-rate
+// int->float conversion). AMD: sign-extending shifts and a conversion.
+__device__ __forceinline__ void i8x4_to_f32(uint32_t w, float* f) {
+#if defined(HI_AMD)
+#pragma unroll
+  for (int i = 0; i < 4; i++) f[i] = (float)((int)(w << (24 - 8 * i)) >> 24);
+#else
+  const uint32_t u = w ^ 0x80808080u;
+#pragma unroll
+  for (int i = 0; i < 4; i++) f[i] = __int_as_float((int)__byte_perm(u, 0x4B000000u, 0x7540u | i)) - 8388736.f;
+#endif
+}
+
+// Eight consecutive weights of one row as fp32: fp16 (one 16-byte load) or int8 (8 bytes,
+// unscaled q; the GEMV applies the row scale to the finished dot product).
+__device__ __forceinline__ void w8_to_f32(const uint4 v, float* f) {
+  H8 t; t.u = v;
+#pragma unroll
+  for (int i = 0; i < 4; i++) { const float2 x = __half22float2(t.h2[i]); f[2 * i] = x.x; f[2 * i + 1] = x.y; }
+}
+__device__ __forceinline__ void w8_to_f32(const uint2 v, float* f) {
+  i8x4_to_f32(v.x, f);
+  i8x4_to_f32(v.y, f + 4);
+}
+
+// Eight weights as the fp16 tensor-core GEMMs read them: unchanged (fp16), or fp16(q * s)
+// (int8; q * s is exact in fp32, so this is the correctly rounded dequantized weight).
+__device__ __forceinline__ uint4 w8_to_h8(const uint4 v, float) { return v; }
+__device__ __forceinline__ uint4 w8_to_h8(const uint2 v, float s) {
+  float f[8];
+  w8_to_f32(v, f);
+  H8 o;
+#pragma unroll
+  for (int i = 0; i < 4; i++) o.h2[i] = __floats2half2_rn(f[2 * i] * s, f[2 * i + 1] * s);
+  return o.u;
+}
+
+// Element and 8-weight vector types of a weight matrix: fp16 (Q8 false) or int8 (Q8 true).
+template <bool Q8> struct WTypes { typedef half T; typedef uint4 V8; };
+template <> struct WTypes<true> { typedef int8_t T; typedef uint2 V8; };
+
 __device__ __forceinline__ half silu_mul(float g, float u) {
   // HF: act_fn(gate_proj(x)) * up_proj(x), every step rounded to fp16
   float gh = __half2float(__float2half(g));
@@ -107,17 +154,24 @@ struct RopeArgs {
 // rows are interleaved in groups of 16 (16 gate rows, then the matching 16 up rows);
 // 3: QKV projection with bias, RoPE and the KV-cache write fused in: a warp computes rows d
 // and d+D/2 of one head, rotates the pair, and writes q to `out` and k/v straight into the cache.
+// Q8: int8 weights (8-byte loads of 8 weights, twice as many in flight, so a lane keeps the same
+// bytes in flight and the same k positions per load as fp16), converted to fp32 in registers;
+// the dot product is scaled by the row's wscale before the epilogue.
 // ---------------------------------------------------------------------------------
-template <int MR, bool NORM, int EPI>
+template <int MR, bool NORM, int EPI, bool Q8 = false>
 __global__ void __launch_bounds__(256)
 gemv_kernel(const half* __restrict__ x, int ldx, const half* __restrict__ normw, float eps,
-            const half* __restrict__ W, int N, int K, half* out, int ldo, RopeArgs ra) {
+            const void* __restrict__ Wv, const half* __restrict__ wscale, int N, int K, half* out, int ldo,
+            RopeArgs ra) {
   extern __shared__ __align__(16) unsigned char gemv_smem[];
   constexpr int NR = (EPI >= 2) ? 2 : 1;
+  typedef typename WTypes<Q8>::T WT;
+  typedef typename WTypes<Q8>::V8 WV;  // one load: 8 weights
+  const WT* W = reinterpret_cast<const WT*>(Wv);
 #ifndef GEMV_U
 #define GEMV_U 4
 #endif
-  constexpr int U = (MR <= 2) ? GEMV_U : 4;  // 16-byte weight loads in flight per lane
+  constexpr int U = ((MR <= 2) ? GEMV_U : 4) * (Q8 ? 2 : 1);  // weight loads in flight per lane
   const int lane = threadIdx.x % HI_WARP, warp = threadIdx.x / HI_WARP, nw = blockDim.x / HI_WARP;
   const int K8 = K / 8;
 
@@ -151,9 +205,9 @@ gemv_kernel(const half* __restrict__ x, int ldx, const half* __restrict__ normw,
     int r0 = o, r1 = o;
     if constexpr (EPI == 2) { r0 = (o / 16) * 32 + (o % 16); r1 = r0 + 16; }
     if constexpr (EPI == 3) { const int HD = ra.D >> 1; r0 = (o / HD) * ra.D + (o % HD); r1 = r0 + HD; }
-    const uint4* wr[NR];
-    wr[0] = reinterpret_cast<const uint4*>(W + (size_t)r0 * K);
-    if constexpr (NR == 2) wr[NR - 1] = reinterpret_cast<const uint4*>(W + (size_t)r1 * K);
+    const WV* wr[NR];
+    wr[0] = reinterpret_cast<const WV*>(W + (size_t)r0 * K);
+    if constexpr (NR == 2) wr[NR - 1] = reinterpret_cast<const WV*>(W + (size_t)r1 * K);
     float acc[NR][MR];
 #pragma unroll
     for (int r = 0; r < NR; r++)
@@ -161,12 +215,12 @@ gemv_kernel(const half* __restrict__ x, int ldx, const half* __restrict__ normw,
       for (int m = 0; m < MR; m++) acc[r][m] = 0.f;
 
     for (int base = 0; base < K8; base += HI_WARP * U) {
-      uint4 wv[NR][U];
+      WV wv[NR][U];
 #pragma unroll
       for (int u = 0; u < U; u++) {
         const int idx = base + u * HI_WARP + lane;
 #pragma unroll
-        for (int r = 0; r < NR; r++) wv[r][u] = idx < K8 ? __ldg(wr[r] + idx) : make_uint4(0, 0, 0, 0);
+        for (int r = 0; r < NR; r++) wv[r][u] = idx < K8 ? __ldg(wr[r] + idx) : WV{};
       }
 #pragma unroll
       for (int u = 0; u < U; u++) {
@@ -174,11 +228,7 @@ gemv_kernel(const half* __restrict__ x, int ldx, const half* __restrict__ normw,
         if (idx < K8) {
           float wf[NR][8];
 #pragma unroll
-          for (int r = 0; r < NR; r++) {
-            H8 t; t.u = wv[r][u];
-#pragma unroll
-            for (int i = 0; i < 4; i++) { const float2 f = __half22float2(t.h2[i]); wf[r][2 * i] = f.x; wf[r][2 * i + 1] = f.y; }
-          }
+          for (int r = 0; r < NR; r++) w8_to_f32(wv[r][u], wf[r]);
 #pragma unroll
           for (int m = 0; m < MR; m++) {
             H8 xv; xv.u = xp[m][idx];
@@ -205,6 +255,7 @@ gemv_kernel(const half* __restrict__ x, int ldx, const half* __restrict__ normw,
       float a0 = 0.f, a1 = 0.f;
 #pragma unroll
       for (int m = 0; m < MR; m++) if (m == lane) { a0 = acc[0][m]; a1 = acc[NR - 1][m]; }
+      if constexpr (Q8) { a0 *= __half2float(wscale[r0]); a1 *= __half2float(wscale[r1]); }
       if constexpr (EPI == 0) out[(size_t)lane * ldo + o] = __float2half(a0);
       else if constexpr (EPI == 1) { half* dst = out + (size_t)lane * ldo + o; *dst = __hadd(*dst, __float2half(a0)); }
       else if constexpr (EPI == 2) out[(size_t)lane * ldo + o] = silu_mul(a0, a1);
@@ -244,11 +295,16 @@ __device__ __forceinline__ void tile_swizzle(int pid, int tiles_m, int tiles_n, 
 // adds `bias` when non-null). WMMA 16x16x16 fragments (rocWMMA on AMD, same API). Block tile
 // BM x BN x BK, 8 warps in a WGM x WGN grid, double-buffered (dynamic) shared memory filled
 // through registers (sm_75 has no cp.async), +8 half padding per row against bank conflicts.
+// Q8: int8 weights; each thread's raw int8 chunk stays in registers until the shared-memory
+// store, where it becomes fp16(q * s) (W8A16 prefill: the tensor cores see fp16 weights).
 // ---------------------------------------------------------------------------------
-template <int BM, int BN, int BK, int WGM, int WGN, int EPI>
+template <int BM, int BN, int BK, int WGM, int WGN, int EPI, bool Q8 = false>
 __global__ void __launch_bounds__(8 * HI_WARP)
-gemm_kernel(const half* __restrict__ A, int lda, const half* __restrict__ W, const half* __restrict__ bias,
-            half* C, int ldc, int M, int N, int K, float* ws, int* counters) {
+gemm_kernel(const half* __restrict__ A, int lda, const void* __restrict__ Wv, const half* __restrict__ wscale,
+            const half* __restrict__ bias, half* C, int ldc, int M, int N, int K, float* ws, int* counters) {
+  typedef typename WTypes<Q8>::T WT;
+  typedef typename WTypes<Q8>::V8 WV;
+  const WT* W = reinterpret_cast<const WT*>(Wv);
   constexpr int LDS = BK + 8;
   constexpr int WTM = BM / WGM, WTN = BN / WGN, FM = WTM / 16, FN = WTN / 16;
   constexpr int NT = 8 * HI_WARP;
@@ -271,7 +327,14 @@ gemm_kernel(const half* __restrict__ A, int lda, const half* __restrict__ W, con
   tile_swizzle(blockIdx.x, tiles_m, tiles_n, tm, tn);
   const int bm = tm * BM, bn = tn * BN;
 
-  uint4 ra[A_PT], rb[B_PT];
+  uint4 ra[A_PT];
+  WV rb[B_PT];
+  float sc[B_PT];  // Q8: the scale of each W row this thread loads (the same rows for every K tile)
+#pragma unroll
+  for (int i = 0; i < B_PT; i++) {
+    const int c = tid + i * NT, g = bn + c / (BK / 8);
+    sc[i] = Q8 && c < B_CH && g < N ? __half2float(wscale[g]) : 0.f;
+  }
   auto gload = [&](int k0) {
 #pragma unroll
     for (int i = 0; i < A_PT; i++) {
@@ -286,7 +349,7 @@ gemm_kernel(const half* __restrict__ A, int lda, const half* __restrict__ W, con
       const int c = tid + i * NT;
       if (c < B_CH) {
         const int r = c / (BK / 8), kc = (c % (BK / 8)) * 8, g = bn + r;
-        rb[i] = g < N ? __ldg(reinterpret_cast<const uint4*>(W + (size_t)g * K + k0 + kc)) : make_uint4(0, 0, 0, 0);
+        rb[i] = g < N ? __ldg(reinterpret_cast<const WV*>(W + (size_t)g * K + k0 + kc)) : WV{};
       }
     }
   };
@@ -299,7 +362,7 @@ gemm_kernel(const half* __restrict__ A, int lda, const half* __restrict__ W, con
 #pragma unroll
     for (int i = 0; i < B_PT; i++) {
       const int c = tid + i * NT;
-      if (c < B_CH) *reinterpret_cast<uint4*>(Bs + st * BN * LDS + (c / (BK / 8)) * LDS + (c % (BK / 8)) * 8) = rb[i];
+      if (c < B_CH) *reinterpret_cast<uint4*>(Bs + st * BN * LDS + (c / (BK / 8)) * LDS + (c % (BK / 8)) * 8) = w8_to_h8(rb[i], sc[i]);
     }
   };
 
@@ -512,11 +575,17 @@ __device__ __forceinline__ void cp_async_wait() {
 // bank-conflict free. STAGES >= 3: cp.async multi-stage pipeline (Ampere+; global->shared
 // copies are asynchronous and 2 tiles are in flight while one is computed). STAGES == 2:
 // register-staged double buffering for Turing, which has no cp.async.
+// Q8 (int8 weights): STAGES == 2 only, on every architecture, since cp.async cannot convert;
+// the raw int8 W chunk waits in registers and is stored to shared memory as fp16(q * s).
 // ---------------------------------------------------------------------------------
-template <int BM, int BN, int BK, int WGM, int WGN, int STAGES, int EPI>
+template <int BM, int BN, int BK, int WGM, int WGN, int STAGES, int EPI, bool Q8 = false>
 __global__ void __launch_bounds__(WGM * WGN * 32)
-gemm_mma_kernel(const half* __restrict__ A, int lda, const half* __restrict__ W, const half* __restrict__ bias,
-                half* C, int ldc, int M, int N, int K, float* ws, int* counters) {
+gemm_mma_kernel(const half* __restrict__ A, int lda, const void* __restrict__ Wv, const half* __restrict__ wscale,
+                const half* __restrict__ bias, half* C, int ldc, int M, int N, int K, float* ws, int* counters) {
+  static_assert(!Q8 || STAGES == 2, "int8 weights use the register-staged pipeline");
+  typedef typename WTypes<Q8>::T WT;
+  typedef typename WTypes<Q8>::V8 WV;
+  const WT* W = reinterpret_cast<const WT*>(Wv);
   constexpr int LDS = BK + 8, NT = WGM * WGN * 32;
   constexpr int WTM = BM / WGM, WTN = BN / WGN, FM = WTM / 16, FN = WTN / 8;
   constexpr int A_CH = BM * BK / 8, B_CH = BN * BK / 8;  // 16-byte chunks per tile
@@ -635,15 +704,22 @@ gemm_mma_kernel(const half* __restrict__ A, int lda, const half* __restrict__ W,
     // and barrier overlap that step's MMAs. Global loads are split so they interleave with MMAs
     // instead of issuing in one burst: A of tile kt+2 right after tile kt's barrier, W of tile
     // kt+1 at k16 step 0 of tile kt.
-    uint4 ra[A_PT], rb[B_PT];
+    uint4 ra[A_PT];
+    WV rb[B_PT];
     // One 64-bit base pointer per operand plus 32-bit row offsets (chunk i is NT / (BK / 8)
     // rows below chunk 0, and i * that < BM <= 256 rows), not one 64-bit pointer per chunk.
     constexpr int RPP = NT / (BK / 8);  // rows per pass of the block over a tile
     static_assert(NT % (BK / 8) == 0, "whole rows per pass");
     const int r0 = tid / (BK / 8), kc0 = (tid % (BK / 8)) * 8;
     const half* a0 = A + (size_t)(bm + r0) * lda + kc0;
-    const half* w0 = W + (size_t)(bn + r0) * K + kc0;
+    const WT* w0 = W + (size_t)(bn + r0) * K + kc0;
     const int sa = RPP * lda, sw = RPP * K;
+    float sc[B_PT];  // Q8: the scale of each W row this thread loads (the same rows for every K tile)
+#pragma unroll
+    for (int i = 0; i < B_PT; i++) {
+      const int g = bn + r0 + i * RPP;
+      sc[i] = Q8 && tid + i * NT < B_CH && g < N ? __half2float(wscale[g]) : 0.f;
+    }
     auto gload_a = [&](int k0) {
 #pragma unroll
       for (int i = 0; i < A_PT; i++) {
@@ -655,7 +731,7 @@ gemm_mma_kernel(const half* __restrict__ A, int lda, const half* __restrict__ W,
 #pragma unroll
       for (int i = 0; i < B_PT; i++) {
         if (tid + i * NT < B_CH)
-          rb[i] = bn + r0 + i * RPP < N ? __ldg(reinterpret_cast<const uint4*>(w0 + i * sw + k0)) : make_uint4(0, 0, 0, 0);
+          rb[i] = bn + r0 + i * RPP < N ? __ldg(reinterpret_cast<const WV*>(w0 + i * sw + k0)) : WV{};
       }
     };
     // ldmatrix through 32-bit shared-window addresses (one register each, where generic pointers
@@ -672,7 +748,7 @@ gemm_mma_kernel(const half* __restrict__ A, int lda, const half* __restrict__ W,
 #pragma unroll
       for (int i = 0; i < B_PT; i++)
         if (tid + i * NT < B_CH) {
-          *reinterpret_cast<uint4*>(Bs + st * BN * LDS + (r0 + i * RPP) * LDS + kc0) = rb[i];
+          *reinterpret_cast<uint4*>(Bs + st * BN * LDS + (r0 + i * RPP) * LDS + kc0) = w8_to_h8(rb[i], sc[i]);
         }
     };
     // ldfrag on shared-window addresses: the k16 step at kk of stage st into buffer buf

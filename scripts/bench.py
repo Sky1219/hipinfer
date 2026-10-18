@@ -4,6 +4,9 @@ latency vs context length, batched throughput with power draw). All timings are 
 medians; per-step decode numbers come from graph-replayed engine steps.
 
 python scripts/bench.py --model unsloth/Llama-3.2-3B --weights llama32-3b.bin --out results/a6000/llama32-3b/bench.json
+
+With int8 weights (version 4) the kernel section adds the int8 GEMV and GEMM next to the fp16 ones
+at the same shapes, and every bandwidth floor counts the int8 bytes (hi_weight_bytes).
 """
 import argparse
 import json
@@ -144,6 +147,9 @@ def bench_kernels(rows, cfg):
             bw = lambda ms: N * K * 2 / ms / 1e6
             row(rows, "gemv", name, M, f"{name} M={M} N={N} K={K}", ours, ref, "torch(cuBLAS)", bw, "GB/s")
 
+    if cfg.get("quant"):
+        bench_int8_kernels(rows, cfg)
+
     print("\n== RMSNorm ==")
     for M in [1, 512, 4096]:
         x, w = r16(M, H), r16(H)
@@ -205,6 +211,40 @@ def bench_kernels(rows, cfg):
         ref = timeit(lambda: F.scaled_dot_product_attention(qq, kc, vc, enable_gqa=True))
         bw = lambda ms: 2 * B * HKV * L * D * 2 / ms / 1e6
         row(rows, "decode_attn", f"B={B}", L, f"B={B} len={L} Hq={HQ} Hkv={HKV} D={D}", ours, ref, "torch SDPA", bw, "GB/s")
+
+
+def bench_int8_kernels(rows, cfg):
+    """int8-weight GEMV (decode) and GEMM (prefill) against hipinfer's own fp16 kernels at the same
+    shapes; GB/s counts the int8 weights plus their fp16 row scales."""
+    from export import quantize_rows
+    H, I, HQ, HKV, D, V = cfg["hidden"], cfg["inter"], cfg["heads"], cfg["kv_heads"], cfg["head_dim"], cfg["vocab"]
+    QKV = (HQ + 2 * HKV) * D
+    r16 = lambda *s: torch.randn(*s, device=dev, dtype=torch.float16)
+    print("\n== GEMV int8 weights (decode; baseline: hipinfer's fp16 GEMV) ==")
+    for M in [1, 4]:
+        for name, N, K, epi, nrm in [("qkv+norm", QKV, H, 0, True), ("o+res", H, HQ * D, 1, False),
+                                     ("gate_up+norm+silu", 2 * I, H, 2, True), ("down+res", H, I, 1, False),
+                                     ("lm_head+norm", V, H, 0, True)]:
+            x, W = r16(M, K), r16(N, K) * 0.02
+            q, s = quantize_rows(W)
+            nw = (torch.rand(K, device=dev) + 0.5).half()
+            out = r16(M, N // 2 if epi == 2 else N)
+            ours = timeit(lambda: hi.gemv(x, q, out=out, normw=nw if nrm else None, epi=epi, scales=s))
+            ref = timeit(lambda: hi.gemv(x, W, out=out, normw=nw if nrm else None, epi=epi))
+            bw = lambda ms: (N * K + 2 * N) / ms / 1e6
+            row(rows, "gemv_int8", name, M, f"{name} M={M} N={N} K={K}", ours, ref, "hipinfer fp16", bw, "GB/s")
+            del x, W, q, s, out
+    print("\n== GEMM int8 weights (prefill, tiles dequantized to fp16; baseline: hipinfer's fp16 GEMM) ==")
+    for M in [128, 512, 2048]:
+        for name, N, K in [("qkv", QKV, H), ("o", H, HQ * D), ("gate_up", 2 * I, H), ("down", H, I), ("lm_head", V, H)]:
+            A, W = r16(M, K), r16(N, K) * 0.02
+            q, s = quantize_rows(W)
+            out = torch.empty(M, N, device=dev, dtype=torch.float16)
+            ours = timeit(lambda: hi.gemm(A, q, out=out, scales=s))
+            ref = timeit(lambda: hi.gemm(A, W, out=out))
+            fl = lambda ms: 2 * M * N * K / ms / 1e9
+            row(rows, "gemm_int8", name, M, f"{name} M={M} N={N} K={K}", ours, ref, "hipinfer fp16", fl, "TFLOPs")
+            del A, W, q, s, out
 
 
 def gemm_sweep(rows, cfg):
@@ -428,7 +468,7 @@ def main():
     e = hi.Engine(a.weights, max_batch=1, max_seq=64, max_prefill=64)
     cfg = {"vocab": e.vocab, "hidden": e.hidden, "inter": e.inter, "layers": e.layers, "heads": e.heads,
            "kv_heads": e.kv_heads, "head_dim": e.head_dim, "max_pos": e.max_pos, "window": e.window, "tied": e.tied,
-           "qkv_bias": e.qkv_bias, "weight_bytes": e.weight_bytes}
+           "qkv_bias": e.qkv_bias, "weight_bytes": e.weight_bytes, "quant": e.quant}
     e.close()
     res = {"gpu": name, "peak_bw_GBs": peak, "torch": torch.__version__, "model": a.model, "config": cfg, "kernels": []}
     print(name, "peak BW", peak, "GB/s |", a.model, cfg)

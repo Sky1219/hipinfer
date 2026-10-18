@@ -3,7 +3,9 @@
 # Usage: scripts/run_baselines.sh <tag>     e.g. CUDA_VISIBLE_DEVICES=1 scripts/run_baselines.sh a6000
 # Env:   PY (python with torch + transformers), LLAMA_CPP (llama.cpp checkout; built if needed),
 #        GGUF (F16 GGUF; converted if missing), VLLM_PY (python with vllm; skipped if unset),
-#        WEIGHTS (hipinfer .bin; hipinfer is re-run in the same session for a same-day comparison)
+#        WEIGHTS (hipinfer .bin; hipinfer is re-run in the same session for a same-day comparison),
+#        GGUF_TYPE (convert_hf_to_gguf --outtype for a missing GGUF, default f16; q8_0 for the int8
+#        comparison), OUT (result directory), LLAMA_NAME / HIPINFER_NAME (result file names)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 TAG=${1:?usage: run_baselines.sh <tag>}
@@ -12,7 +14,10 @@ MODEL=${MODEL:-TinyLlama/TinyLlama-1.1B-Chat-v1.0}
 LLAMA_CPP=${LLAMA_CPP:-../llama.cpp}
 GGUF=${GGUF:-$LLAMA_CPP/tinyllama-1.1b-chat-f16.gguf}
 WEIGHTS=${WEIGHTS:-tinyllama.bin}
-OUT=results/baselines/$TAG
+GGUF_TYPE=${GGUF_TYPE:-f16}
+OUT=${OUT:-results/baselines/$TAG}
+LLAMA_NAME=${LLAMA_NAME:-llamacpp}
+HIPINFER_NAME=${HIPINFER_NAME:-hipinfer}
 mkdir -p "$OUT"
 # inductor/triton caches and temp files off a possibly small /tmp
 SCRATCH=${SCRATCH:-$(cd .. && pwd)/tmp}
@@ -23,7 +28,7 @@ export TMPDIR=${TMPDIR:-$SCRATCH} TORCHINDUCTOR_CACHE_DIR=${TORCHINDUCTOR_CACHE_
 ONLY=${ONLY:-hipinfer llamacpp torch_compile hf_static vllm}   # subset to (re)run
 want() { [[ " $ONLY " == *" $1 "* ]]; }
 
-# llama.cpp: GPU build + F16 GGUF, no quantization. Ninja when installed.
+# llama.cpp: GPU build + F16 GGUF (GGUF_TYPE=q8_0: its 8-bit format, for hipinfer's int8 weights). Ninja when installed.
 #  NVIDIA: CUDA build. Host compiler gcc-11 when present (CUDA 12.4 rejects newer gcc), else the
 #    default. CUDA_ARCHS narrows the build to the GPU at hand (e.g. "80" on an A100), which is
 #    several times faster than the default list.
@@ -50,13 +55,13 @@ if want llamacpp && [ ! -x "$LLAMA_CPP/build/bin/llama-bench" ]; then
 fi
 if want llamacpp && [ ! -f "$GGUF" ]; then
   SNAP=$($PY -c "from huggingface_hub import snapshot_download as s; print(s('$MODEL'))")
-  $PY "$LLAMA_CPP/convert_hf_to_gguf.py" "$SNAP" --outtype f16 --outfile "$GGUF"
+  $PY "$LLAMA_CPP/convert_hf_to_gguf.py" "$SNAP" --outtype "$GGUF_TYPE" --outfile "$GGUF"
 fi
 
 run() { echo "== $1"; "${@:2}" 2>&1 | grep -vE "Loading weights|Warning: You are sending" | tee "$OUT/$1.log"; }
 
-[ -f "$WEIGHTS" ] && want hipinfer && run hipinfer $PY scripts/bench.py --weights "$WEIGHTS" --model "$MODEL" --skip-kernels --out "$OUT/hipinfer.json"
-want llamacpp && { run llamacpp $PY scripts/bench_baselines.py llamacpp --llama-bench "$LLAMA_CPP/build/bin/llama-bench" --gguf "$GGUF" --out "$OUT/llamacpp.json" || echo "llamacpp failed (see log)"; }
+[ -f "$WEIGHTS" ] && want hipinfer && run "$HIPINFER_NAME" $PY scripts/bench.py --weights "$WEIGHTS" --model "$MODEL" --skip-kernels ${HIPINFER_ARGS:-} --out "$OUT/$HIPINFER_NAME.json"
+want llamacpp && { run "$LLAMA_NAME" $PY scripts/bench_baselines.py llamacpp --llama-bench "$LLAMA_CPP/build/bin/llama-bench" --gguf "$GGUF" --out "$OUT/$LLAMA_NAME.json" || echo "llamacpp failed (see log)"; }
 want torch_compile && { run torch_compile $PY scripts/bench_baselines.py torch_compile --model "$MODEL" --out "$OUT/torch_compile.json" || echo "torch_compile failed (see log)"; }
 want hf_static && { run hf_static $PY scripts/bench_baselines.py hf_static --model "$MODEL" --out "$OUT/hf_static.json" || echo "hf_static failed (see log)"; }
 if [ -n "${VLLM_PY:-}" ] && want vllm; then
