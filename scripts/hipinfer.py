@@ -57,6 +57,11 @@ lib.hi_logits.restype = I
 lib.hi_set_state.argtypes = [P, I, IP, IP]
 lib.hi_set_state.restype = I
 lib.hi_sync.argtypes = [P]
+lib.hi_verify.argtypes = [P, I, IP, I, I, IP, P, I]
+lib.hi_verify.restype = I
+lib.hi_verify_max_rows.restype = I
+lib.hi_rewind.argtypes = [P, I, I, I]
+lib.hi_rewind.restype = I
 # MoE
 lib.hi_moe_config.argtypes = [P, IP]
 lib.hi_moe_router.argtypes = [P, I, P, I, I, I, I, I, P, P, P]
@@ -322,6 +327,36 @@ class Engine:
         if n_new > 1:
             self.decode(1, n_new - 1, graph)
         return [first] + self.history(0, len(prompt) + 1, n_new - 1)
+
+    MAX_VERIFY = lib.hi_verify_max_rows()  # rows per verify() call: k + 1 for k draft tokens
+
+    def verify(self, slot, tokens, p0, graph=True, logits=False):
+        """Greedy next token after each of `tokens`, fed at positions p0.. of `slot` (whose cache
+        must hold positions < p0), computed by the B=1 decode kernels, so entry i is exactly the
+        token plain greedy decoding produces at p0 + i given the same prefix. Writes the rows'
+        k/v; leaves the slot's next token and position alone (see rewind). With logits=True
+        also returns the [len(tokens), vocab] fp16 logits. Dense models, tp=1."""
+        R = len(tokens)
+        out = (C.c_int * R)()
+        lg = torch.empty(R, self.vocab, dtype=torch.float16, device=self.device) if logits else None
+        self._ok(lib.hi_verify(self.h, slot, (C.c_int * R)(*tokens), R, p0, out, _p(lg), int(graph)), "verify")
+        return (list(out), lg) if logits else list(out)
+
+    def rewind(self, slot, length, next_token):
+        """Cut slot's cache to `length` positions; the next decode step feeds next_token there."""
+        self._ok(lib.hi_rewind(self.h, slot, length, next_token), "rewind")
+
+    def generate_speculative(self, draft, prompt, n_new, k, graph=True, stats=None, verify="decode"):
+        """Greedy speculative decoding (docs/speculative.md, loop in scripts/speculative.py):
+        `draft`, an Engine on the same GPU with the same vocabulary, proposes up to k tokens per
+        round with plain greedy decode steps; one verify() pass of this engine checks them all;
+        the agreeing prefix plus the target's own next token is accepted and both caches are
+        rewound past the rest. Returns the same n_new tokens as generate(prompt, n_new). Uses
+        slot 0 of both engines. stats (a dict) receives counts and timings. verify="prefill"
+        checks with prefill_logits instead (GEMM numerics: not exact, kept for comparison)."""
+        import speculative
+        assert draft.vocab == self.vocab, "draft and target need the same vocabulary"
+        return speculative.generate(self, draft, prompt, n_new, k, graph, stats, verify, self.MAX_VERIFY)
 
     def close(self):
         if self.h:
