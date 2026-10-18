@@ -1,5 +1,5 @@
-# CPU tests (no GPU: MoE reference engine and layer-diff tool vs HF transformers) on every push
-# and pull request.
+# CPU tests (no GPU: MoE reference engine and layer-diff tool vs HF transformers) and an NVIDIA
+# (nvcc) compile check on every push and pull request.
 name: CI
 
 on:
@@ -42,3 +42,28 @@ jobs:
         run: python tests/test_moe_ref.py --quick
       - name: Layer-diff tool (capture, fault localisation, engine dump layout)
         run: python tests/test_layer_diff.py
+
+  nvidia-build:
+    name: NVIDIA build (nvcc, sm_75 + sm_80, NCCL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container: nvidia/cuda:12.8.1-devel-ubuntu24.04
+    steps:
+      - uses: actions/checkout@v4
+      # NCCL from the pip wheel, as scripts/run_all.sh takes it from the wheel that ships with torch
+      - name: Install the NCCL wheel
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends python3-pip > /dev/null
+          pip install --quiet --target /opt/nccl nvidia-nccl-cu12==2.29.7
+          test -f /opt/nccl/nvidia/nccl/include/nccl.h
+      # --threads 0: compile the two archs in parallel (about half the time of one after the other)
+      - name: make (sm_75 + sm_80, NCCL)
+        run: >-
+          make NVCC="nvcc --threads 0" NCCL=/opt/nccl/nvidia/nccl
+          NV_ARCH="-gencode arch=compute_75,code=sm_75 -gencode arch=compute_80,code=sm_80"
+      - name: Check the library links NCCL and exports the C API
+        run: |
+          ldd build/libhipinfer.so | grep libnccl.so.2
+          if ldd build/libhipinfer.so | grep "not found"; then exit 1; fi
+          nm -D --defined-only build/libhipinfer.so | grep -c " T hi_"
