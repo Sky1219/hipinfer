@@ -1,0 +1,83 @@
+# CPU tests (no GPU: MoE reference engine and layer-diff tool vs HF transformers) and compile checks
+# for NVIDIA (nvcc) and AMD (hipcc) on every push and pull request.
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cpu-tests:
+    name: CPU tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TRANSFORMERS_VERBOSITY: error
+      HF_HUB_DISABLE_TELEMETRY: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: .github/ci-requirements.txt
+      - name: Install CPU-only PyTorch and transformers
+        run: pip install -r .github/ci-requirements.txt
+      # The hf-internal-testing tiny models the tests download (a few MB)
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-tiny-models-v1
+      - name: Byte-compile scripts and tests
+        run: python -m compileall -q scripts tests
+      - name: MoE export + reference engine vs HF (tiny Mixtral, OLMoE, Granite MoE)
+        run: python tests/test_moe_ref.py --quick
+      - name: Layer-diff tool (capture, fault localisation, engine dump layout)
+        run: python tests/test_layer_diff.py
+
+  nvidia-build:
+    name: NVIDIA build (nvcc, sm_75 + sm_80, NCCL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container: nvidia/cuda:12.8.1-devel-ubuntu24.04
+    steps:
+      - uses: actions/checkout@v4
+      # NCCL from the pip wheel, as scripts/run_all.sh takes it from the wheel that ships with torch
+      - name: Install the NCCL wheel
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends python3-pip > /dev/null
+          pip install --quiet --target /opt/nccl nvidia-nccl-cu12==2.29.7
+          test -f /opt/nccl/nvidia/nccl/include/nccl.h
+      # --threads 0: compile the two archs in parallel (about half the time of one after the other)
+      - name: make (sm_75 + sm_80, NCCL)
+        run: >-
+          make NVCC="nvcc --threads 0" NCCL=/opt/nccl/nvidia/nccl
+          NV_ARCH="-gencode arch=compute_75,code=sm_75 -gencode arch=compute_80,code=sm_80"
+      - name: Check the library links NCCL and exports the C API
+        run: |
+          ldd build/libhipinfer.so | grep libnccl.so.2
+          if ldd build/libhipinfer.so | grep "not found"; then exit 1; fi
+          nm -D --defined-only build/libhipinfer.so | grep -c " T hi_"
+
+  amd-build:
+    name: AMD build (hipcc, gfx90a + gfx942 + gfx1100)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container: rocm/dev-ubuntu-24.04:7.2.4
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install rocWMMA headers
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends rocwmma-dev > /dev/null
+      - name: make hip
+        run: make hip HIPCC=/opt/rocm/bin/hipcc

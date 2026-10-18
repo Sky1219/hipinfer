@@ -1,0 +1,5 @@
+# Python packages for the CPU tests in .github/workflows/ci.yml (CPU-only PyTorch wheel).
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.13.0+cpu
+transformers==5.18.0
+numpy==2.4.6
