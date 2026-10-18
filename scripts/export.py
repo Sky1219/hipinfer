@@ -24,6 +24,13 @@ each layer's MLP is
   (q_norm [heads*head_dim], k_norm [kv_heads*head_dim] after wo, if QK-norm)
   router [E, hidden], wgu [E][2*inter, hidden] (each expert interleaved as above), wdown [E][hidden, inter]
 
+Layout (version 4, dense models with --int8; docs/quantization.md): the version-2 layout and header,
+plus int32 qtype at byte 56 (1: int8, one fp16 scale per output row). Every projection (wqkv, wo,
+wgu, wdown) and the lm_head is stored as int8 rows q [N, K] followed by fp16 scales s [N] (each on
+its own 256-byte boundary), W ~ q * s with symmetric round-to-nearest (quantize_rows). The lm_head
+is always written (flag bit 0 is clear): the embedding, which the engine only gathers rows from,
+stays fp16. Embedding, norms and biases are fp16 as in version 2.
+
 Granite's scalar multipliers are folded in so the engine runs the plain Llama graph: embedding x
 embedding_multiplier, lm_head / logits_scaling (untying a tied head), q rows x
 attention_multiplier * sqrt(head_dim) (the engine scales scores by 1/sqrt(head_dim)), wo x
@@ -40,6 +47,51 @@ from transformers import AutoConfig, AutoModelForCausalLM
 MAGIC = 0x48495046
 VERSION = 2
 VERSION_MOE = 3
+VERSION_INT8 = 4
+QTYPE_INT8_ROW = 1  # version-4 header field at byte 56
+
+
+def quantize_rows(w, chunk=8192):
+    """Symmetric round-to-nearest int8 with one fp16 scale per output row (W8A16):
+    s[n] = fp16(max_k |w[n, k]| / 127), q[n, k] = clamp(round(w[n, k] / s[n]), -127, 127), so w ~ q * s.
+    The rounding uses the stored fp16 scale. An all-zero row (or one whose scale underflows) gets q = 0.
+    Rows are processed in chunks to bound the fp32 temporaries."""
+    w = w.detach()
+    q = torch.empty(w.shape, dtype=torch.int8, device=w.device)
+    s = torch.empty(w.shape[0], dtype=torch.float16, device=w.device)
+    for r0 in range(0, w.shape[0], chunk):
+        x = w[r0:r0 + chunk].float()
+        sc = (x.abs().amax(dim=1) / 127.0).half()
+        sf = sc.float()[:, None]
+        q[r0:r0 + chunk] = torch.where(sf > 0, torch.round(x / sf.clamp_min(1e-30)), 0.0).clamp_(-127, 127).to(torch.int8)
+        s[r0:r0 + chunk] = sc
+    return q, s
+
+
+def dequantize_rows(q, s):
+    """fp16(q * s): the weights the engine's int8 prefill GEMMs compute with."""
+    return (q.float() * s.float()[:, None]).half()
+
+
+def fake_quantize_hf(model):
+    """Replace a HF Llama-family model's projection and lm_head weights (in place) by their int8
+    round trip dequantize_rows(*quantize_rows(w)): the model an --int8 export computes, in HF, as
+    a reference that differs from the engine only in summation order and where the row scale is
+    applied. The embedding stays fp16; a tied lm_head is untied first. Only for models without
+    folded Granite multipliers."""
+    cfg = model.config
+    for k in ("embedding_multiplier", "logits_scaling", "residual_multiplier", "attention_multiplier"):
+        if getattr(cfg, k, None) not in (None, 1.0):
+            raise SystemExit(f"fake_quantize_hf: {k} is folded into the exported weights; not supported here")
+    for layer in model.model.layers:
+        for lin in (layer.self_attn.q_proj, layer.self_attn.k_proj, layer.self_attn.v_proj, layer.self_attn.o_proj,
+                    layer.mlp.gate_proj, layer.mlp.up_proj, layer.mlp.down_proj):
+            lin.weight.data = dequantize_rows(*quantize_rows(lin.weight.data)).to(lin.weight.dtype)
+    head = model.lm_head.weight.data
+    model.lm_head.weight = torch.nn.Parameter(dequantize_rows(*quantize_rows(head)).to(head.dtype), requires_grad=False)
+    if hasattr(model.config, "tie_word_embeddings"):
+        model.config.tie_word_embeddings = False
+    return model
 
 
 def interleave_gate_up(gate, up, group=16):
@@ -141,6 +193,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default="TinyLlama/TinyLlama-1.1B-Chat-v1.0")
     ap.add_argument("--out", required=True)
+    ap.add_argument("--int8", action="store_true", help="version 4: int8 projections and lm_head (W8A16, one fp16 "
+                    "scale per output row, round-to-nearest)")
     a = ap.parse_args()
 
     cfg = AutoConfig.from_pretrained(a.model)
@@ -153,6 +207,8 @@ def main():
         or torch.equal(sd["lm_head.weight"], sd["model.embed_tokens.weight"])
     has_bias = "model.layers.0.self_attn.q_proj.bias" in sd
     moe = moe_config(cfg)
+    if a.int8 and moe:
+        raise SystemExit("--int8 supports dense models only (the MoE expert kernels are fp16)")
     qk_norm = "model.layers.0.self_attn.q_norm.weight" in sd
     if qk_norm and not moe:
         raise SystemExit("QK-norm is only supported in the MoE (version 3) layout")
@@ -166,9 +222,12 @@ def main():
     lm_head = embed if tied else sd["lm_head.weight"]
     if tied and (emb_mult != 1.0 or logit_div != 1.0):
         tied = False  # embed and lm_head get different scales
+    if a.int8:
+        tied = False  # int8 lm_head written separately; the embedding stays fp16
     flags = (1 if tied else 0) | (2 if has_bias else 0) | (4 if moe else 0) | (8 if qk_norm else 0)
     window = sliding_window(cfg)
-    hdr = struct.pack("<10i2f2i", MAGIC, VERSION_MOE if moe else VERSION, cfg.vocab_size, cfg.hidden_size,
+    version = VERSION_MOE if moe else VERSION_INT8 if a.int8 else VERSION
+    hdr = struct.pack("<10i2f2i", MAGIC, version, cfg.vocab_size, cfg.hidden_size,
                       cfg.intermediate_size, cfg.num_hidden_layers, cfg.num_attention_heads, cfg.num_key_value_heads,
                       head_dim, cfg.max_position_embeddings, cfg.rms_norm_eps, attn_scaling, flags, window)
     if moe:
@@ -176,10 +235,13 @@ def main():
         hdr = hdr.ljust(64, b"\0") + struct.pack("<3if", E, top_k, moe_flags, res_mult)
         hdr = hdr.ljust(128, b"\0")
     else:
+        if a.int8:
+            hdr += struct.pack("<i", QTYPE_INT8_ROW)
         hdr = hdr.ljust(64, b"\0")
     print(f"{a.model}: hidden {cfg.hidden_size} inter {cfg.intermediate_size} layers {cfg.num_hidden_layers} "
           f"heads {cfg.num_attention_heads}/{cfg.num_key_value_heads} head_dim {head_dim} vocab {cfg.vocab_size} "
-          f"tied={tied} qkv_bias={has_bias} rope={getattr(cfg, 'rope_scaling', None)} sliding_window={window or None}")
+          f"tied={tied} qkv_bias={has_bias} rope={getattr(cfg, 'rope_scaling', None)} sliding_window={window or None}"
+          + (" weights=int8 (version 4)" if a.int8 else ""))
     if moe:
         print(f"  MoE: {moe[0]} experts, top-{moe[1]}, norm_topk={bool(moe[2] & 1)} fp16_weights={bool(moe[2] & 2)} "
               f"qk_norm={qk_norm} out_scale={res_mult}")
@@ -198,24 +260,31 @@ def main():
         def put(t):
             put_bytes(t.detach().to(torch.float16).contiguous().numpy().tobytes())
 
+        def put_w(t):  # a projection [N, K]: fp16, or (--int8) int8 rows then their fp16 scales
+            if not a.int8:
+                return put(t)
+            q, sc = quantize_rows(t)
+            put_bytes(q.contiguous().numpy().tobytes())
+            put(sc)
+
         put_bytes(inv_freq.contiguous().numpy().astype("float32").tobytes())
         put(scaled(embed, emb_mult))
         put(sd["model.norm.weight"])
         if not tied:
-            put(scaled(lm_head, 1.0 / logit_div))
+            put_w(scaled(lm_head, 1.0 / logit_div))
         for i in range(cfg.num_hidden_layers):
             p = f"model.layers.{i}."
             put(sd[p + "input_layernorm.weight"])
-            put(torch.cat([scaled(sd[p + "self_attn.q_proj.weight"], q_mult), sd[p + "self_attn.k_proj.weight"],
-                           sd[p + "self_attn.v_proj.weight"]], 0))
+            put_w(torch.cat([scaled(sd[p + "self_attn.q_proj.weight"], q_mult), sd[p + "self_attn.k_proj.weight"],
+                             sd[p + "self_attn.v_proj.weight"]], 0))
             if has_bias:
                 put(torch.cat([scaled(sd[p + "self_attn.q_proj.bias"], q_mult), sd[p + "self_attn.k_proj.bias"],
                                sd[p + "self_attn.v_proj.bias"]], 0))
-            put(scaled(sd[p + "self_attn.o_proj.weight"], res_mult))
+            put_w(scaled(sd[p + "self_attn.o_proj.weight"], res_mult))
             put(sd[p + "post_attention_layernorm.weight"])
             if not moe:
-                put(interleave_gate_up(sd[p + "mlp.gate_proj.weight"], sd[p + "mlp.up_proj.weight"]))
-                put(scaled(sd[p + "mlp.down_proj.weight"], res_mult))
+                put_w(interleave_gate_up(sd[p + "mlp.gate_proj.weight"], sd[p + "mlp.up_proj.weight"]))
+                put_w(scaled(sd[p + "mlp.down_proj.weight"], res_mult))
                 continue
             if qk_norm:  # QK-norm weights scale q after the norm: fold q_mult there instead
                 assert q_mult == 1.0
