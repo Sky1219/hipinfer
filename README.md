@@ -302,6 +302,33 @@ python tests/test_tp.py --weights llama32-3b.bin --tp 2
 python scripts/bench_tp.py --weights llama31-8b.bin --tp 2 --no-single --out tp2.json
 ```
 
+## Speculative decoding
+
+Greedy speculative decoding with two engines on one GPU. Llama-3.2-1B drafts `k` tokens with its
+normal graph-captured decode steps, and Llama-3.2-3B checks all of them in one pass. The longest
+agreeing prefix is accepted, plus the target's own next token. Both caches are then rolled back by
+resetting their lengths, which is all a rollback needs because the KV cache is contiguous.
+
+```python
+target, draft = hi.Engine("llama32-3b.bin", max_batch=1), hi.Engine("llama32-1b.bin", max_batch=1)
+tokens = target.generate_speculative(draft, prompt_ids, n_new=128, k=4)  # == target.generate(prompt_ids, 128)
+```
+
+The output is the same as plain greedy decoding **token for token**, and this holds without
+needing any near-tie tolerance. The target doesn't verify through its prefill path, whose GEMMs
+round differently from decode. It runs the `k + 1` rows through the B=1 decode kernels (GEMVs and
+split-K decode attention), with each row's arithmetic independent of the row count. Every row's
+logits are therefore bit-identical to the decode step they replace.
+[docs/speculative.md](docs/speculative.md) explains the design and the cost model.
+
+**Status: implemented but not yet measured.** The code compiles for sm_75, and the round loop
+(accept, roll back, draft catch-up) passes a CPU test with stub engines,
+[tests/test_spec_logic.py](tests/test_spec_logic.py). Neither the GPU exact-match test
+([tests/test_spec.py](tests/test_spec.py), k = 2, 4, 6, 8 on the gate prompts) nor the speed-up
+benchmark has been run yet. `scripts/run_spec.sh` runs both on a 2080 Ti and writes
+`results/2080ti/spec/`. Expect modest gains: on a 2080 Ti a 1B draft step costs about 40 % of a 3B
+step, so only small `k` can pay off.
+
 ## Correctness
 
 Fast is only interesting if the answers are right, so every model is checked against HF transformers
