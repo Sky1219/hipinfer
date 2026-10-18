@@ -1119,8 +1119,9 @@ static Engine* load_shard(const char* path, int rank, int world, int maxB, int m
   for (int i = 0; i < D / 2; i++)
     for (int p = 0; p < max_seq; p++) {
       const float a = (float)p * inv[i];
-      rt[(size_t)p * (D / 2) + i] = __halves2half2(__float2half((float)cos((double)a) * c.attn_scaling),
-                                                   __float2half((float)sin((double)a) * c.attn_scaling));
+      // the __half2 constructor, not __halves2half2: that is device-only in CUDA 12.0 headers
+      rt[(size_t)p * (D / 2) + i] = __half2(__float2half((float)cos((double)a) * c.attn_scaling),
+                                            __float2half((float)sin((double)a) * c.attn_scaling));
     }
   e->rope = (__half2*)dalloc(rt.size() * 4);
   HI_CHECK(hipMemcpy(e->rope, rt.data(), rt.size() * 4, hipMemcpyHostToDevice));

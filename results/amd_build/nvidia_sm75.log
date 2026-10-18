@@ -1,0 +1,15 @@
+$ make NVCC=nvcc NV_ARCH="-gencode arch=compute_75,code=sm_75"
+(WSL Ubuntu-24.04, Build cuda_12.0.r12.0/compiler.32267302_0)
+
+mkdir -p build
+nvcc -O3 -std=c++17 -lineinfo -gencode arch=compute_75,code=sm_75 -Xcompiler -fPIC,-fvisibility=hidden -shared src/api.cu  -lpthread -o build/libhipinfer.so
+src/api.cu(798): warning #177-D: function "ar_nccl" was declared but never referenced
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+nvlink warning : Skipping incompatible '/usr/lib/x86_64-linux-gnu/libpthread.a' when searching for -lpthread
+
+exit status: 0 (261 s)
+build/libhipinfer.so: 6946712 bytes
+ELF file    1: tmpxft_0000066a_00000000-0.sm_75.cubin
+ELF file    2: tmpxft_0000066a_00000000-1.sm_75.cubin

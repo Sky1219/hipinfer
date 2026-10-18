@@ -1,0 +1,134 @@
+$ make hip HIPCC=hipcc -Wall -Wextra
+
+mkdir -p build
+hipcc -Wall -Wextra -O3 -std=c++17 -fPIC -fvisibility=hidden -shared --offload-arch=gfx90a --offload-arch=gfx942 --offload-arch=gfx1100 -x hip src/api.cu  -lpthread -o build/libhipinfer_amd.so
+In file included from src/api.cu:4:
+src/kernels.cuh:1892:21: warning: comparison of integers of different signs: 'unsigned int' and 'int' [-Wsign-compare]
+ 1892 |     if (threadIdx.x < a.world) {
+      |         ~~~~~~~~~~~ ^ ~~~~~~~
+src/api.cu:262:47: warning: unused parameter 'epi' [-Wunused-parameter]
+  262 | static int gemm_pick(int M, int N, int K, int epi) {
+      |                                               ^
+In file included from src/api.cu:4:
+src/kernels.cuh:1892:21: warning: comparison of integers of different signs: 'unsigned int' and 'int' [-Wsign-compare]
+ 1892 |     if (threadIdx.x < a.world) {
+      |         ~~~~~~~~~~~ ^ ~~~~~~~
+src/api.cu:900:3: note: in instantiation of function template specialization 'allreduce_oneshot_kernel<0>' requested here
+  900 |   allreduce_oneshot_kernel<OP><<<nb, kARThreads, 0, s>>>(g->args[e->rank], (uint4*)x, nv);
+      |   ^
+src/api.cu:905:21: note: in instantiation of function template specialization 'tp_allreduce_op<0>' requested here
+  905 |   if (e->world > 1) tp_allreduce_op<0>(e, x, n * 2, s);
+      |                     ^
+In file included from src/api.cu:4:
+src/kernels.cuh:1892:21: warning: comparison of integers of different signs: 'unsigned int' and 'int' [-Wsign-compare]
+ 1892 |     if (threadIdx.x < a.world) {
+      |         ~~~~~~~~~~~ ^ ~~~~~~~
+src/api.cu:900:3: note: in instantiation of function template specialization 'allreduce_oneshot_kernel<1>' requested here
+  900 |   allreduce_oneshot_kernel<OP><<<nb, kARThreads, 0, s>>>(g->args[e->rank], (uint4*)x, nv);
+      |   ^
+src/api.cu:920:3: note: in instantiation of function template specialization 'tp_allreduce_op<1>' requested here
+  920 |   tp_allreduce_op<1>(e, e->keys, (size_t)(B + 1) / 2 * 16, s);
+      |   ^
+src/api.cu:798:13: warning: unused function 'ar_nccl' [-Wunused-function]
+  798 | static bool ar_nccl(const TPGroup* g, size_t bytes) {
+      |             ^~~~~~~
+5 warnings generated when compiling for gfx1100.
+In file included from src/api.cu:4:
+src/kernels.cuh:1892:21: warning: comparison of integers of different signs: 'unsigned int' and 'int' [-Wsign-compare]
+ 1892 |     if (threadIdx.x < a.world) {
+      |         ~~~~~~~~~~~ ^ ~~~~~~~
+src/api.cu:262:47: warning: unused parameter 'epi' [-Wunused-parameter]
+  262 | static int gemm_pick(int M, int N, int K, int epi) {
+      |                                               ^
+In file included from src/api.cu:4:
+src/kernels.cuh:1892:21: warning: comparison of integers of different signs: 'unsigned int' and 'int' [-Wsign-compare]
+ 1892 |     if (threadIdx.x < a.world) {
+      |         ~~~~~~~~~~~ ^ ~~~~~~~
+src/api.cu:900:3: note: in instantiation of function template specialization 'allreduce_oneshot_kernel<0>' requested here
+  900 |   allreduce_oneshot_kernel<OP><<<nb, kARThreads, 0, s>>>(g->args[e->rank], (uint4*)x, nv);
+      |   ^
+src/api.cu:905:21: note: in instantiation of function template specialization 'tp_allreduce_op<0>' requested here
+  905 |   if (e->world > 1) tp_allreduce_op<0>(e, x, n * 2, s);
+      |                     ^
+In file included from src/api.cu:4:
+src/kernels.cuh:1892:21: warning: comparison of integers of different signs: 'unsigned int' and 'int' [-Wsign-compare]
+ 1892 |     if (threadIdx.x < a.world) {
+      |         ~~~~~~~~~~~ ^ ~~~~~~~
+src/api.cu:900:3: note: in instantiation of function template specialization 'allreduce_oneshot_kernel<1>' requested here
+  900 |   allreduce_oneshot_kernel<OP><<<nb, kARThreads, 0, s>>>(g->args[e->rank], (uint4*)x, nv);
+      |   ^
+src/api.cu:920:3: note: in instantiation of function template specialization 'tp_allreduce_op<1>' requested here
+  920 |   tp_allreduce_op<1>(e, e->keys, (size_t)(B + 1) / 2 * 16, s);
+      |   ^
+src/api.cu:798:13: warning: unused function 'ar_nccl' [-Wunused-function]
+  798 | static bool ar_nccl(const TPGroup* g, size_t bytes) {
+      |             ^~~~~~~
+5 warnings generated when compiling for gfx90a.
+In file included from src/api.cu:4:
+src/kernels.cuh:1892:21: warning: comparison of integers of different signs: 'unsigned int' and 'int' [-Wsign-compare]
+ 1892 |     if (threadIdx.x < a.world) {
+      |         ~~~~~~~~~~~ ^ ~~~~~~~
+src/api.cu:262:47: warning: unused parameter 'epi' [-Wunused-parameter]
+  262 | static int gemm_pick(int M, int N, int K, int epi) {
+      |                                               ^
+In file included from src/api.cu:4:
+src/kernels.cuh:1892:21: warning: comparison of integers of different signs: 'unsigned int' and 'int' [-Wsign-compare]
+ 1892 |     if (threadIdx.x < a.world) {
+      |         ~~~~~~~~~~~ ^ ~~~~~~~
+src/api.cu:900:3: note: in instantiation of function template specialization 'allreduce_oneshot_kernel<0>' requested here
+  900 |   allreduce_oneshot_kernel<OP><<<nb, kARThreads, 0, s>>>(g->args[e->rank], (uint4*)x, nv);
+      |   ^
+src/api.cu:905:21: note: in instantiation of function template specialization 'tp_allreduce_op<0>' requested here
+  905 |   if (e->world > 1) tp_allreduce_op<0>(e, x, n * 2, s);
+      |                     ^
+In file included from src/api.cu:4:
+src/kernels.cuh:1892:21: warning: comparison of integers of different signs: 'unsigned int' and 'int' [-Wsign-compare]
+ 1892 |     if (threadIdx.x < a.world) {
+      |         ~~~~~~~~~~~ ^ ~~~~~~~
+src/api.cu:900:3: note: in instantiation of function template specialization 'allreduce_oneshot_kernel<1>' requested here
+  900 |   allreduce_oneshot_kernel<OP><<<nb, kARThreads, 0, s>>>(g->args[e->rank], (uint4*)x, nv);
+      |   ^
+src/api.cu:920:3: note: in instantiation of function template specialization 'tp_allreduce_op<1>' requested here
+  920 |   tp_allreduce_op<1>(e, e->keys, (size_t)(B + 1) / 2 * 16, s);
+      |   ^
+src/api.cu:798:13: warning: unused function 'ar_nccl' [-Wunused-function]
+  798 | static bool ar_nccl(const TPGroup* g, size_t bytes) {
+      |             ^~~~~~~
+5 warnings generated when compiling for gfx942.
+In file included from src/api.cu:4:
+src/kernels.cuh:1892:21: warning: comparison of integers of different signs: 'unsigned int' and 'int' [-Wsign-compare]
+ 1892 |     if (threadIdx.x < a.world) {
+      |         ~~~~~~~~~~~ ^ ~~~~~~~
+src/api.cu:262:47: warning: unused parameter 'epi' [-Wunused-parameter]
+  262 | static int gemm_pick(int M, int N, int K, int epi) {
+      |                                               ^
+In file included from src/api.cu:4:
+src/kernels.cuh:1892:21: warning: comparison of integers of different signs: 'unsigned int' and 'int' [-Wsign-compare]
+ 1892 |     if (threadIdx.x < a.world) {
+      |         ~~~~~~~~~~~ ^ ~~~~~~~
+src/api.cu:900:3: note: in instantiation of function template specialization 'allreduce_oneshot_kernel<0>' requested here
+  900 |   allreduce_oneshot_kernel<OP><<<nb, kARThreads, 0, s>>>(g->args[e->rank], (uint4*)x, nv);
+      |   ^
+src/api.cu:905:21: note: in instantiation of function template specialization 'tp_allreduce_op<0>' requested here
+  905 |   if (e->world > 1) tp_allreduce_op<0>(e, x, n * 2, s);
+      |                     ^
+In file included from src/api.cu:4:
+src/kernels.cuh:1892:21: warning: comparison of integers of different signs: 'unsigned int' and 'int' [-Wsign-compare]
+ 1892 |     if (threadIdx.x < a.world) {
+      |         ~~~~~~~~~~~ ^ ~~~~~~~
+src/api.cu:900:3: note: in instantiation of function template specialization 'allreduce_oneshot_kernel<1>' requested here
+  900 |   allreduce_oneshot_kernel<OP><<<nb, kARThreads, 0, s>>>(g->args[e->rank], (uint4*)x, nv);
+      |   ^
+src/api.cu:920:3: note: in instantiation of function template specialization 'tp_allreduce_op<1>' requested here
+  920 |   tp_allreduce_op<1>(e, e->keys, (size_t)(B + 1) / 2 * 16, s);
+      |   ^
+src/api.cu:798:13: warning: unused function 'ar_nccl' [-Wunused-function]
+  798 | static bool ar_nccl(const TPGroup* g, size_t bytes) {
+      |             ^~~~~~~
+5 warnings generated when compiling for host.
+
+exit status: 0 (216 s)
+build/libhipinfer_amd.so: 3702664 bytes
+  gfx90a: 113 kernels; MoE: moe_combine_kernel moe_gather_kernel moe_gemv_down_kernel moe_gemv_gu_kernel moe_router_kernel moe_sort_kernel 
+  gfx942: 113 kernels; MoE: moe_combine_kernel moe_gather_kernel moe_gemv_down_kernel moe_gemv_gu_kernel moe_router_kernel moe_sort_kernel 
+  gfx1100: 113 kernels; MoE: moe_combine_kernel moe_gather_kernel moe_gemv_down_kernel moe_gemv_gu_kernel moe_router_kernel moe_sort_kernel 

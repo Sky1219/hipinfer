@@ -1,0 +1,8 @@
+$ make hip AMD_ARCH=--offload-arch=gfx90a
+
+mkdir -p build
+hipcc -O3 -std=c++17 -fPIC -fvisibility=hidden -shared --offload-arch=gfx90a -x hip src/api.cu  -lpthread -o build/libhipinfer_amd.so
+
+exit status: 0 (84 s)
+build/libhipinfer_amd.so: 1424856 bytes
+  gfx90a: 113 kernels; MoE: moe_combine_kernel moe_gather_kernel moe_gemv_down_kernel moe_gemv_gu_kernel moe_router_kernel moe_sort_kernel 

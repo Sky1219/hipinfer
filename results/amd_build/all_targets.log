@@ -1,0 +1,10 @@
+$ make hip
+
+mkdir -p build
+hipcc -O3 -std=c++17 -fPIC -fvisibility=hidden -shared --offload-arch=gfx90a --offload-arch=gfx942 --offload-arch=gfx1100 -x hip src/api.cu  -lpthread -o build/libhipinfer_amd.so
+
+exit status: 0 (223 s)
+build/libhipinfer_amd.so: 3702664 bytes
+  gfx90a: 113 kernels; MoE: moe_combine_kernel moe_gather_kernel moe_gemv_down_kernel moe_gemv_gu_kernel moe_router_kernel moe_sort_kernel 
+  gfx942: 113 kernels; MoE: moe_combine_kernel moe_gather_kernel moe_gemv_down_kernel moe_gemv_gu_kernel moe_router_kernel moe_sort_kernel 
+  gfx1100: 113 kernels; MoE: moe_combine_kernel moe_gather_kernel moe_gemv_down_kernel moe_gemv_gu_kernel moe_router_kernel moe_sort_kernel 

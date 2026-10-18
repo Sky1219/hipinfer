@@ -1,0 +1,13 @@
+image:   rocm/dev-ubuntu-24.04:7.2.4
+rocm:    7.2.4
+rocwmma: 2.2.0.70204-93~24.04
+rccl:    2.27.7.70204-93~24.04
+os:      Ubuntu 24.04.4 LTS
+source:  662ab55 (src/ and Makefile as committed)
+
+HIP version: 7.2.53211-97f5574fe2
+AMD clang version 22.0.0git (https://github.com/RadeonOpenCompute/llvm-project roc-7.2.4 26084 f58b06dce1f9c15707c5f808fd002e18c2accf7e)
+Target: x86_64-unknown-linux-gnu
+Thread model: posix
+InstalledDir: /opt/rocm-7.2.4/lib/llvm/bin
+Configuration file: /opt/rocm-7.2.4/lib/llvm/bin/clang++.cfg
