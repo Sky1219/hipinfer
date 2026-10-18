@@ -1,5 +1,6 @@
-# CPU tests (no GPU: MoE reference engine and layer-diff tool vs HF transformers) and compile checks
-# for NVIDIA (nvcc) and AMD (hipcc) on every push and pull request.
+# CPU tests (no GPU: MoE reference engine, layer-diff tool, int8 export, speculative round loop,
+# eviction reference, decode profiler) and compile checks for NVIDIA (nvcc) and AMD (hipcc) on
+# every push and pull request.
 name: CI
 
 on:
@@ -42,6 +43,14 @@ jobs:
         run: python tests/test_moe_ref.py --quick
       - name: Layer-diff tool (capture, fault localisation, engine dump layout)
         run: python tests/test_layer_diff.py
+      - name: int8 export (file layout, rounding, kernel int8-to-fp32 conversion)
+        run: python tests/test_int8_cpu.py
+      - name: Speculative decoding round loop (stub engines vs plain greedy)
+        run: python tests/test_spec_logic.py
+      - name: Eviction reference (H2O / WFL selection, incremental rescan)
+        run: python tests/test_eviction_cpu.py
+      - name: Decode profile summary (synthetic Nsight Systems trace)
+        run: python tests/test_profile_decode.py
 
   nvidia-build:
     name: NVIDIA build (nvcc, sm_75 + sm_80, NCCL)
