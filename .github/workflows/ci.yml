@@ -1,0 +1,44 @@
+# CPU tests (no GPU: MoE reference engine and layer-diff tool vs HF transformers) on every push
+# and pull request.
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cpu-tests:
+    name: CPU tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TRANSFORMERS_VERBOSITY: error
+      HF_HUB_DISABLE_TELEMETRY: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: .github/ci-requirements.txt
+      - name: Install CPU-only PyTorch and transformers
+        run: pip install -r .github/ci-requirements.txt
+      # The hf-internal-testing tiny models the tests download (a few MB)
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-tiny-models-v1
+      - name: Byte-compile scripts and tests
+        run: python -m compileall -q scripts tests
+      - name: MoE export + reference engine vs HF (tiny Mixtral, OLMoE, Granite MoE)
+        run: python tests/test_moe_ref.py --quick
+      - name: Layer-diff tool (capture, fault localisation, engine dump layout)
+        run: python tests/test_layer_diff.py
