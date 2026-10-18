@@ -21,7 +21,7 @@ ifneq ($(RCCL),)
   AMD_NCCL = -DHI_NCCL -lrccl
 endif
 SRC = src/api.cu
-DEPS = src/api.cu src/kernels.cuh src/hip_compat.h
+DEPS = src/api.cu src/kernels.cuh src/evict.cuh src/hip_compat.h
 
 build/libhipinfer.so: $(DEPS)
 	mkdir -p build
