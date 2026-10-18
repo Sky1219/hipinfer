@@ -1,5 +1,10 @@
 # hipinfer
 
+[![CI](https://github.com/Sky1219/hipinfer/actions/workflows/ci.yml/badge.svg)](https://github.com/Sky1219/hipinfer/actions/workflows/ci.yml)
+
+CI runs the CPU tests against HF transformers and compiles the engine for NVIDIA (nvcc) and AMD
+(hipcc) on every commit.
+
 An LLM inference engine I wrote from scratch in HIP. On one RTX 2080 Ti it runs Llama, Qwen and
 TinyLlama models in fp16 **5–47 % faster than llama.cpp at batch-1 decode** (128-token context;
 3–43 % at 1,024), and its outputs match Hugging Face transformers (WikiText-2 perplexity within
