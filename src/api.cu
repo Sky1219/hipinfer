@@ -876,6 +876,11 @@ struct Engine {
   size_t layer_cache;                  // elements per layer of the KV cache
   half* dbg = nullptr;                 // hi_prefill_debug: where prefill copies its intermediates (null: off)
   int dbg_T = 0;                       // rows of each dbg plane
+  // hi_verify (speculative decoding): up to kGemvMaxRows rows of one slot, allocated on first use
+  int *v_tok = nullptr, *v_pos = nullptr, *v_out = nullptr;
+  half* v_logits = nullptr;            // [kGemvMaxRows, vocab]
+  void* v_work = nullptr;              // decode-attention workspace for kGemvMaxRows queries
+  std::map<std::pair<int, int>, hipGraphExec_t> vgraphs;  // (slot, rows)
 };
 
 // Vocabulary-sharded logits ([rows, vl] at src, row stride vl) into the caller's [rows, vocab]
@@ -1170,9 +1175,11 @@ static Engine* load_shard(const char* path, int rank, int world, int maxB, int m
 
 static void free_shard(Engine* e) {
   for (auto g : e->graphs) if (g) (void)hipGraphExecDestroy(g);
+  for (auto& g : e->vgraphs) (void)hipGraphExecDestroy(g.second);
   for (void* p : e->wallocs) (void)hipFree(p);
   void* ps[] = {e->kc, e->vc, e->x, e->xn, e->qkv, e->att, e->act, e->logits, e->keys, e->rope,
-                e->d_tok, e->d_pos, e->d_hist, e->d_ptok, e->work, e->pf_logits, e->moe_idx, e->moe_w, e->moe_work};
+                e->d_tok, e->d_pos, e->d_hist, e->d_ptok, e->work, e->pf_logits, e->moe_idx, e->moe_w, e->moe_work,
+                e->v_tok, e->v_pos, e->v_out, e->v_logits, e->v_work};
   for (void* p : ps) if (p) (void)hipFree(p);
   if (e->hstage) (void)hipHostFree(e->hstage);
   (void)hipStreamDestroy(e->st);
@@ -1690,6 +1697,111 @@ EXPORT int hi_decode_debug(Engine* e, int B, void* dst) {
   decode_step(e, B);
   e->dbg = nullptr;
   HI_CHECK(hipStreamSynchronize(e->st));
+  return 0;
+}
+
+// ------------------------------------------------------------------ speculative verification
+// docs/speculative.md. R consecutive tokens of the sequence in slot `slot` (v_tok, at positions
+// v_pos = p0 .. p0 + R - 1) go through the kernels a B=1 decode step uses, with R activation
+// rows: the GEMVs (a row's arithmetic does not depend on the row count) and the decode attention
+// with B=1's split count and every query reading this slot's cache. All R rows' k/v are written
+// before any attention runs, and query i reads positions <= p0 + i only, so row i's logits, and
+// the k/v it leaves in the cache, are bit-identical to what plain greedy decoding computes at
+// position p0 + i. Accepting the draft tokens the target's argmax agrees with therefore
+// reproduces plain greedy output token for token. Above 8 rows (or when the fused norm's shared
+// memory does not fit) the RMSNorms run as rmsnorm_kernel, the same arithmetic as the GEMV's
+// fused prologue. v_out[i] = the argmax after row i. Dense models, one GPU.
+static void verify_step(Engine* e, int slot, int R) {
+  const Config& c = e->c;
+  const int H = c.hidden, D = c.head_dim, hq = e->hq, hkv = e->hkv, il = e->il, HD = hq * D, V = c.vocab;
+  hipStream_t s = e->st;
+  const bool fuse = R <= 8 && norm_fits(R, H);
+  const int S = decode_splits(1, hkv);  // B=1's split count, whatever R is
+  embed_kernel<<<R, 256, 0, s>>>(e->v_tok, e->embed, e->x, H);
+  for (int l = 0; l < c.layers; l++) {
+    const Layer& w = e->L[l];
+    half* kc = e->kc + e->layer_cache * l;
+    half* vc = e->vc + e->layer_cache * l;
+    if (fuse) {
+      gemv_qkv_rope(e->x, H, w.attn_norm, c.eps, w.wqkv, w.bqkv, e->qkv, e->qkv_dim, R, H, hq, hkv, D, e->rope, e->v_pos,
+                    kc, vc, e->max_seq, slot, s);
+    } else {
+      hi_rmsnorm(e->x, w.attn_norm, e->xn, R, H, c.eps, s);
+      gemv_qkv_rope(e->xn, H, nullptr, c.eps, w.wqkv, w.bqkv, e->qkv, e->qkv_dim, R, H, hq, hkv, D, e->rope, e->v_pos,
+                    kc, vc, e->max_seq, slot, s);
+    }
+    decode_attn(e->qkv, e->qkv_dim, kc, vc, e->max_seq, e->v_pos, e->att, HD, R, hq, hkv, D, e->v_work, S, slot, s);
+    hi_gemv(e->att, HD, nullptr, 0.f, w.wo, e->x, H, R, H, HD, 1, s);
+    if (fuse) hi_gemv(e->x, H, w.mlp_norm, c.eps, w.wgu, e->act, il, R, 2 * il, H, 2, s);
+    else { hi_rmsnorm(e->x, w.mlp_norm, e->xn, R, H, c.eps, s); hi_gemv(e->xn, H, nullptr, 0.f, w.wgu, e->act, il, R, 2 * il, H, 2, s); }
+    hi_gemv(e->act, il, nullptr, 0.f, w.wdown, e->x, H, R, H, il, 1, s);
+  }
+  if (fuse) hi_gemv(e->x, H, e->final_norm, c.eps, e->lm_head, e->v_logits, V, R, V, H, 0, s);
+  else {
+    hi_rmsnorm(e->x, e->final_norm, e->xn, R, H, c.eps, s);
+    hi_gemv(e->xn, H, nullptr, 0.f, e->lm_head, e->v_logits, V, R, V, H, 0, s);
+  }
+  argmax_kernel<<<R, 1024, 0, s>>>(e->v_logits, V, e->v_out, nullptr, nullptr, 0);
+}
+
+static bool verify_ok(const Engine* e, int slot, const int* tokens, int R, int p0) {
+  HI_REQ(e->world == 1 && !e->c.moe, "hi_verify: dense models on one GPU only");
+  HI_REQ(gemv_max() >= 1, "hi_verify: B=1 decode must take the GEMV path (HIPINFER_GEMV_MAX >= 1)");
+  HI_REQ(R >= 1 && R <= kGemvMaxRows, "hi_verify: R %d outside [1, %d]", R, kGemvMaxRows);
+  return prefill_ok(e, slot, tokens, R, p0, "hi_verify");
+}
+
+EXPORT int hi_verify_max_rows() { return kGemvMaxRows; }
+
+// Speculative verification (verify_step): the greedy next token after each of the R tokens at
+// positions p0 .. p0 + R - 1 of slot `slot`, into out[0, R) (host). With logits_dst (device
+// pointer on the engine's GPU, [R, vocab] fp16) non-null the logits are copied there too. The
+// rows' k/v are written to the cache; the slot's next token, position and history are left
+// alone (hi_rewind sets them). Returns 0, or -1 for bad arguments.
+EXPORT int hi_verify(Engine* e, int slot, const int* tokens, int R, int p0, int* out, void* logits_dst, int use_graph) {
+  if (!verify_ok(e, slot, tokens, R, p0)) return -1;
+  DevGuard dg(e->dev);
+  hi_init();  // norm_fits and decode_splits read this device's properties
+  hipStream_t s = e->st;
+  if (!e->v_tok) {
+    e->v_tok = (int*)dalloc(kGemvMaxRows * 4);
+    e->v_pos = (int*)dalloc(kGemvMaxRows * 4);
+    e->v_out = (int*)dalloc(kGemvMaxRows * 4);
+    e->v_logits = (half*)dalloc((size_t)kGemvMaxRows * e->c.vocab * 2);
+    e->v_work = dalloc(decode_work_bytes(kGemvMaxRows, e->hq, e->hkv, e->c.head_dim));
+  }
+  int pos[kGemvMaxRows];
+  for (int i = 0; i < R; i++) pos[i] = p0 + i;
+  HI_CHECK(hipMemcpyAsync(e->v_tok, tokens, (size_t)R * 4, hipMemcpyHostToDevice, s));
+  HI_CHECK(hipMemcpyAsync(e->v_pos, pos, (size_t)R * 4, hipMemcpyHostToDevice, s));
+  if (use_graph) {
+    hipGraphExec_t& g = e->vgraphs[{slot, R}];
+    if (!g) g = capture(s, [&] { verify_step(e, slot, R); });
+    HI_CHECK(hipGraphLaunch(g, s));
+  } else {
+    verify_step(e, slot, R);
+  }
+  if (logits_dst)
+    HI_CHECK(hipMemcpyAsync(logits_dst, e->v_logits, (size_t)R * e->c.vocab * 2, hipMemcpyDeviceToDevice, s));
+  HI_CHECK(hipMemcpyAsync(out, e->v_out, (size_t)R * 4, hipMemcpyDeviceToHost, s));
+  HI_CHECK(hipStreamSynchronize(s));
+  return 0;
+}
+
+// Set slot `slot`'s cache length to `len` (positions [0, len) are kept) and its next input token
+// to `tok`, so the next decode step feeds tok at position len. The cache is contiguous per slot,
+// so this is the whole rollback of rejected speculative tokens. Returns 0, or -1 for bad arguments.
+EXPORT int hi_rewind(Engine* e, int slot, int len, int tok) {
+  auto ok = [&] {
+    HI_REQ(slot >= 0 && slot < e->maxB, "hi_rewind: slot %d outside [0, max_batch %d)", slot, e->maxB);
+    HI_REQ(len >= 0 && len < e->max_seq, "hi_rewind: length %d outside [0, max_seq %d)", len, e->max_seq);
+    return tokens_ok(e, &tok, 1, "hi_rewind");
+  };
+  if (!ok()) return -1;
+  each_rank(e, [&](Engine* r) {
+    HI_CHECK(hipMemcpy(r->d_tok + slot, &tok, 4, hipMemcpyHostToDevice));
+    HI_CHECK(hipMemcpy(r->d_pos + slot, &len, 4, hipMemcpyHostToDevice));
+  });
   return 0;
 }
 
