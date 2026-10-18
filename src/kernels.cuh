@@ -91,10 +91,11 @@ __device__ __forceinline__ void rope_pair(half x1, half x2, __half2 t, half& y1,
 // Arguments of the fused QKV epilogue (EPI 3); unused by the other epilogues.
 struct RopeArgs {
   const __half2* cs;  // [max_seq][D/2] (cos, sin)
-  const int* pos;     // [M] position of each row; row m goes to cache slot m
+  const int* pos;     // [M] position of each row; row m goes to cache slot m (or kv_slot)
   half *kc, *vc;      // this layer's cache [slots][Hkv][max_seq][D]
   const half* bias;   // optional QKV bias [(Hq + 2 Hkv) * D] (Qwen2), or null
   int max_seq, Hq, Hkv, D;
+  int kv_slot = -1;   // >= 0: every row is a position of this one slot (speculative verification)
 };
 
 // ---------------------------------------------------------------------------------
@@ -210,14 +211,14 @@ gemv_kernel(const half* __restrict__ x, int ldx, const half* __restrict__ normw,
       else if constexpr (EPI == 2) out[(size_t)lane * ldo + o] = silu_mul(a0, a1);
       else {
         const int D = ra.D, HD = D >> 1;
-        const int head = o / HD, d = o % HD, p = ra.pos[lane];
+        const int head = o / HD, d = o % HD, p = ra.pos[lane], slot = ra.kv_slot >= 0 ? ra.kv_slot : lane;
         if (ra.bias) { a0 += __half2float(ra.bias[r0]); a1 += __half2float(ra.bias[r1]); }
         half y1 = __float2half(a0), y2 = __float2half(a1);
         if (head < ra.Hq + ra.Hkv) rope_pair(y1, y2, ra.cs[(size_t)p * HD + d], y1, y2);
         half* dst;
         if (head < ra.Hq) dst = out + (size_t)lane * ldo + head * D;
-        else if (head < ra.Hq + ra.Hkv) dst = ra.kc + (((size_t)lane * ra.Hkv + head - ra.Hq) * ra.max_seq + p) * D;
-        else dst = ra.vc + (((size_t)lane * ra.Hkv + head - ra.Hq - ra.Hkv) * ra.max_seq + p) * D;
+        else if (head < ra.Hq + ra.Hkv) dst = ra.kc + (((size_t)slot * ra.Hkv + head - ra.Hq) * ra.max_seq + p) * D;
+        else dst = ra.vc + (((size_t)slot * ra.Hkv + head - ra.Hq - ra.Hkv) * ra.max_seq + p) * D;
         dst[d] = y1;
         dst[d + HD] = y2;
       }
@@ -1401,13 +1402,16 @@ flash_prefill_mma_kernel(const half* __restrict__ q, int ldq, const half* __rest
 // graph-capturable while the context grows). Each split runs an online softmax over its
 // keys in tiles of 256; the last split block to finish (atomic counter) merges the partials,
 // so no separate combine launch is needed. With one split the block normalizes directly.
+// Query b reads cache slot b, or slot kv_slot for every b when kv_slot >= 0 (speculative
+// verification: the queries are consecutive positions of one sequence). A query's result
+// depends only on its position, its slot's keys and S, never on the number of queries.
 // ---------------------------------------------------------------------------------
 template <int G, int D>
 __global__ void __launch_bounds__(256)
 decode_attn_kernel(const half* __restrict__ q, int ldq, const half* __restrict__ kc,
                    const half* __restrict__ vc, int max_seq, int Hkv, const int* __restrict__ pos,
                    float* part_o, float* part_ml, int* counters, int S, half* out, int ldo,
-                   float scale_log2) {
+                   float scale_log2, int kv_slot) {
   constexpr int TILE = 256, NT = 256, HALF = D / 2, NP = (G * HALF + NT - 1) / NT;  // PV passes
   __shared__ float qs[G][D];
   __shared__ float sc[G][TILE];
@@ -1420,8 +1424,9 @@ decode_attn_kernel(const half* __restrict__ q, int ldq, const half* __restrict__
   if (split >= S_eff) return;
   const int chunk = (len + S_eff - 1) / S_eff;
   const int start = split * chunk, end = min(len, start + chunk);
-  const half* Kh = kc + ((size_t)b * Hkv + hk) * max_seq * D;
-  const half* Vh = vc + ((size_t)b * Hkv + hk) * max_seq * D;
+  const size_t cb = (size_t)(kv_slot >= 0 ? kv_slot : b);  // the cache slot this query reads
+  const half* Kh = kc + (cb * Hkv + hk) * max_seq * D;
+  const half* Vh = vc + (cb * Hkv + hk) * max_seq * D;
 
   for (int i = tid; i < G * D; i += blockDim.x)
     qs[i / D][i % D] = __half2float(q[(size_t)b * ldq + (hk * G) * D + i]) * scale_log2;
@@ -1579,7 +1584,7 @@ __global__ void __launch_bounds__(128)
 decode_attn_mma_kernel(const half* __restrict__ q, int ldq, const half* __restrict__ kc,
                        const half* __restrict__ vc, int max_seq, int Hkv, const int* __restrict__ pos,
                        float* part_o, float* part_ml, int* counters, int S, half* out, int ldo,
-                       float scale_log2) {
+                       float scale_log2, int kv_slot) {
   static_assert(G <= 8, "one quad row per head");
   constexpr int TILE = 64, LD = D + 8;
   static_assert(4 * G * D * 4 <= TILE * LD * 2, "warp-merge scratch aliases the K tile");
@@ -1600,8 +1605,9 @@ decode_attn_mma_kernel(const half* __restrict__ q, int ldq, const half* __restri
   if (split >= S_eff) return;
   const int chunk = (len + S_eff - 1) / S_eff;
   const int start = split * chunk, end = min(len, start + chunk);
-  const half* Kh = kc + ((size_t)b * Hkv + hk) * max_seq * D;
-  const half* Vh = vc + ((size_t)b * Hkv + hk) * max_seq * D;
+  const size_t cb = (size_t)(kv_slot >= 0 ? kv_slot : b);  // the cache slot this query reads
+  const half* Kh = kc + (cb * Hkv + hk) * max_seq * D;
+  const half* Vh = vc + (cb * Hkv + hk) * max_seq * D;
 
   for (int c = tid; c < 16 * D / 8; c += 128) {
     const int r = c / (D / 8), d8 = (c % (D / 8)) * 8;

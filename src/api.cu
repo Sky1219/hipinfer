@@ -108,59 +108,82 @@ static void gemv_launch(const half* x, int ldx, const half* nw, float eps, const
   gemv_kernel<MR, NORM, EPI><<<grid, 256, sm, s>>>(x, ldx, nw, eps, W, N, K, out, ldo, ra);
 }
 
+template <int MR, bool NORM>
+static void gemv_epi(const half* x, int ldx, const half* nw, float eps, const half* W, half* out,
+                     int ldo, int N, int K, int epi, hipStream_t s) {
+  if (epi == 0) gemv_launch<MR, NORM, 0>(x, ldx, nw, eps, W, out, ldo, N, K, s);
+  else if (epi == 1) gemv_launch<MR, NORM, 1>(x, ldx, nw, eps, W, out, ldo, N, K, s);
+  else gemv_launch<MR, NORM, 2>(x, ldx, nw, eps, W, out, ldo, N, K, s);
+}
+
 template <int MR>
 static void gemv_mr(const half* x, int ldx, const half* nw, float eps, const half* W, half* out,
                     int ldo, int N, int K, int epi, hipStream_t s) {
-  if (nw) {
-    if (epi == 0) gemv_launch<MR, true, 0>(x, ldx, nw, eps, W, out, ldo, N, K, s);
-    else if (epi == 1) gemv_launch<MR, true, 1>(x, ldx, nw, eps, W, out, ldo, N, K, s);
-    else gemv_launch<MR, true, 2>(x, ldx, nw, eps, W, out, ldo, N, K, s);
-  } else {
-    if (epi == 0) gemv_launch<MR, false, 0>(x, ldx, nw, eps, W, out, ldo, N, K, s);
-    else if (epi == 1) gemv_launch<MR, false, 1>(x, ldx, nw, eps, W, out, ldo, N, K, s);
-    else gemv_launch<MR, false, 2>(x, ldx, nw, eps, W, out, ldo, N, K, s);
-  }
+  if (nw) gemv_epi<MR, true>(x, ldx, nw, eps, W, out, ldo, N, K, epi, s);
+  else gemv_epi<MR, false>(x, ldx, nw, eps, W, out, ldo, N, K, epi, s);
 }
+
+// Widest GEMV launch: 8 rows with the RMSNorm fused (its shared memory holds the normalized
+// rows), kGemvMaxRows without (speculative verification of up to 15 draft tokens in one weight
+// pass). A row's arithmetic does not depend on the row count: row m of an M-row GEMV is
+// bit-identical to a 1-row GEMV of that row.
+static const int kGemvMaxRows = 16;
 
 // out[M, *] (epi) x[M, K] @ W[N, K]^T for small M, optionally RMSNorm-ing x first (normw != null)
 EXPORT void hi_gemv(const void* x, int ldx, const void* normw, float eps, const void* W, void* out,
                     int ldo, int M, int N, int K, int epi, void* s) {
   hi_init();
-  for (int m0 = 0; m0 < M; m0 += 8) {
-    const int mr = M - m0 < 8 ? M - m0 : 8;
+  const int cap = normw ? 8 : kGemvMaxRows;
+  for (int m0 = 0; m0 < M; m0 += cap) {
+    const int mr = M - m0 < cap ? M - m0 : cap;
     const half* xp = (const half*)x + (size_t)m0 * ldx;
     half* op = (half*)out + (size_t)m0 * ldo;
     const half* nw = (const half*)normw;
+    const half* w = (const half*)W;
+#define HI_GW(m) case m: gemv_epi<m, false>(xp, ldx, nw, eps, w, op, ldo, N, K, epi, ST(s)); break
     switch (mr) {
-      case 1: gemv_mr<1>(xp, ldx, nw, eps, (const half*)W, op, ldo, N, K, epi, ST(s)); break;
-      case 2: gemv_mr<2>(xp, ldx, nw, eps, (const half*)W, op, ldo, N, K, epi, ST(s)); break;
-      case 3: gemv_mr<3>(xp, ldx, nw, eps, (const half*)W, op, ldo, N, K, epi, ST(s)); break;
-      case 4: gemv_mr<4>(xp, ldx, nw, eps, (const half*)W, op, ldo, N, K, epi, ST(s)); break;
-      case 5: gemv_mr<5>(xp, ldx, nw, eps, (const half*)W, op, ldo, N, K, epi, ST(s)); break;
-      case 6: gemv_mr<6>(xp, ldx, nw, eps, (const half*)W, op, ldo, N, K, epi, ST(s)); break;
-      case 7: gemv_mr<7>(xp, ldx, nw, eps, (const half*)W, op, ldo, N, K, epi, ST(s)); break;
-      default: gemv_mr<8>(xp, ldx, nw, eps, (const half*)W, op, ldo, N, K, epi, ST(s)); break;
+      case 1: gemv_mr<1>(xp, ldx, nw, eps, w, op, ldo, N, K, epi, ST(s)); break;
+      case 2: gemv_mr<2>(xp, ldx, nw, eps, w, op, ldo, N, K, epi, ST(s)); break;
+      case 3: gemv_mr<3>(xp, ldx, nw, eps, w, op, ldo, N, K, epi, ST(s)); break;
+      case 4: gemv_mr<4>(xp, ldx, nw, eps, w, op, ldo, N, K, epi, ST(s)); break;
+      case 5: gemv_mr<5>(xp, ldx, nw, eps, w, op, ldo, N, K, epi, ST(s)); break;
+      case 6: gemv_mr<6>(xp, ldx, nw, eps, w, op, ldo, N, K, epi, ST(s)); break;
+      case 7: gemv_mr<7>(xp, ldx, nw, eps, w, op, ldo, N, K, epi, ST(s)); break;
+      case 8: gemv_mr<8>(xp, ldx, nw, eps, w, op, ldo, N, K, epi, ST(s)); break;
+      HI_GW(9); HI_GW(10); HI_GW(11); HI_GW(12); HI_GW(13); HI_GW(14); HI_GW(15); HI_GW(16);
     }
+#undef HI_GW
   }
 }
 
+// Fused QKV GEMV (hi_gemv_qkv_rope); kv_slot >= 0 sends every row's k/v to that one slot.
+static void gemv_qkv_rope(const half* x, int ldx, const half* nw, float eps, const half* w, const half* bias, half* o,
+                          int ldo, int M, int K, int Hq, int Hkv, int D, const __half2* cs, const int* pos, half* kc,
+                          half* vc, int max_seq, int kv_slot, hipStream_t s) {
+  const int N = (Hq + 2 * Hkv) * D;
+  RopeArgs ra{cs, pos, kc, vc, bias, max_seq, Hq, Hkv, D, kv_slot};
+#define HI_QKV(mr) case mr: if (nw) gemv_launch<mr, true, 3>(x, ldx, nw, eps, w, o, ldo, N, K, s, ra); \
+                            else gemv_launch<mr, false, 3>(x, ldx, nw, eps, w, o, ldo, N, K, s, ra); break
+#define HI_QKV_NN(mr) case mr: gemv_launch<mr, false, 3>(x, ldx, nw, eps, w, o, ldo, N, K, s, ra); break
+  if (nw && M > 8) { fprintf(stderr, "hi_gemv_qkv_rope: M must be 1..8 with the fused RMSNorm\n"); exit(1); }
+  switch (M) {
+    HI_QKV(1); HI_QKV(2); HI_QKV(3); HI_QKV(4); HI_QKV(5); HI_QKV(6); HI_QKV(7); HI_QKV(8);
+    HI_QKV_NN(9); HI_QKV_NN(10); HI_QKV_NN(11); HI_QKV_NN(12); HI_QKV_NN(13); HI_QKV_NN(14); HI_QKV_NN(15);
+    HI_QKV_NN(16);
+    default: fprintf(stderr, "hi_gemv_qkv_rope: M must be 1..%d\n", kGemvMaxRows); exit(1);
+  }
+#undef HI_QKV
+#undef HI_QKV_NN
+}
+
 // QKV projection (RMSNorm fused) with bias, RoPE and the KV-cache write fused into the epilogue.
-// q goes to out[m, 0:Hq*D]; k/v go to cache slot m at position pos[m].
+// q goes to out[m, 0:Hq*D]; k/v go to cache slot m at position pos[m]. M <= 8 with normw, <= 16 without.
 EXPORT void hi_gemv_qkv_rope(const void* x, int ldx, const void* normw, float eps, const void* W, const void* bias,
                              void* out, int ldo, int M, int K, int Hq, int Hkv, int D, const void* cs, const int* pos,
                              void* kc, void* vc, int max_seq, void* s) {
   hi_init();
-  const int N = (Hq + 2 * Hkv) * D;
-  RopeArgs ra{(const __half2*)cs, pos, (half*)kc, (half*)vc, (const half*)bias, max_seq, Hq, Hkv, D};
-  const half* xp = (const half*)x; const half* nw = (const half*)normw; const half* w = (const half*)W;
-  half* o = (half*)out;
-#define HI_QKV(mr) case mr: if (nw) gemv_launch<mr, true, 3>(xp, ldx, nw, eps, w, o, ldo, N, K, ST(s), ra); \
-                            else gemv_launch<mr, false, 3>(xp, ldx, nw, eps, w, o, ldo, N, K, ST(s), ra); break
-  switch (M) {
-    HI_QKV(1); HI_QKV(2); HI_QKV(3); HI_QKV(4); HI_QKV(5); HI_QKV(6); HI_QKV(7); HI_QKV(8);
-    default: fprintf(stderr, "hi_gemv_qkv_rope: M must be 1..8\n"); exit(1);
-  }
-#undef HI_QKV
+  gemv_qkv_rope((const half*)x, ldx, (const half*)normw, eps, (const half*)W, (const half*)bias, (half*)out, ldo, M, K,
+                Hq, Hkv, D, (const __half2*)cs, pos, (half*)kc, (half*)vc, max_seq, -1, ST(s));
 }
 
 template <int BM, int BN, int BK, int WGM, int WGN, int EPI>
@@ -534,22 +557,24 @@ EXPORT size_t hi_decode_work_bytes(int B, int Hq, int Hkv, int D) { return decod
 template <int G, int D>
 static void decode_attn_g(dim3 grid, bool mma, const half* q, int ldq, const half* kc, const half* vc, int max_seq, int Hkv,
                           const int* pos, float* po, float* pml, int* counters, int S, half* out, int ldo, float sl2,
-                          hipStream_t s) {
+                          int kv_slot, hipStream_t s) {
 #if !defined(HI_AMD)
   if (mma) {
-    decode_attn_mma_kernel<G, D><<<grid, 128, 0, s>>>(q, ldq, kc, vc, max_seq, Hkv, pos, po, pml, counters, S, out, ldo, sl2);
+    decode_attn_mma_kernel<G, D><<<grid, 128, 0, s>>>(q, ldq, kc, vc, max_seq, Hkv, pos, po, pml, counters, S, out, ldo, sl2,
+                                                      kv_slot);
     return;
   }
 #endif
   (void)mma;
-  decode_attn_kernel<G, D><<<grid, 256, 0, s>>>(q, ldq, kc, vc, max_seq, Hkv, pos, po, pml, counters, S, out, ldo, sl2);
+  decode_attn_kernel<G, D><<<grid, 256, 0, s>>>(q, ldq, kc, vc, max_seq, Hkv, pos, po, pml, counters, S, out, ldo, sl2,
+                                                kv_slot);
 }
 
 template <int D>
 static void decode_attn_d(int G, dim3 grid, bool mma, const half* q, int ldq, const half* kc, const half* vc, int max_seq,
                           int Hkv, const int* pos, float* po, float* pml, int* counters, int S, half* out, int ldo,
-                          float sl2, hipStream_t s) {
-#define HI_DA(g) case g: decode_attn_g<g, D>(grid, mma, q, ldq, kc, vc, max_seq, Hkv, pos, po, pml, counters, S, out, ldo, sl2, s); break
+                          float sl2, int kv_slot, hipStream_t s) {
+#define HI_DA(g) case g: decode_attn_g<g, D>(grid, mma, q, ldq, kc, vc, max_seq, Hkv, pos, po, pml, counters, S, out, ldo, sl2, kv_slot, s); break
   switch (G) {
     HI_DA(1); HI_DA(2); HI_DA(3); HI_DA(4); HI_DA(5); HI_DA(6); HI_DA(7); HI_DA(8);
     default: fprintf(stderr, "unsupported GQA group %d (1..8)\n", G); exit(1);
@@ -557,11 +582,11 @@ static void decode_attn_d(int G, dim3 grid, bool mma, const half* q, int ldq, co
 #undef HI_DA
 }
 
-EXPORT void hi_decode_attn(const void* q, int ldq, const void* kc, const void* vc, int max_seq, const int* pos,
-                           void* out, int ldo, int B, int Hq, int Hkv, int D, void* work, void* s) {
-  hi_init();
+// Decode attention of B queries with S splits; kv_slot >= 0: every query reads that cache slot.
+static void decode_attn(const half* q, int ldq, const half* kc, const half* vc, int max_seq, const int* pos, half* out,
+                        int ldo, int B, int Hq, int Hkv, int D, void* work, int S, int kv_slot, hipStream_t s) {
   check_head_dim(D, "hi_decode_attn");
-  const int S = decode_splits(B, Hkv), G = Hq / Hkv;
+  const int G = Hq / Hkv;
   if (B * Hkv > kDecodeCounters) { fprintf(stderr, "hi_decode_attn: B*Hkv %d > %d\n", B * Hkv, kDecodeCounters); exit(1); }
   int* counters = (int*)work;
   float* po = (float*)work + kDecodeCounters;
@@ -570,11 +595,18 @@ EXPORT void hi_decode_attn(const void* q, int ldq, const void* kc, const void* v
   dim3 grid(S, Hkv, B);
   static const bool use_mma = !getenv("HIPINFER_DECODE_SCALAR");  // env var forces the portable kernel
   if (D == 64)
-    decode_attn_d<64>(G, grid, use_mma, (const half*)q, ldq, (const half*)kc, (const half*)vc, max_seq, Hkv, pos, po, pml,
-                      counters, S, (half*)out, ldo, scale_log2, ST(s));
+    decode_attn_d<64>(G, grid, use_mma, q, ldq, kc, vc, max_seq, Hkv, pos, po, pml, counters, S, out, ldo, scale_log2,
+                      kv_slot, s);
   else
-    decode_attn_d<128>(G, grid, use_mma, (const half*)q, ldq, (const half*)kc, (const half*)vc, max_seq, Hkv, pos, po, pml,
-                       counters, S, (half*)out, ldo, scale_log2, ST(s));
+    decode_attn_d<128>(G, grid, use_mma, q, ldq, kc, vc, max_seq, Hkv, pos, po, pml, counters, S, out, ldo, scale_log2,
+                       kv_slot, s);
+}
+
+EXPORT void hi_decode_attn(const void* q, int ldq, const void* kc, const void* vc, int max_seq, const int* pos,
+                           void* out, int ldo, int B, int Hq, int Hkv, int D, void* work, void* s) {
+  hi_init();
+  decode_attn((const half*)q, ldq, (const half*)kc, (const half*)vc, max_seq, pos, (half*)out, ldo, B, Hq, Hkv, D, work,
+              decode_splits(B, Hkv), -1, ST(s));
 }
 
 EXPORT void hi_argmax(const void* logits, int B, int V, int* tok_out, void* s) {
