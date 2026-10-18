@@ -653,6 +653,98 @@ EXPORT void hi_decode_attn_track(const void* q, int ldq, const void* kc, const v
                     wscore, s);
 }
 
+// ------------------------------------------------------------------ eviction selection
+// Problem p of P is (layer p / hkv, kv head p % hkv); slot j of its per-slot arrays is at
+// base + (p / hkv) * ls + (p % hkv) * hs + j (and its K / V rows at D times that).
+
+// flags[p][lo .. hi) |= 1 for the k slots with the largest (largest = 1) or smallest score; ties
+// go to the lower slot. H2O keeps the top-m with it.
+EXPORT void hi_select_k(const float* score, long long ls, long long hs, int hkv, int P, int lo, int hi, int k, int largest,
+                        unsigned char* flags, int ld, void* s) {
+  hi_init();
+  if (P > 0 && k > 0) evict_select_kernel<<<P, 1024, 0, ST(s)>>>(score, ProbStride{ls, hs, hkv}, lo, hi, k, largest, flags, ld);
+}
+
+// WFL prune workspace for P problems of n slots: kn, vn [P][n][D] fp32, then [P][n] arrays w,
+// best, sec, acc (fp32), arg, arg2, hit, rl (int32), rcount [P], kept [P][n] (u8), each
+// 256-byte aligned. hi_wfl_work_offset gives array `which` (in that order, 0..11) for tests.
+struct WflWs { float *kn, *vn, *w, *best, *sec, *acc; int *arg, *arg2, *hit, *rl, *rcount; unsigned char* kept; };
+static size_t wfl_layout(int P, int n, int D, char* base, WflWs* ws, int which = -1) {
+  const size_t pn = (size_t)P * n;
+  const size_t sz[12] = {pn * D * 4, pn * D * 4, pn * 4, pn * 4, pn * 4, pn * 4, pn * 4, pn * 4, pn * 4, pn * 4,
+                         (size_t)P * 4, pn};
+  size_t off[12], o = 0;
+  for (int i = 0; i < 12; i++) { off[i] = o; o += (sz[i] + 255) / 256 * 256; }
+  if (which >= 0) return off[which];
+  if (ws) {
+    ws->kn = (float*)(base + off[0]); ws->vn = (float*)(base + off[1]); ws->w = (float*)(base + off[2]);
+    ws->best = (float*)(base + off[3]); ws->sec = (float*)(base + off[4]); ws->acc = (float*)(base + off[5]);
+    ws->arg = (int*)(base + off[6]); ws->arg2 = (int*)(base + off[7]); ws->hit = (int*)(base + off[8]);
+    ws->rl = (int*)(base + off[9]); ws->rcount = (int*)(base + off[10]); ws->kept = (unsigned char*)(base + off[11]);
+  }
+  return o;
+}
+EXPORT size_t hi_wfl_work_bytes(int P, int n, int D) { return wfl_layout(P, n, D, nullptr, nullptr); }
+EXPORT size_t hi_wfl_work_offset(int P, int n, int D, int which) { return wfl_layout(P, n, D, nullptr, nullptr, which); }
+
+// policies.wfl_prune (SubCache) on the GPU. Ground set of problem p: slots gidx[p][0..n) (status 0
+// candidate, 1 held); keys / values / H2O scores read through the strides. Removes ncand - m
+// candidates per problem (every problem must have ncand candidates), `step` per round (raised to
+// ceil(removals / rounds) when rounds > 0); sim = (max(cos_k, 0) * max(cos_v, 0))^power, power 1
+// or 2. incremental = 0 rescans every row each round (for checking the incremental rescan).
+// max_rounds >= 0 stops after that many rounds with the top-2 state of the next round in the
+// workspace (debug). Leaves kept [P][n] in the workspace (1 = kept, held slots included).
+// Returns the number of rounds run.
+static int wfl_prune(const half* kc, const half* vc, ProbStride kst, const float* score, ProbStride sst, const int* gidx,
+                     const unsigned char* status, int P, int n, int D, int ncand, int m, float mix, int step, int rounds,
+                     int power, int incremental, int max_rounds, void* work, hipStream_t s) {
+  WflWs ws;
+  wfl_layout(P, n, D, (char*)work, &ws);
+  wfl_prep_kernel<<<P, 256, 0, s>>>(kc, vc, kst, score, sst, gidx, n, D, ws.kn, ws.vn, ws.w, ws.kept, ws.hit, ws.rl,
+                                    ws.rcount);
+  const int n_remove = ncand - m;
+  if (n_remove <= 0 && max_rounds != 0) return 0;
+  if (rounds > 0) step = std::max(step, (n_remove + rounds - 1) / rounds);
+  step = std::max(step, 1);
+  const dim3 tg((n + 63) / 64, P);
+  int removed = 0, r = 0;
+  for (;; r++) {
+    wfl_top2_kernel<<<tg, 256, 0, s>>>(ws.kn, ws.vn, n, D, ws.kept, ws.rl, ws.rcount, power, ws.best, ws.sec, ws.arg,
+                                       ws.arg2);
+    if (r == max_rounds) break;
+    const int k = std::min(step, n_remove - removed);
+    wfl_round_kernel<<<P, 1024, 0, s>>>(n, k, r, mix, incremental, ws.w, ws.best, ws.sec, ws.arg, ws.arg2, status,
+                                        ws.acc, ws.kept, ws.hit, ws.rl, ws.rcount);
+    removed += k;
+    if (removed >= n_remove) { r++; break; }
+  }
+  return r;
+}
+static bool wfl_args_ok(int D, int power, const char* who) {
+  if (D != 64 && D != 128) { fprintf(stderr, "%s: head_dim %d not supported (64 or 128)\n", who, D); return false; }
+  if (power != 1 && power != 2) { fprintf(stderr, "%s: power must be 1 or 2\n", who); return false; }
+  return true;
+}
+// Standalone WFL prune (tests, benchmarks): kc / vc are fp16 K / V caches, score fp32, both laid
+// out by the strides above (in slots). kept_out [P][n] (u8, may be null) = kept candidates
+// (kept & status 0), as policies.wfl_prune returns. work: hi_wfl_work_bytes(P, n, D) bytes.
+// Returns the number of rounds, or -1 for bad arguments.
+EXPORT int hi_wfl_prune(const void* kc, const void* vc, long long k_ls, long long k_hs, const float* score, long long s_ls,
+                        long long s_hs, int hkv, const int* gidx, const unsigned char* status, int P, int n, int D, int ncand,
+                        int m, float mix, int step, int rounds, int power, int incremental, int max_rounds,
+                        unsigned char* kept_out, void* work, void* s) {
+  hi_init();
+  if (!wfl_args_ok(D, power, "hi_wfl_prune")) return -1;
+  const int r = wfl_prune((const half*)kc, (const half*)vc, ProbStride{k_ls, k_hs, hkv}, score, ProbStride{s_ls, s_hs, hkv},
+                          gidx, status, P, n, D, ncand, m, mix, step, rounds, power, incremental, max_rounds, work, ST(s));
+  if (kept_out) {
+    WflWs ws;
+    wfl_layout(P, n, D, (char*)work, &ws);
+    wfl_output_kernel<<<P, 256, 0, ST(s)>>>(ws.kept, status, n, kept_out);
+  }
+  return r;
+}
+
 EXPORT void hi_argmax(const void* logits, int B, int V, int* tok_out, void* s) {
   argmax_kernel<<<B, 1024, 0, ST(s)>>>((const half*)logits, V, tok_out, nullptr, nullptr, 0);
 }
@@ -920,6 +1012,18 @@ struct Engine {
   size_t layer_cache;                  // elements per layer of the KV cache
   half* dbg = nullptr;                 // hi_prefill_debug: where prefill copies its intermediates (null: off)
   int dbg_T = 0;                       // rows of each dbg plane
+  // Eviction scoring (hi_set_tracking; off by default, one GPU only). score / wscore
+  // [layers][maxB][hkv][max_seq] fp32: H2O mass of every cached key, and its mass from the window
+  // (the last `win` prompt tokens; null when win is 0). After hi_evict, sequence b's cache holds
+  // positions' keys compacted: its decode writes cache index pos - shift[b].
+  bool track = false;
+  int win = 0, win_from = 0;           // prefill rows at positions >= win_from are window rows
+  float *score = nullptr, *wscore = nullptr;
+  float *trk_lg = nullptr, *trk_lse = nullptr;  // decode logits [maxB][hq][max_seq]; LSE [max(maxB, max_pf)][hq]
+  int* d_shift = nullptr;              // [maxB] slots evicted per sequence (host copy: shift)
+  std::vector<int> shift;
+  void* ev_work = nullptr;             // hi_evict workspace (grow-only)
+  size_t ev_work_bytes = 0;
 };
 
 // Vocabulary-sharded logits ([rows, vl] at src, row stride vl) into the caller's [rows, vocab]
@@ -1216,7 +1320,8 @@ static void free_shard(Engine* e) {
   for (auto g : e->graphs) if (g) (void)hipGraphExecDestroy(g);
   for (void* p : e->wallocs) (void)hipFree(p);
   void* ps[] = {e->kc, e->vc, e->x, e->xn, e->qkv, e->att, e->act, e->logits, e->keys, e->rope,
-                e->d_tok, e->d_pos, e->d_hist, e->d_ptok, e->work, e->pf_logits, e->moe_idx, e->moe_w, e->moe_work};
+                e->d_tok, e->d_pos, e->d_hist, e->d_ptok, e->work, e->pf_logits, e->moe_idx, e->moe_w, e->moe_work,
+                e->score, e->wscore, e->trk_lg, e->trk_lse, e->d_shift, e->ev_work};
   for (void* p : ps) if (p) (void)hipFree(p);
   if (e->hstage) (void)hipHostFree(e->hstage);
   (void)hipStreamDestroy(e->st);
@@ -1425,8 +1530,15 @@ static void attn_rows(Engine* e, const Layer& w, half* kc, half* vc, int slot, i
   dbg_step(e, w, kDbgQkv, q, ld, r0, m, s);
   hi_rope_cache(q, ld, m, hq, hkv, D, e->rope, nullptr, pb + r0, slot, kc, vc, e->max_seq, s);
   dbg_rope(e, w, q, ld, kc, slot, r0, m, pb, s);
-  hi_flash_prefill(q, ld, kc + (size_t)slot * hkv * e->max_seq * D, vc + (size_t)slot * hkv * e->max_seq * D, e->max_seq,
-                   e->att + (size_t)r0 * HD, HD, m, pb + r0, hq, hkv, D, s);
+  const half* kslot = kc + (size_t)slot * hkv * e->max_seq * D;
+  flash_prefill(q, ld, kslot, vc + (size_t)slot * hkv * e->max_seq * D, e->max_seq, e->att + (size_t)r0 * HD, HD, m,
+                pb + r0, hq, hkv, D, e->track ? e->trk_lse : nullptr, s);
+  if (e->track) {  // eviction scores: second, key-parallel pass over the same rows
+    const size_t at = ((size_t)(&w - e->L.data()) * e->maxB + slot) * hkv * e->max_seq;
+    const int win_r0 = (int)std::min<long long>(m, std::max<long long>(0, (long long)e->win_from - (pb + r0)));
+    hi_prefill_scores(q, ld, kslot, e->max_seq, m, pb + r0, hq, hkv, D, e->trk_lse, e->score + at, nullptr, win_r0, 0, 0,
+                      e->win > 0 ? e->wscore + at : nullptr, s);
+  }
   dbg_step(e, w, kDbgAttn, e->att + (size_t)r0 * HD, HD, r0, m, s);
   hi_gemm(e->att + (size_t)r0 * HD, HD, w.wo, nullptr, e->x + (size_t)r0 * H, H, m, H, HD, ep, s);
   dbg_step(e, w, kDbgO, e->x + (size_t)r0 * H, H, r0, m, s);
@@ -1515,6 +1627,18 @@ static int prefill(Engine* e, int slot, const int* tokens, int T, int p0, half* 
   const int H = c.hidden, V = c.vocab, vl = e->vl;
   hipStream_t s = e->st;
   if (all_logits && e->world > 1 && !e->pf_logits) e->pf_logits = (half*)dalloc((size_t)e->max_pf * vl * 2);
+  if (e->track) {
+    if (p0 == 0) {  // a new sequence: no scores, no evictions
+      const size_t per = (size_t)e->hkv * e->max_seq;
+      for (int l = 0; l < c.layers; l++) {
+        HI_CHECK(hipMemsetAsync(e->score + ((size_t)l * e->maxB + slot) * per, 0, per * 4, s));
+        if (e->wscore) HI_CHECK(hipMemsetAsync(e->wscore + ((size_t)l * e->maxB + slot) * per, 0, per * 4, s));
+      }
+      e->shift[slot] = 0;
+      HI_CHECK(hipMemsetAsync(e->d_shift + slot, 0, 4, s));
+    }
+    e->win_from = e->win > 0 ? p0 + T - e->win : INT32_MAX;  // the last `win` tokens of this prompt
+  }
   for (int t0 = 0; t0 < T; t0 += e->max_pf) {
     const int n = T - t0 < e->max_pf ? T - t0 : e->max_pf;
     const int pb = p0 + t0;
@@ -1563,6 +1687,8 @@ static bool prefill_ok(const Engine* e, int slot, const int* tokens, int T, int 
   HI_REQ(slot >= 0 && slot < e->maxB, "%s: slot %d outside [0, max_batch %d)", who, slot, e->maxB);
   HI_REQ(T >= 1 && p0 >= 0, "%s: needs T >= 1 and p0 >= 0 (T %d, p0 %d)", who, T, p0);
   HI_REQ((long long)p0 + T <= e->max_seq, "%s: p0 %d + T %d exceeds max_seq %d", who, p0, T, e->max_seq);
+  HI_REQ(p0 == 0 || e->shift.empty() || e->shift[slot] == 0,
+         "%s: slot %d has evicted slots; continuing it with a prefill (p0 %d > 0) is not supported", who, slot, p0);
   return tokens_ok(e, tokens, T, who);
 }
 
@@ -1625,24 +1751,30 @@ static void decode_step(Engine* e, int B) {
   // The fused RMSNorm keeps B normalized rows in shared memory; for very wide models on a
   // small-smem GPU (e.g. hidden 4096 x 8 rows on Turing) run the norm as its own kernel.
   const bool fuse = norm_fits(B, H);
+  const int* shift = e->track ? e->d_shift : nullptr;  // eviction: cache index = position - shift
   embed_kernel<<<B, 256, 0, s>>>(e->d_tok, e->embed, e->x, H);
   for (int l = 0; l < c.layers; l++) {
     const Layer& w = e->L[l];
     half* kc = e->kc + e->layer_cache * l;
     half* vc = e->vc + e->layer_cache * l;
     if (small && fuse) {
-      hi_gemv_qkv_rope(e->x, H, w.attn_norm, c.eps, w.wqkv, w.bqkv, e->qkv, e->qkv_dim, B, H, hq, hkv, D, e->rope, e->d_pos,
-                       kc, vc, e->max_seq, s);
+      gemv_qkv_rope(e->x, H, w.attn_norm, c.eps, w.wqkv, w.bqkv, e->qkv, e->qkv_dim, B, H, hq, hkv, D, e->rope, e->d_pos,
+                    kc, vc, e->max_seq, shift, s);
     } else if (small) {
       hi_rmsnorm(e->x, w.attn_norm, e->xn, B, H, c.eps, s);
-      hi_gemv_qkv_rope(e->xn, H, nullptr, c.eps, w.wqkv, w.bqkv, e->qkv, e->qkv_dim, B, H, hq, hkv, D, e->rope, e->d_pos,
-                       kc, vc, e->max_seq, s);
+      gemv_qkv_rope(e->xn, H, nullptr, c.eps, w.wqkv, w.bqkv, e->qkv, e->qkv_dim, B, H, hq, hkv, D, e->rope, e->d_pos,
+                    kc, vc, e->max_seq, shift, s);
     } else {
       hi_rmsnorm(e->x, w.attn_norm, e->xn, B, H, c.eps, s);
       hi_gemm(e->xn, H, w.wqkv, w.bqkv, e->qkv, e->qkv_dim, B, e->qkv_dim, H, 0, s);
-      hi_rope_cache(e->qkv, e->qkv_dim, B, hq, hkv, D, e->rope, e->d_pos, 0, 0, kc, vc, e->max_seq, s);
+      rope_cache(e->qkv, e->qkv_dim, B, hq, hkv, D, e->rope, e->d_pos, 0, 0, kc, vc, e->max_seq, shift, s);
     }
-    hi_decode_attn(e->qkv, e->qkv_dim, kc, vc, e->max_seq, e->d_pos, e->att, HD, B, hq, hkv, D, e->work, s);
+    if (e->track)
+      decode_attn_track(e->qkv, e->qkv_dim, kc, vc, e->max_seq, e->d_pos, e->d_shift, e->att, HD, B, hq, hkv, D, e->work,
+                        e->trk_lg, e->trk_lse, e->score + (size_t)l * e->maxB * hkv * e->max_seq, nullptr, nullptr, 0,
+                        nullptr, s);
+    else
+      hi_decode_attn(e->qkv, e->qkv_dim, kc, vc, e->max_seq, e->d_pos, e->att, HD, B, hq, hkv, D, e->work, s);
     if (c.moe) {  // one GPU only (no all-reduce); GEMV experts for small B, grouped GEMMs above
       if (small) hi_gemv(e->att, HD, nullptr, 0.f, w.wo, e->x, H, B, H, HD, ep, s);
       else hi_gemm(e->att, HD, w.wo, nullptr, e->x, H, B, H, HD, ep, s);
@@ -1791,3 +1923,195 @@ EXPORT int hi_set_state(Engine* e, int B, const int* tok, const int* pos) {
 }
 
 EXPORT void* hi_stream(Engine* e) { return e->st; }
+
+// ------------------------------------------------------------------ eviction (docs/eviction.md)
+// Turn eviction scoring on (allocating its buffers on first use) or off. window > 0 also keeps
+// each key's mass from the last `window` prompt tokens (wscore; policy 2 of hi_evict). Captured
+// decode graphs are dropped (they bake the path in). Scores start at the next fresh prefill
+// (p0 = 0). Returns 0, or -1 (tensor-parallel engine, or turning off with evicted slots).
+EXPORT int hi_set_tracking(Engine* e, int on, int window) {
+  if (e->world > 1) { fprintf(stderr, "hi_set_tracking: tensor-parallel engines are not supported\n"); return -1; }
+  DevGuard dg(e->dev);
+  HI_CHECK(hipStreamSynchronize(e->st));
+  if (!on) {
+    for (int v : e->shift)
+      if (v) { fprintf(stderr, "hi_set_tracking: cannot turn off while a slot has evicted slots (prefill it anew)\n"); return -1; }
+  } else {
+    const size_t per = (size_t)e->c.layers * e->maxB * e->hkv * e->max_seq * 4;
+    if (!e->score) {
+      e->score = (float*)dalloc(per);
+      e->trk_lg = (float*)dalloc((size_t)e->maxB * e->hq * e->max_seq * 4);
+      e->trk_lse = (float*)dalloc((size_t)std::max(e->maxB, e->max_pf) * e->hq * 4);
+      e->d_shift = (int*)dalloc((size_t)e->maxB * 4);
+      e->shift.assign(e->maxB, 0);
+    }
+    if (window > 0 && !e->wscore) e->wscore = (float*)dalloc(per);
+    e->win = window > 0 ? window : 0;
+  }
+  e->track = on != 0;
+  for (auto& gr : e->graphs) if (gr) { (void)hipGraphExecDestroy(gr); gr = nullptr; }
+  return 0;
+}
+
+// Cached keys of sequence `slot` (its position minus its evicted slots), or -1.
+EXPORT int hi_cache_len(Engine* e, int slot) {
+  if (slot < 0 || slot >= e->maxB) { fprintf(stderr, "hi_cache_len: slot %d outside [0, %d)\n", slot, e->maxB); return -1; }
+  DevGuard dg(e->dev);
+  HI_CHECK(hipStreamSynchronize(e->st));
+  int pos;
+  HI_CHECK(hipMemcpy(&pos, e->d_pos + slot, 4, hipMemcpyDeviceToHost));
+  return pos - (e->shift.empty() ? 0 : e->shift[slot]);
+}
+
+// Copy layer `layer`'s scores of sequence `slot`, slots [0, n), to dst ([hkv][n] fp32, host or
+// device): which 0 = H2O score, 1 = window score. Returns 0, or -1.
+EXPORT int hi_scores(Engine* e, int which, int layer, int slot, int n, float* dst) {
+  const float* src = which == 1 ? e->wscore : e->score;
+  if (!e->track || !src || layer < 0 || layer >= e->c.layers || slot < 0 || slot >= e->maxB || n < 0 || n > e->max_seq) {
+    fprintf(stderr, "hi_scores: tracking off, no such score, or bad layer / slot / n\n");
+    return -1;
+  }
+  DevGuard dg(e->dev);
+  HI_CHECK(hipStreamSynchronize(e->st));
+  HI_CHECK(hipMemcpy2D(dst, (size_t)n * 4, src + ((size_t)layer * e->maxB + slot) * e->hkv * e->max_seq,
+                       (size_t)e->max_seq * 4, (size_t)n * 4, e->hkv, hipMemcpyDefault));
+  return 0;
+}
+
+// Copy layer `layer`'s cached keys and values of sequence `slot`, cache indices [0, n), to kdst /
+// vdst ([hkv][n][D] fp16, host or device; either may be null). Returns 0, or -1.
+EXPORT int hi_cache_read(Engine* e, int layer, int slot, int n, void* kdst, void* vdst) {
+  if (e->world > 1 || layer < 0 || layer >= e->c.layers || slot < 0 || slot >= e->maxB || n < 0 || n > e->max_seq) {
+    fprintf(stderr, "hi_cache_read: bad layer / slot / n (or tensor-parallel engine)\n");
+    return -1;
+  }
+  DevGuard dg(e->dev);
+  HI_CHECK(hipStreamSynchronize(e->st));
+  const size_t D = e->c.head_dim, at = (size_t)layer * e->layer_cache + (size_t)slot * e->hkv * e->max_seq * D;
+  if (kdst) HI_CHECK(hipMemcpy2D(kdst, n * D * 2, e->kc + at, e->max_seq * D * 2, n * D * 2, e->hkv, hipMemcpyDefault));
+  if (vdst) HI_CHECK(hipMemcpy2D(vdst, n * D * 2, e->vc + at, e->max_seq * D * 2, n * D * 2, e->hkv, hipMemcpyDefault));
+  return 0;
+}
+
+static void* ev_alloc(Engine* e, size_t bytes) {
+  if (bytes > e->ev_work_bytes) {
+    if (e->ev_work) HI_CHECK(hipFree(e->ev_work));
+    HI_CHECK(hipMalloc(&e->ev_work, bytes));
+    e->ev_work_bytes = bytes;
+  }
+  return e->ev_work;
+}
+
+// Evict sequence `slot` down to `capacity` cached slots in every (layer, kv head): keep the first
+// `sink` and the last `recent` slots, and choose capacity - sink - recent of the rest by
+//   policy 0  H2O: the largest scores
+//          1  WFL prune (policies.wfl_prune: mix, step, rounds; pool > 0 limits the candidates to
+//             the pool * m highest-scoring ones, as select_keep's pool)
+//          2  the largest window scores (needs hi_set_tracking with window > 0)
+// Ties go to the lower slot. The kept keys, values and scores move to cache indices
+// [0, capacity) in slot order; decode continues at the same positions. kept_out (host, may be
+// null) receives the kept slot indices [layers][hkv][capacity] (indices before this eviction);
+// ms_out (host, may be null) {selection, compaction} GPU milliseconds. Returns the number of
+// slots evicted per head (0 if the cache holds <= capacity), or -1 for bad arguments.
+EXPORT int hi_evict(Engine* e, int slot, int capacity, int policy, int sink, int recent, float mix, int step, int rounds,
+                    float pool, int power, int* kept_out, float* ms_out) {
+  if (!e->track || e->world > 1 || slot < 0 || slot >= e->maxB || capacity < 1 || policy < 0 || policy > 2 ||
+      sink < 0 || recent < 0 || (policy == 2 && e->win <= 0) || (pool != 0.f && !(pool >= 1.f))) {
+    fprintf(stderr, "hi_evict: needs tracking on (window > 0 for policy 2), one GPU, a valid slot, capacity >= 1, "
+                    "policy 0..2, sink / recent >= 0, pool 0 (none) or >= 1\n");
+    return -1;
+  }
+  const int D = e->c.head_dim, hkv = e->hkv, L = e->c.layers, P = L * hkv;
+  if (policy == 1 && !wfl_args_ok(D, power, "hi_evict")) return -1;
+  const int n = hi_cache_len(e, slot);  // syncs the stream
+  if (n <= capacity) return 0;
+  DevGuard dg(e->dev);
+  hipStream_t s = e->st;
+  sink = std::min(sink, capacity);
+  recent = std::min(recent, capacity - sink);
+  const int m = capacity - sink - recent, ncand = n - sink - recent;
+  const long long lstride = (long long)e->maxB * hkv * e->max_seq;  // per layer, in slots (= layer_cache / D)
+  const ProbStride st{lstride, e->max_seq, hkv};
+  const size_t slot_off = (size_t)slot * hkv * e->max_seq;  // this sequence's first slot within a layer
+  const float* sbase = e->score + slot_off;
+  const half* kbase = e->kc + slot_off * D;
+  const half* vbase = e->vc + slot_off * D;
+  // WFL ground set: every slot, or the protected ones plus the pool
+  const int kpool = (policy == 1 && pool > 0) ? std::min((int)(pool * m), ncand) : ncand;
+  const int ng = sink + recent + kpool;
+  int Pc = P;  // WFL problems per chunk (whole layers), bounded by HIPINFER_WFL_MEM_MB (default 1024)
+  if (policy == 1) {
+    const char* mb = getenv("HIPINFER_WFL_MEM_MB");
+    const size_t budget = (size_t)(mb ? atof(mb) : 1024.0) * (1 << 20);
+    const size_t per = hi_wfl_work_bytes(hkv, ng, D);
+    Pc = std::max(1, std::min(L, (int)(budget / std::max<size_t>(per, 1)))) * hkv;
+  }
+  auto al = [](size_t b) { return (b + 255) / 256 * 256; };
+  const size_t b_flags = al((size_t)P * n), b_pool = al((size_t)P * n), b_gidx = al((size_t)P * ng * 4),
+               b_stat = al((size_t)P * ng), b_klist = al((size_t)P * capacity * 4), b_err = 256,
+               b_tkv = al((size_t)hkv * capacity * 2 * D * 2), b_ts = al((size_t)hkv * capacity * 2 * 4),
+               b_wfl = policy == 1 ? hi_wfl_work_bytes(Pc, ng, D) : 0;
+  char* wk = (char*)ev_alloc(e, b_flags + b_pool + b_gidx + b_stat + b_klist + b_err + b_tkv + b_ts + b_wfl);
+  unsigned char* flags = (unsigned char*)wk;
+  unsigned char* pflags = flags + b_flags;
+  int* gidx = (int*)(wk + b_flags + b_pool);
+  unsigned char* status = (unsigned char*)gidx + b_gidx;
+  int* klist = (int*)(status + b_stat);
+  int* err = (int*)((char*)klist + b_klist);
+  half* tkv = (half*)((char*)err + b_err);
+  float* ts = (float*)((char*)tkv + b_tkv);
+  void* wfl_ws = (char*)ts + b_ts;
+
+  hipEvent_t ev[4];
+  for (auto& x : ev) HI_CHECK(hipEventCreate(&x));
+  HI_CHECK(hipEventRecord(ev[0], s));
+  HI_CHECK(hipMemsetAsync(flags, 0, b_flags + b_pool, s));
+  HI_CHECK(hipMemsetAsync(err, 0, 4, s));
+  if (policy != 1) {
+    evict_select_kernel<<<P, 1024, 0, s>>>(policy == 2 ? e->wscore + slot_off : sbase, st, sink, n - recent, m, 1, flags, n);
+  } else {
+    if (kpool < ncand) evict_select_kernel<<<P, 1024, 0, s>>>(sbase, st, sink, n - recent, kpool, 1, pflags, n);
+    evict_ground_kernel<<<P, 1024, 0, s>>>(n, sink, recent, kpool < ncand ? pflags : nullptr, gidx, status, ng);
+    for (int p0 = 0; p0 < P; p0 += Pc) {
+      const int pc = std::min(Pc, P - p0);
+      const size_t lo = (size_t)(p0 / hkv) * lstride * D;
+      wfl_prune(kbase + lo, vbase + lo, st, sbase + (size_t)(p0 / hkv) * lstride, st, gidx + (size_t)p0 * ng,
+                status + (size_t)p0 * ng, pc, ng, D, kpool, m, mix, step, rounds, power, 1, -1, wfl_ws, s);
+      WflWs ws;
+      wfl_layout(pc, ng, D, (char*)wfl_ws, &ws);
+      scatter_flags_kernel<<<pc, 256, 0, s>>>(ws.kept, gidx + (size_t)p0 * ng, ng, flags + (size_t)p0 * n, n);
+    }
+  }
+  evict_list_kernel<<<P, 1024, 0, s>>>(n, sink, recent, flags, n, capacity, klist, err);
+  HI_CHECK(hipEventRecord(ev[1], s));
+  int bad = 0;
+  HI_CHECK(hipMemcpyAsync(&bad, err, 4, hipMemcpyDeviceToHost, s));
+  HI_CHECK(hipStreamSynchronize(s));
+  if (bad) {
+    fprintf(stderr, "hi_evict: internal error: a head did not keep exactly %d slots; cache left unchanged\n", capacity);
+    for (auto x : ev) (void)hipEventDestroy(x);
+    return -1;
+  }
+  const ProbStride lst{0, e->max_seq, hkv};  // one layer's heads
+  HI_CHECK(hipEventRecord(ev[2], s));
+  for (int l = 0; l < L; l++) {
+    half* K = e->kc + (size_t)l * e->layer_cache + slot_off * D;
+    half* V = e->vc + (size_t)l * e->layer_cache + slot_off * D;
+    float* s0 = e->score + (size_t)l * lstride + slot_off;
+    float* s1 = e->wscore ? e->wscore + (size_t)l * lstride + slot_off : nullptr;
+    const int* kl = klist + (size_t)l * hkv * capacity;
+    for (int phase = 0; phase < 2; phase++)
+      evict_move_kernel<<<dim3(capacity, hkv), 128, 0, s>>>(phase, kl, capacity, K, V, lst, D, s0, s1, lst, tkv, ts);
+  }
+  HI_CHECK(hipEventRecord(ev[3], s));
+  if (kept_out) HI_CHECK(hipMemcpyAsync(kept_out, klist, (size_t)P * capacity * 4, hipMemcpyDeviceToHost, s));
+  e->shift[slot] += n - capacity;
+  HI_CHECK(hipMemcpyAsync(e->d_shift + slot, &e->shift[slot], 4, hipMemcpyHostToDevice, s));
+  HI_CHECK(hipStreamSynchronize(s));
+  if (ms_out) {
+    HI_CHECK(hipEventElapsedTime(&ms_out[0], ev[0], ev[1]));
+    HI_CHECK(hipEventElapsedTime(&ms_out[1], ev[2], ev[3]));
+  }
+  for (auto x : ev) (void)hipEventDestroy(x);
+  return n - capacity;
+}
