@@ -88,13 +88,14 @@ __device__ __forceinline__ void rope_pair(half x1, half x2, __half2 t, half& y1,
   y2 = __float2half(__half2float(__float2half(f2 * c)) + __half2float(__float2half(f1 * sn)));
 }
 
-// Arguments of the fused QKV epilogue (EPI 3); unused by the other epilogues.
+// Arguments of the fused QKV epilogues (EPI 3, 4); unused by the other epilogues.
 struct RopeArgs {
   const __half2* cs;  // [max_seq][D/2] (cos, sin)
   const int* pos;     // [M] position of each row; row m goes to cache slot m
   half *kc, *vc;      // this layer's cache [slots][Hkv][max_seq][D]
   const half* bias;   // optional QKV bias [(Hq + 2 Hkv) * D] (Qwen2), or null
   int max_seq, Hq, Hkv, D;
+  const int* shift = nullptr;  // EPI 4: [M] slots evicted before row m; k / v go to cache index pos - shift
 };
 
 // ---------------------------------------------------------------------------------
@@ -106,7 +107,8 @@ struct RopeArgs {
 // EPI 0: store; 1: out += y (residual, fp16 rounding like HF); 2: SwiGLU over weights whose
 // rows are interleaved in groups of 16 (16 gate rows, then the matching 16 up rows);
 // 3: QKV projection with bias, RoPE and the KV-cache write fused in: a warp computes rows d
-// and d+D/2 of one head, rotates the pair, and writes q to `out` and k/v straight into the cache.
+// and d+D/2 of one head, rotates the pair, and writes q to `out` and k/v straight into the cache;
+// 4: the same after evictions (k / v at cache index pos - ra.shift[m]).
 // ---------------------------------------------------------------------------------
 template <int MR, bool NORM, int EPI>
 __global__ void __launch_bounds__(256)
@@ -150,7 +152,7 @@ gemv_kernel(const half* __restrict__ x, int ldx, const half* __restrict__ normw,
   for (int o = blockIdx.x * nw + warp; o < n_out; o += gridDim.x * nw) {
     int r0 = o, r1 = o;
     if constexpr (EPI == 2) { r0 = (o / 16) * 32 + (o % 16); r1 = r0 + 16; }
-    if constexpr (EPI == 3) { const int HD = ra.D >> 1; r0 = (o / HD) * ra.D + (o % HD); r1 = r0 + HD; }
+    if constexpr (EPI >= 3) { const int HD = ra.D >> 1; r0 = (o / HD) * ra.D + (o % HD); r1 = r0 + HD; }
     const uint4* wr[NR];
     wr[0] = reinterpret_cast<const uint4*>(W + (size_t)r0 * K);
     if constexpr (NR == 2) wr[NR - 1] = reinterpret_cast<const uint4*>(W + (size_t)r1 * K);
@@ -210,14 +212,14 @@ gemv_kernel(const half* __restrict__ x, int ldx, const half* __restrict__ normw,
       else if constexpr (EPI == 2) out[(size_t)lane * ldo + o] = silu_mul(a0, a1);
       else {
         const int D = ra.D, HD = D >> 1;
-        const int head = o / HD, d = o % HD, p = ra.pos[lane];
+        const int head = o / HD, d = o % HD, p = ra.pos[lane], pc = EPI == 4 ? p - ra.shift[lane] : p;
         if (ra.bias) { a0 += __half2float(ra.bias[r0]); a1 += __half2float(ra.bias[r1]); }
         half y1 = __float2half(a0), y2 = __float2half(a1);
         if (head < ra.Hq + ra.Hkv) rope_pair(y1, y2, ra.cs[(size_t)p * HD + d], y1, y2);
         half* dst;
         if (head < ra.Hq) dst = out + (size_t)lane * ldo + head * D;
-        else if (head < ra.Hq + ra.Hkv) dst = ra.kc + (((size_t)lane * ra.Hkv + head - ra.Hq) * ra.max_seq + p) * D;
-        else dst = ra.vc + (((size_t)lane * ra.Hkv + head - ra.Hq - ra.Hkv) * ra.max_seq + p) * D;
+        else if (head < ra.Hq + ra.Hkv) dst = ra.kc + (((size_t)lane * ra.Hkv + head - ra.Hq) * ra.max_seq + pc) * D;
+        else dst = ra.vc + (((size_t)lane * ra.Hkv + head - ra.Hq - ra.Hkv) * ra.max_seq + pc) * D;
         dst[d] = y1;
         dst[d + HD] = y2;
       }
@@ -1040,15 +1042,17 @@ gemm_skinny_kernel(const half* __restrict__ A, int lda, const half* __restrict__
 // qkv row layout: [q (Hq*D) | k (Hkv*D) | v (Hkv*D)]. q is rotated in place; rotated k
 // and raw v go to cache[slot][kv_head][pos][D]. cs = per-position (cos, sin) in fp16.
 // Positions come from device memory (decode, so a captured graph can advance them) or
-// from pos_base + row (prefill).
+// from pos_base + row (prefill). With `shift` (decode after eviction, else null) the cache index
+// is pos - shift[row]; RoPE still uses the true position.
 // ---------------------------------------------------------------------------------
 __global__ void rope_cache_kernel(half* qkv, int ldq, int Hq, int Hkv, int D, const __half2* __restrict__ cs,
                                   const int* pos, int pos_base, int slot_base,
-                                  half* kc, half* vc, int max_seq) {
+                                  half* kc, half* vc, int max_seq, const int* shift) {
   const int HD = D / 2;
   const int row = blockIdx.x;
   const int p = pos ? pos[row] : pos_base + row;
   const int s = pos ? slot_base + row : slot_base;
+  const int pc = shift ? p - shift[row] : p;
   half* base = qkv + (size_t)row * ldq;
   for (int i = threadIdx.x; i < (Hq + Hkv) * HD; i += blockDim.x) {
     const int hh = i / HD, d = i % HD;
@@ -1059,13 +1063,13 @@ __global__ void rope_cache_kernel(half* qkv, int ldq, int Hq, int Hkv, int D, co
     if (hh < Hq) {
       ptr[d] = y1; ptr[d + HD] = y2;
     } else {
-      half* dst = kc + (((size_t)s * Hkv + (hh - Hq)) * max_seq + p) * D;
+      half* dst = kc + (((size_t)s * Hkv + (hh - Hq)) * max_seq + pc) * D;
       dst[d] = y1; dst[d + HD] = y2;
     }
   }
   const half* v = base + (Hq + Hkv) * D;
   for (int i = threadIdx.x; i < Hkv * D; i += blockDim.x)
-    vc[(((size_t)s * Hkv + i / D) * max_seq + p) * D + i % D] = v[i];
+    vc[(((size_t)s * Hkv + i / D) * max_seq + pc) * D + i % D] = v[i];
 }
 
 // ---------------------------------------------------------------------------------
@@ -1074,12 +1078,14 @@ __global__ void rope_cache_kernel(half* qkv, int ldq, int Hq, int Hkv, int D, co
 // read from the KV cache (so prefill can continue an existing prefix at p0). S = QK^T and
 // O += PV run on WMMA; the online softmax runs on the fp32 S tile in shared memory, and
 // the output accumulator lives in registers with a fixed lane->(row, cols) map.
+// lse (optional, else null): each row's log2-domain log-sum-exp of the scaled logits, [Hq][T],
+// for the eviction-score pass (prefill_score_kernel in evict.cuh).
 // ---------------------------------------------------------------------------------
 template <int D, int BKV>
 __global__ void __launch_bounds__(4 * HI_WARP)
 flash_prefill_kernel(const half* __restrict__ q, int ldq, const half* __restrict__ kc,
                      const half* __restrict__ vc, int max_seq, half* out, int ldo,
-                     int T, int p0, int Hq, int Hkv, float scale_log2) {
+                     int T, int p0, int Hq, int Hkv, float scale_log2, float* lse) {
   constexpr int BQ = 64, LDK = D + 8, SC = BKV > 64 ? BKV : 64, LDSF = SC + 4, LDP = BKV + 8, LDQ = D + 8;
   constexpr int LPR = HI_WARP / 16;          // lanes per row
   constexpr int CPL = BKV / LPR;             // score columns per lane
@@ -1221,6 +1227,7 @@ flash_prefill_kernel(const half* __restrict__ q, int ldq, const half* __restrict
   }
 
   if (qrow0 + my_row < T) {
+    if (lse && lane % LPR == 0) lse[(size_t)h * T + qrow0 + my_row] = m_i + log2f(l_i);
     const float inv = 1.f / l_i;
 #pragma unroll
     for (int ch = 0; ch < D / 64; ch++) {
@@ -1245,13 +1252,13 @@ flash_prefill_kernel(const half* __restrict__ q, int ldq, const half* __restrict
 // operand of P V (the m16n8 accumulator layout of two adjacent key tiles *is* the m16n8k16
 // A layout), and O stays in registers. K/V fragments come from shared memory via ldmatrix
 // (.trans for V). Same block shape and numerics as flash_prefill_kernel (P rounded to fp16
-// before P V); Turing runs each m16n8k16 as two m16n8k8.
+// before P V), same optional lse output; Turing runs each m16n8k16 as two m16n8k8.
 // ---------------------------------------------------------------------------------
 template <int D, int BKV>
 __global__ void __launch_bounds__(128)
 flash_prefill_mma_kernel(const half* __restrict__ q, int ldq, const half* __restrict__ kc,
                          const half* __restrict__ vc, int max_seq, half* out, int ldo,
-                         int T, int p0, int Hq, int Hkv, float scale_log2) {
+                         int T, int p0, int Hq, int Hkv, float scale_log2, float* lse) {
   constexpr int BQ = 64, LD = D + 8;
   __shared__ __align__(16) half Qs[BQ * LD];
   __shared__ __align__(16) half Ks[BKV * LD];
@@ -1384,6 +1391,10 @@ flash_prefill_mma_kernel(const half* __restrict__ q, int ldq, const half* __rest
 
   const float i0 = 1.f / l0, i1 = 1.f / l1;
   const int r0 = qrow0 + g, r1 = r0 + 8;
+  if (lse && t == 0) {
+    if (r0 < T) lse[(size_t)h * T + r0] = m0 + log2f(l0);
+    if (r1 < T) lse[(size_t)h * T + r1] = m1 + log2f(l1);
+  }
 #pragma unroll
   for (int dt = 0; dt < D / 8; dt++) {
     const int col = h * D + dt * 8 + 2 * t;
@@ -1401,13 +1412,17 @@ flash_prefill_mma_kernel(const half* __restrict__ q, int ldq, const half* __rest
 // graph-capturable while the context grows). Each split runs an online softmax over its
 // keys in tiles of 256; the last split block to finish (atomic counter) merges the partials,
 // so no separate combine launch is needed. With one split the block normalizes directly.
+// TRACK (eviction scoring; false is the plain kernel): the cache holds pos - shift + 1 keys
+// (shift: slots evicted so far, null = none), every key's log2-domain logit of each query head
+// goes to lg [B][Hq][max_seq], and each head's log2-domain log-sum-exp to lse [B][Hq], for
+// decode_score_kernel (evict.cuh) to turn into attention weights.
 // ---------------------------------------------------------------------------------
-template <int G, int D>
+template <int G, int D, bool TRACK = false>
 __global__ void __launch_bounds__(256)
 decode_attn_kernel(const half* __restrict__ q, int ldq, const half* __restrict__ kc,
                    const half* __restrict__ vc, int max_seq, int Hkv, const int* __restrict__ pos,
                    float* part_o, float* part_ml, int* counters, int S, half* out, int ldo,
-                   float scale_log2) {
+                   float scale_log2, const int* shift = nullptr, float* lg = nullptr, float* lse = nullptr) {
   constexpr int TILE = 256, NT = 256, HALF = D / 2, NP = (G * HALF + NT - 1) / NT;  // PV passes
   __shared__ float qs[G][D];
   __shared__ float sc[G][TILE];
@@ -1415,7 +1430,7 @@ decode_attn_kernel(const half* __restrict__ q, int ldq, const half* __restrict__
   const int split = blockIdx.x, hk = blockIdx.y, b = blockIdx.z;
   const int tid = threadIdx.x, lane = tid % HI_WARP, warp = tid / HI_WARP, nw = blockDim.x / HI_WARP;
   const int Hq = Hkv * G;
-  const int len = pos[b] + 1;
+  const int len = pos[b] + 1 - (TRACK && shift ? shift[b] : 0);
   const int S_eff = min(S, (len + 63) / 64);
   if (split >= S_eff) return;
   const int chunk = (len + S_eff - 1) / S_eff;
@@ -1455,6 +1470,10 @@ decode_attn_kernel(const half* __restrict__ q, int ldq, const half* __restrict__
       }
 #pragma unroll
       for (int g = 0; g < G; g++) sc[g][tid] = s[g];
+      if (TRACK && j < end) {
+#pragma unroll
+        for (int g = 0; g < G; g++) lg[((size_t)b * Hq + hk * G + g) * max_seq + j] = s[g];
+      }
     }
     __syncthreads();
     for (int g = warp; g < G; g += nw) {
@@ -1501,6 +1520,7 @@ decode_attn_kernel(const half* __restrict__ q, int ldq, const half* __restrict__
     __syncthreads();
   }
   if (S_eff == 1) {
+    if (TRACK && tid < G) lse[(size_t)b * Hq + hk * G + tid] = m_s[tid] + log2f(l_s[tid]);
 #pragma unroll
     for (int k = 0; k < NP; k++) {
       const int idx = tid + k * NT, g3 = idx / HALF, dp = idx % HALF;
@@ -1547,6 +1567,7 @@ decode_attn_kernel(const half* __restrict__ q, int ldq, const half* __restrict__
     float L = 0.f;
     for (int s2 = lane; s2 < S_eff; s2 += HI_WARP) L += exp2f(wgt[g][s2] - mx) * sc[g][s2];
     L = warp_sum(L);
+    if (TRACK && lane == 0) lse[(size_t)b * Hq + hk * G + g] = mx + log2f(L);
     for (int s2 = lane; s2 < S_eff; s2 += HI_WARP) wgt[g][s2] = exp2f(wgt[g][s2] - mx) / L;
   }
   __syncthreads();
@@ -1572,14 +1593,14 @@ decode_attn_kernel(const half* __restrict__ q, int ldq, const half* __restrict__
 // owns 16 keys of every 64-key tile and keeps its own online-softmax state in registers
 // (S, P and O never touch shared memory); the warps are merged through shared memory at the
 // end (reusing the K tile), then splits are merged by the last block exactly as in
-// decode_attn_kernel.
+// decode_attn_kernel, including the TRACK outputs.
 // ---------------------------------------------------------------------------------
-template <int G, int D>
+template <int G, int D, bool TRACK = false>
 __global__ void __launch_bounds__(128)
 decode_attn_mma_kernel(const half* __restrict__ q, int ldq, const half* __restrict__ kc,
                        const half* __restrict__ vc, int max_seq, int Hkv, const int* __restrict__ pos,
                        float* part_o, float* part_ml, int* counters, int S, half* out, int ldo,
-                       float scale_log2) {
+                       float scale_log2, const int* shift = nullptr, float* lg = nullptr, float* lse = nullptr) {
   static_assert(G <= 8, "one quad row per head");
   constexpr int TILE = 64, LD = D + 8;
   static_assert(4 * G * D * 4 <= TILE * LD * 2, "warp-merge scratch aliases the K tile");
@@ -1595,7 +1616,7 @@ decode_attn_mma_kernel(const half* __restrict__ q, int ldq, const half* __restri
   const int split = blockIdx.x, hk = blockIdx.y, b = blockIdx.z;
   const int tid = threadIdx.x, w = tid / 32, lane = tid % 32, g = lane / 4, t = lane % 4;
   const int Hq = Hkv * G;
-  const int len = pos[b] + 1;
+  const int len = pos[b] + 1 - (TRACK && shift ? shift[b] : 0);
   const int S_eff = min(S, (len + TILE - 1) / TILE);
   if (split >= S_eff) return;
   const int chunk = (len + S_eff - 1) / S_eff;
@@ -1647,6 +1668,7 @@ decode_attn_mma_kernel(const half* __restrict__ q, int ldq, const half* __restri
         const float v = kp < end ? s[nt][c] * scale_log2 : HI_NEG_INF;
         s[nt][c] = v;
         mx = fmaxf(mx, v);
+        if (TRACK && g < G && kp < end) lg[((size_t)b * Hq + hk * G + g) * max_seq + kp] = v;
       }
     mx = fmaxf(mx, __shfl_xor_sync(0xffffffffu, mx, 1));
     mx = fmaxf(mx, __shfl_xor_sync(0xffffffffu, mx, 2));
@@ -1708,6 +1730,7 @@ decode_attn_mma_kernel(const half* __restrict__ q, int ldq, const half* __restri
       O += red_o[(ww * G + r) * D + d] * e;
     }
     if (S_eff == 1) {
+      if (TRACK && d == 0) lse[(size_t)b * Hq + hk * G + r] = M + log2f(L);
       out[(size_t)b * ldo + (hk * G + r) * D + d] = __float2half(O / L);
     } else {
       const size_t idx = ((size_t)b * Hq + hk * G + r) * S + split;
@@ -1742,6 +1765,7 @@ decode_attn_mma_kernel(const half* __restrict__ q, int ldq, const half* __restri
     float L = 0.f;
     for (int s2 = lane; s2 < S_eff; s2 += 32) L += exp2f(wgt[r][s2] - mx) * lsum[r][s2];
     L = warp_sum(L);
+    if (TRACK && lane == 0) lse[(size_t)b * Hq + hk * G + r] = mx + log2f(L);
     for (int s2 = lane; s2 < S_eff; s2 += 32) wgt[r][s2] = exp2f(wgt[r][s2] - mx) / L;
   }
   __syncthreads();

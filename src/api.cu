@@ -2,6 +2,7 @@
 // Python on torch tensors) and the Llama-family engine (weights, KV cache, prefill,
 // graph-captured decode).
 #include "kernels.cuh"
+#include "evict.cuh"
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -146,21 +147,31 @@ EXPORT void hi_gemv(const void* x, int ldx, const void* normw, float eps, const 
 
 // QKV projection (RMSNorm fused) with bias, RoPE and the KV-cache write fused into the epilogue.
 // q goes to out[m, 0:Hq*D]; k/v go to cache slot m at position pos[m].
-EXPORT void hi_gemv_qkv_rope(const void* x, int ldx, const void* normw, float eps, const void* W, const void* bias,
-                             void* out, int ldo, int M, int K, int Hq, int Hkv, int D, const void* cs, const int* pos,
-                             void* kc, void* vc, int max_seq, void* s) {
+// shift (decode after eviction, else null): row m's k / v go to cache index pos[m] - shift[m].
+static void gemv_qkv_rope(const void* x, int ldx, const void* normw, float eps, const void* W, const void* bias,
+                          void* out, int ldo, int M, int K, int Hq, int Hkv, int D, const void* cs, const int* pos,
+                          void* kc, void* vc, int max_seq, const int* shift, void* s) {
   hi_init();
   const int N = (Hq + 2 * Hkv) * D;
-  RopeArgs ra{(const __half2*)cs, pos, (half*)kc, (half*)vc, (const half*)bias, max_seq, Hq, Hkv, D};
+  RopeArgs ra{(const __half2*)cs, pos, (half*)kc, (half*)vc, (const half*)bias, max_seq, Hq, Hkv, D, shift};
   const half* xp = (const half*)x; const half* nw = (const half*)normw; const half* w = (const half*)W;
   half* o = (half*)out;
-#define HI_QKV(mr) case mr: if (nw) gemv_launch<mr, true, 3>(xp, ldx, nw, eps, w, o, ldo, N, K, ST(s), ra); \
-                            else gemv_launch<mr, false, 3>(xp, ldx, nw, eps, w, o, ldo, N, K, ST(s), ra); break
+#define HI_QKV(mr) case mr: \
+  if (shift) { if (nw) gemv_launch<mr, true, 4>(xp, ldx, nw, eps, w, o, ldo, N, K, ST(s), ra); \
+               else gemv_launch<mr, false, 4>(xp, ldx, nw, eps, w, o, ldo, N, K, ST(s), ra); } \
+  else if (nw) gemv_launch<mr, true, 3>(xp, ldx, nw, eps, w, o, ldo, N, K, ST(s), ra); \
+  else gemv_launch<mr, false, 3>(xp, ldx, nw, eps, w, o, ldo, N, K, ST(s), ra); \
+  break
   switch (M) {
     HI_QKV(1); HI_QKV(2); HI_QKV(3); HI_QKV(4); HI_QKV(5); HI_QKV(6); HI_QKV(7); HI_QKV(8);
     default: fprintf(stderr, "hi_gemv_qkv_rope: M must be 1..8\n"); exit(1);
   }
 #undef HI_QKV
+}
+EXPORT void hi_gemv_qkv_rope(const void* x, int ldx, const void* normw, float eps, const void* W, const void* bias,
+                             void* out, int ldo, int M, int K, int Hq, int Hkv, int D, const void* cs, const int* pos,
+                             void* kc, void* vc, int max_seq, void* s) {
+  gemv_qkv_rope(x, ldx, normw, eps, W, bias, out, ldo, M, K, Hq, Hkv, D, cs, pos, kc, vc, max_seq, nullptr, s);
 }
 
 template <int BM, int BN, int BK, int WGM, int WGN, int EPI>
@@ -484,10 +495,14 @@ EXPORT void hi_gemm(const void* A, int lda, const void* W, const void* bias, voi
   else gemm_cfg<2>(ch.cfg, ch.splits, ws, a, lda, w, nullptr, c, ldc, M, N, K, ST(s));
 }
 
+static void rope_cache(void* qkv, int ldq, int M, int Hq, int Hkv, int D, const void* cs, const int* pos,
+                       int pos_base, int slot_base, void* kc, void* vc, int max_seq, const int* shift, void* s) {
+  rope_cache_kernel<<<M, 256, 0, ST(s)>>>((half*)qkv, ldq, Hq, Hkv, D, (const __half2*)cs, pos, pos_base,
+                                          slot_base, (half*)kc, (half*)vc, max_seq, shift);
+}
 EXPORT void hi_rope_cache(void* qkv, int ldq, int M, int Hq, int Hkv, int D, const void* cs, const int* pos,
                           int pos_base, int slot_base, void* kc, void* vc, int max_seq, void* s) {
-  rope_cache_kernel<<<M, 256, 0, ST(s)>>>((half*)qkv, ldq, Hq, Hkv, D, (const __half2*)cs, pos, pos_base,
-                                          slot_base, (half*)kc, (half*)vc, max_seq);
+  rope_cache(qkv, ldq, M, Hq, Hkv, D, cs, pos, pos_base, slot_base, kc, vc, max_seq, nullptr, s);
 }
 
 static bool head_dim_ok(int D, const char* who) {
@@ -497,8 +512,8 @@ static bool head_dim_ok(int D, const char* who) {
 }
 static void check_head_dim(int D, const char* who) { if (!head_dim_ok(D, who)) exit(1); }
 
-EXPORT void hi_flash_prefill(const void* q, int ldq, const void* kc, const void* vc, int max_seq,
-                             void* out, int ldo, int T, int p0, int Hq, int Hkv, int D, void* s) {
+static void flash_prefill(const void* q, int ldq, const void* kc, const void* vc, int max_seq,
+                          void* out, int ldo, int T, int p0, int Hq, int Hkv, int D, float* lse, void* s) {
   hi_init();
   check_head_dim(D, "hi_flash_prefill");
   const float scale_log2 = 1.4426950408889634f / sqrtf((float)D);
@@ -507,13 +522,41 @@ EXPORT void hi_flash_prefill(const void* q, int ldq, const void* kc, const void*
 #if !defined(HI_AMD)
   static const bool use_mma = !getenv("HIPINFER_FLASH_WMMA");  // env var forces the portable kernel
   if (use_mma) {
-    if (D == 64) flash_prefill_mma_kernel<64, 64><<<grid, 128, 0, ST(s)>>>(Q, ldq, K, V, max_seq, O, ldo, T, p0, Hq, Hkv, scale_log2);
-    else flash_prefill_mma_kernel<128, 32><<<grid, 128, 0, ST(s)>>>(Q, ldq, K, V, max_seq, O, ldo, T, p0, Hq, Hkv, scale_log2);
+    if (D == 64) flash_prefill_mma_kernel<64, 64><<<grid, 128, 0, ST(s)>>>(Q, ldq, K, V, max_seq, O, ldo, T, p0, Hq, Hkv, scale_log2, lse);
+    else flash_prefill_mma_kernel<128, 32><<<grid, 128, 0, ST(s)>>>(Q, ldq, K, V, max_seq, O, ldo, T, p0, Hq, Hkv, scale_log2, lse);
     return;
   }
 #endif
-  if (D == 64) flash_prefill_kernel<64, 64><<<grid, 4 * g_warp, 0, ST(s)>>>(Q, ldq, K, V, max_seq, O, ldo, T, p0, Hq, Hkv, scale_log2);
-  else flash_prefill_kernel<128, 32><<<grid, 4 * g_warp, 0, ST(s)>>>(Q, ldq, K, V, max_seq, O, ldo, T, p0, Hq, Hkv, scale_log2);
+  if (D == 64) flash_prefill_kernel<64, 64><<<grid, 4 * g_warp, 0, ST(s)>>>(Q, ldq, K, V, max_seq, O, ldo, T, p0, Hq, Hkv, scale_log2, lse);
+  else flash_prefill_kernel<128, 32><<<grid, 4 * g_warp, 0, ST(s)>>>(Q, ldq, K, V, max_seq, O, ldo, T, p0, Hq, Hkv, scale_log2, lse);
+}
+EXPORT void hi_flash_prefill(const void* q, int ldq, const void* kc, const void* vc, int max_seq,
+                             void* out, int ldo, int T, int p0, int Hq, int Hkv, int D, void* s) {
+  flash_prefill(q, ldq, kc, vc, max_seq, out, ldo, T, p0, Hq, Hkv, D, nullptr, s);
+}
+// Same, and also each row's log2-domain log-sum-exp into lse [Hq][T] (fp32).
+EXPORT void hi_flash_prefill_lse(const void* q, int ldq, const void* kc, const void* vc, int max_seq,
+                                 void* out, int ldo, int T, int p0, int Hq, int Hkv, int D, float* lse, void* s) {
+  flash_prefill(q, ldq, kc, vc, max_seq, out, ldo, T, p0, Hq, Hkv, D, lse, s);
+}
+
+// Eviction-score pass of a prefill (prefill_score_kernel): adds each key's attention mass from
+// the T query rows to score [Hkv][max_seq] of this slot; lse from hi_flash_prefill_lse on the same
+// q / cache. Window rows (call rows >= win_r0): softmax rows into win [Hq][W][max_seq] at row
+// win_off + row - win_r0 (if win is non-null), per-key mass added to wscore (if non-null).
+EXPORT void hi_prefill_scores(const void* q, int ldq, const void* kc, int max_seq, int T, int p0, int Hq, int Hkv,
+                              int D, const float* lse, float* score, void* win, int win_r0, int win_off, int W,
+                              float* wscore, void* s) {
+  hi_init();
+  check_head_dim(D, "hi_prefill_scores");
+  const float scale_log2 = 1.4426950408889634f / sqrtf((float)D);
+  dim3 grid((p0 + T + 63) / 64, Hkv);
+  if (D == 64)
+    prefill_score_kernel<64><<<grid, 4 * g_warp, 0, ST(s)>>>((const half*)q, ldq, (const half*)kc, max_seq, lse, T, p0,
+                                                              Hq, Hkv, scale_log2, score, (half*)win, win_r0, win_off, W, wscore);
+  else
+    prefill_score_kernel<128><<<grid, 4 * g_warp, 0, ST(s)>>>((const half*)q, ldq, (const half*)kc, max_seq, lse, T, p0,
+                                                               Hq, Hkv, scale_log2, score, (half*)win, win_r0, win_off, W, wscore);
 }
 
 static int decode_splits(int B, int Hkv) {
@@ -531,25 +574,32 @@ static size_t decode_work_bytes(int B, int Hq, int Hkv, int D) {
 }
 EXPORT size_t hi_decode_work_bytes(int B, int Hq, int Hkv, int D) { return decode_work_bytes(B, Hq, Hkv, D); }
 
+// Tracking (eviction scoring) state of a decode-attention launch: null = the plain kernels.
+struct DecodeTrack { const int* shift; float *lg, *lse; };
+
 template <int G, int D>
 static void decode_attn_g(dim3 grid, bool mma, const half* q, int ldq, const half* kc, const half* vc, int max_seq, int Hkv,
                           const int* pos, float* po, float* pml, int* counters, int S, half* out, int ldo, float sl2,
-                          hipStream_t s) {
+                          const DecodeTrack* tr, hipStream_t s) {
 #if !defined(HI_AMD)
   if (mma) {
-    decode_attn_mma_kernel<G, D><<<grid, 128, 0, s>>>(q, ldq, kc, vc, max_seq, Hkv, pos, po, pml, counters, S, out, ldo, sl2);
+    if (tr) decode_attn_mma_kernel<G, D, true><<<grid, 128, 0, s>>>(q, ldq, kc, vc, max_seq, Hkv, pos, po, pml, counters, S,
+                                                                    out, ldo, sl2, tr->shift, tr->lg, tr->lse);
+    else decode_attn_mma_kernel<G, D><<<grid, 128, 0, s>>>(q, ldq, kc, vc, max_seq, Hkv, pos, po, pml, counters, S, out, ldo, sl2);
     return;
   }
 #endif
   (void)mma;
-  decode_attn_kernel<G, D><<<grid, 256, 0, s>>>(q, ldq, kc, vc, max_seq, Hkv, pos, po, pml, counters, S, out, ldo, sl2);
+  if (tr) decode_attn_kernel<G, D, true><<<grid, 256, 0, s>>>(q, ldq, kc, vc, max_seq, Hkv, pos, po, pml, counters, S, out,
+                                                              ldo, sl2, tr->shift, tr->lg, tr->lse);
+  else decode_attn_kernel<G, D><<<grid, 256, 0, s>>>(q, ldq, kc, vc, max_seq, Hkv, pos, po, pml, counters, S, out, ldo, sl2);
 }
 
 template <int D>
 static void decode_attn_d(int G, dim3 grid, bool mma, const half* q, int ldq, const half* kc, const half* vc, int max_seq,
                           int Hkv, const int* pos, float* po, float* pml, int* counters, int S, half* out, int ldo,
-                          float sl2, hipStream_t s) {
-#define HI_DA(g) case g: decode_attn_g<g, D>(grid, mma, q, ldq, kc, vc, max_seq, Hkv, pos, po, pml, counters, S, out, ldo, sl2, s); break
+                          float sl2, const DecodeTrack* tr, hipStream_t s) {
+#define HI_DA(g) case g: decode_attn_g<g, D>(grid, mma, q, ldq, kc, vc, max_seq, Hkv, pos, po, pml, counters, S, out, ldo, sl2, tr, s); break
   switch (G) {
     HI_DA(1); HI_DA(2); HI_DA(3); HI_DA(4); HI_DA(5); HI_DA(6); HI_DA(7); HI_DA(8);
     default: fprintf(stderr, "unsupported GQA group %d (1..8)\n", G); exit(1);
@@ -557,8 +607,8 @@ static void decode_attn_d(int G, dim3 grid, bool mma, const half* q, int ldq, co
 #undef HI_DA
 }
 
-EXPORT void hi_decode_attn(const void* q, int ldq, const void* kc, const void* vc, int max_seq, const int* pos,
-                           void* out, int ldo, int B, int Hq, int Hkv, int D, void* work, void* s) {
+static void decode_attn(const void* q, int ldq, const void* kc, const void* vc, int max_seq, const int* pos,
+                        void* out, int ldo, int B, int Hq, int Hkv, int D, void* work, const DecodeTrack* tr, void* s) {
   hi_init();
   check_head_dim(D, "hi_decode_attn");
   const int S = decode_splits(B, Hkv), G = Hq / Hkv;
@@ -571,10 +621,36 @@ EXPORT void hi_decode_attn(const void* q, int ldq, const void* kc, const void* v
   static const bool use_mma = !getenv("HIPINFER_DECODE_SCALAR");  // env var forces the portable kernel
   if (D == 64)
     decode_attn_d<64>(G, grid, use_mma, (const half*)q, ldq, (const half*)kc, (const half*)vc, max_seq, Hkv, pos, po, pml,
-                      counters, S, (half*)out, ldo, scale_log2, ST(s));
+                      counters, S, (half*)out, ldo, scale_log2, tr, ST(s));
   else
     decode_attn_d<128>(G, grid, use_mma, (const half*)q, ldq, (const half*)kc, (const half*)vc, max_seq, Hkv, pos, po, pml,
-                       counters, S, (half*)out, ldo, scale_log2, ST(s));
+                       counters, S, (half*)out, ldo, scale_log2, tr, ST(s));
+}
+EXPORT void hi_decode_attn(const void* q, int ldq, const void* kc, const void* vc, int max_seq, const int* pos,
+                           void* out, int ldo, int B, int Hq, int Hkv, int D, void* work, void* s) {
+  decode_attn(q, ldq, kc, vc, max_seq, pos, out, ldo, B, Hq, Hkv, D, work, nullptr, s);
+}
+
+// Decode attention with eviction scoring: as hi_decode_attn over the pos[b] - shift[b] + 1 cached
+// keys of sequence b (shift may be null: no evictions), then decode_score_kernel adds every key's
+// attention weight (summed over the query heads of its kv head) to score [B][Hkv][max_seq].
+// lg [B][Hq][max_seq] fp32 is scratch (it holds the log2-domain logits afterwards), lse [B][Hq] the
+// log2-domain log-sum-exps. Window (optional, win_row null = none): sequence b's query is window
+// row win_row[b] (none if < 0): its softmax rows go to win [B][Hq][W][max_seq] fp16 (if non-null)
+// and its per-key mass is added to wscore [B][Hkv][max_seq] (if non-null). Graph-capturable.
+static void decode_attn_track(const void* q, int ldq, const void* kc, const void* vc, int max_seq, const int* pos,
+                              const int* shift, void* out, int ldo, int B, int Hq, int Hkv, int D, void* work, float* lg,
+                              float* lse, float* score, void* win, const int* win_row, int W, float* wscore, void* s) {
+  const DecodeTrack tr{shift, lg, lse};
+  decode_attn(q, ldq, kc, vc, max_seq, pos, out, ldo, B, Hq, Hkv, D, work, &tr, s);
+  decode_score_kernel<<<dim3(decode_splits(B, Hkv), Hkv, B), 256, 0, ST(s)>>>(lg, lse, pos, shift, max_seq, Hkv, Hq / Hkv,
+                                                                             score, (half*)win, win_row, W, wscore);
+}
+EXPORT void hi_decode_attn_track(const void* q, int ldq, const void* kc, const void* vc, int max_seq, const int* pos,
+                                 const int* shift, void* out, int ldo, int B, int Hq, int Hkv, int D, void* work, float* lg,
+                                 float* lse, float* score, void* win, const int* win_row, int W, float* wscore, void* s) {
+  decode_attn_track(q, ldq, kc, vc, max_seq, pos, shift, out, ldo, B, Hq, Hkv, D, work, lg, lse, score, win, win_row, W,
+                    wscore, s);
 }
 
 EXPORT void hi_argmax(const void* logits, int B, int V, int* tok_out, void* s) {
