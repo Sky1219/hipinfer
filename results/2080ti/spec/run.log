@@ -1,0 +1,50 @@
+== run_spec 2026-10-18T20:59:24-05:00 on csr-90011, GPU 2, steps: build logic kernels gates spec bench
+name, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.limit [W], temperature.gpu
+NVIDIA GeForce RTX 2080 Ti, 580.178.04, 1350 MHz, 2100 MHz, 250.00 W, 33
+== build (sm_75)
+/usr/local/cuda/bin/nvcc -O3 -std=c++17 -lineinfo -gencode arch=compute_75,code=sm_75 -Xcompiler -fPIC,-fvisibility=hidden -shared src/api.cu  -lpthread -o build/libhipinfer.so
+  static bool ar_nccl(const TPGroup* g, size_t bytes) {
+== round-loop logic (CPU)
+SPEC LOGIC PASS
+== kernel tests
+ALL PASS
+== llama32-1b gate
+15/20 runs token-identical, max prefill-logit |diff| 0.0237
+GATE PASS
+== llama32-3b gate
+19/20 runs token-identical, max prefill-logit |diff| 0.0234
+GATE PASS
+== tinyllama gate
+20/20 runs token-identical, max prefill-logit |diff| 0.0244
+GATE PASS
+== exact-match test, k in 2,4,6,8
+105/105 runs pass
+SPEC PASS
+== bench: Llama-3.2-3B <- 1B draft
+llama32-3b.bin <- llama32-1b.bin on NVIDIA GeForce RTX 2080 Ti: 7 prompts x 128 tokens, reps 3
+GPU before: {'sm_clock_mhz': '1350', 'power_w': '68.18', 'compute_apps': '1430729, 8834 MiB'}
+decode step: target 11.875 ms, draft 4.681 ms (ratio 0.394)
+verify pass (wall ms) by rows: 1: 11.876, 2: 12.156, 3: 13.003, 4: 12.753, 5: 13.240, 6: 13.591, 7: 14.151, 8: 14.940, 9: 15.780
+plain: 82.6 tok/s (median of [82.9, 82.6, 82.5])
+k=1: 88.6 tok/s, speed-up 1.072x (model 1.078x), acceptance 0.914, 1.91 tokens/round, draft 42% / verify 58% of the loop, exact=True
+k=2: 100.8 tok/s, speed-up 1.219x (model 1.237x), acceptance 0.871, 2.72 tokens/round, draft 50% / verify 50% of the loop, exact=True
+k=3: 110.6 tok/s, speed-up 1.338x (model 1.355x), acceptance 0.825, 3.45 tokens/round, draft 58% / verify 42% of the loop, exact=True
+k=4: 113.9 tok/s, speed-up 1.379x (model 1.388x), acceptance 0.788, 4.10 tokens/round, draft 62% / verify 38% of the loop, exact=True
+k=5: 115.5 tok/s, speed-up 1.398x (model 1.403x), acceptance 0.758, 4.70 tokens/round, draft 65% / verify 35% of the loop, exact=True
+k=6: 115.1 tok/s, speed-up 1.393x (model 1.391x), acceptance 0.724, 5.26 tokens/round, draft 68% / verify 32% of the loop, exact=True
+k=8: 110.1 tok/s, speed-up 1.333x (model 1.324x), acceptance 0.666, 6.17 tokens/round, draft 71% / verify 29% of the loop, exact=True
+verify='prefill': 0/49 runs diverge from plain greedy output
+GPU after: {'sm_clock_mhz': '1710', 'power_w': '238.69', 'compute_apps': '1430729, 9066 MiB'}
+== bench: Llama-3.2-1B <- itself (every token accepted: the cost of verification)
+GPU before: {'sm_clock_mhz': '1350', 'power_w': '69.77', 'compute_apps': '1435423, 4976 MiB'}
+decode step: target 4.670 ms, draft 4.672 ms (ratio 1.000)
+verify pass (wall ms) by rows: 1: 4.676, 2: 4.782, 3: 5.180, 4: 4.994, 5: 5.146, 6: 5.283, 7: 5.539, 8: 5.777, 9: 6.027
+plain: 212.3 tok/s (median of [212.4, 212.3, 212.0])
+k=1: 139.4 tok/s, speed-up 0.657x (model 0.663x), acceptance 1.000, 1.98 tokens/round, draft 66% / verify 34% of the loop, exact=True
+k=2: 153.3 tok/s, speed-up 0.722x (model 0.727x), acceptance 1.000, 2.95 tokens/round, draft 72% / verify 28% of the loop, exact=True
+k=4: 171.6 tok/s, speed-up 0.809x (model 0.805x), acceptance 1.000, 4.88 tokens/round, draft 81% / verify 19% of the loop, exact=True
+k=8: 184.5 tok/s, speed-up 0.869x (model 0.833x), acceptance 1.000, 8.47 tokens/round, draft 87% / verify 13% of the loop, exact=True
+verify='prefill': 16/28 runs diverge from plain greedy output
+GPU after: {'sm_clock_mhz': '1740', 'power_w': '168.96', 'compute_apps': '1435423, 5234 MiB'}
+GPU at the end: 1800 MHz, 74
+== all steps passed

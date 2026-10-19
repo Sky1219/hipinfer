@@ -1,0 +1,260 @@
+{
+ "gpu": "NVIDIA GeForce RTX 2080 Ti",
+ "target": "llama32-1b.bin",
+ "draft": "llama32-1b.bin",
+ "prompts": 7,
+ "prompt_lens": [
+  6,
+  14,
+  18,
+  20,
+  16,
+  13,
+  700
+ ],
+ "new_tokens": 128,
+ "reps": 3,
+ "t_target_ms": 4.670094966888428,
+ "t_draft_ms": 4.67160177230835,
+ "t_verify_ms": {
+  "1": 4.676081996876746,
+  "2": 4.781978961545974,
+  "3": 5.179886473342776,
+  "4": 4.994100541807711,
+  "5": 5.1457175286486745,
+  "6": 5.2830560598522425,
+  "7": 5.538679542951286,
+  "8": 5.777220998425037,
+  "9": 6.027370458468795
+ },
+ "plain_tok_s": 212.25422557377254,
+ "plain_tok_s_runs": [
+  212.38101988959343,
+  212.25422557377254,
+  212.03223421704288
+ ],
+ "spec": [
+  {
+   "k": 1,
+   "tok_s": 139.38194093965737,
+   "speedup": 0.6566745164336567,
+   "acceptance": 1.0,
+   "tokens_per_round": 1.984375,
+   "rounds": 448,
+   "exact": true,
+   "draft_share": 0.6578599126228751,
+   "verify_share": 0.3419473216583849,
+   "predicted_speedup": 0.6629294270914678,
+   "tok_s_runs": [
+    139.9339694788284,
+    139.38194093965737,
+    139.19544480300434
+   ]
+  },
+  {
+   "k": 2,
+   "tok_s": 153.26435797071787,
+   "speedup": 0.7220791838485602,
+   "acceptance": 1.0,
+   "tokens_per_round": 2.953488372093023,
+   "rounds": 301,
+   "exact": true,
+   "draft_share": 0.7246096596407934,
+   "verify_share": 0.2750154467729053,
+   "predicted_speedup": 0.726815336994021,
+   "tok_s_runs": [
+    153.26435797071787,
+    152.86432440033977,
+    153.4158529470833
+   ]
+  },
+  {
+   "k": 4,
+   "tok_s": 171.6086594061842,
+   "speedup": 0.8085052674088634,
+   "acceptance": 1.0,
+   "tokens_per_round": 4.884615384615385,
+   "rounds": 182,
+   "exact": true,
+   "draft_share": 0.8146982390358557,
+   "verify_share": 0.18512845935047678,
+   "predicted_speedup": 0.805379817044293,
+   "tok_s_runs": [
+    171.6086594061842,
+    171.77707367402337,
+    171.3671564775903
+   ]
+  },
+  {
+   "k": 8,
+   "tok_s": 184.45398379349723,
+   "speedup": 0.8690238476754713,
+   "acceptance": 1.0,
+   "tokens_per_round": 8.466666666666667,
+   "rounds": 105,
+   "exact": true,
+   "draft_share": 0.8679120748517404,
+   "verify_share": 0.1319420150764826,
+   "predicted_speedup": 0.8333203139016694,
+   "tok_s_runs": [
+    184.544761469527,
+    184.45398379349723,
+    184.39450200900595
+   ]
+  }
+ ],
+ "prefill_verify_divergent": 16,
+ "prefill_verify_runs": 28,
+ "prefill_verify": [
+  {
+   "k": 1,
+   "prompt": 0,
+   "first_diff": 79
+  },
+  {
+   "k": 1,
+   "prompt": 1,
+   "first_diff": null
+  },
+  {
+   "k": 1,
+   "prompt": 2,
+   "first_diff": 27
+  },
+  {
+   "k": 1,
+   "prompt": 3,
+   "first_diff": 74
+  },
+  {
+   "k": 1,
+   "prompt": 4,
+   "first_diff": 19
+  },
+  {
+   "k": 1,
+   "prompt": 5,
+   "first_diff": null
+  },
+  {
+   "k": 1,
+   "prompt": 6,
+   "first_diff": null
+  },
+  {
+   "k": 2,
+   "prompt": 0,
+   "first_diff": 79
+  },
+  {
+   "k": 2,
+   "prompt": 1,
+   "first_diff": null
+  },
+  {
+   "k": 2,
+   "prompt": 2,
+   "first_diff": 27
+  },
+  {
+   "k": 2,
+   "prompt": 3,
+   "first_diff": 74
+  },
+  {
+   "k": 2,
+   "prompt": 4,
+   "first_diff": 19
+  },
+  {
+   "k": 2,
+   "prompt": 5,
+   "first_diff": null
+  },
+  {
+   "k": 2,
+   "prompt": 6,
+   "first_diff": null
+  },
+  {
+   "k": 4,
+   "prompt": 0,
+   "first_diff": 79
+  },
+  {
+   "k": 4,
+   "prompt": 1,
+   "first_diff": null
+  },
+  {
+   "k": 4,
+   "prompt": 2,
+   "first_diff": 27
+  },
+  {
+   "k": 4,
+   "prompt": 3,
+   "first_diff": 74
+  },
+  {
+   "k": 4,
+   "prompt": 4,
+   "first_diff": 19
+  },
+  {
+   "k": 4,
+   "prompt": 5,
+   "first_diff": null
+  },
+  {
+   "k": 4,
+   "prompt": 6,
+   "first_diff": null
+  },
+  {
+   "k": 8,
+   "prompt": 0,
+   "first_diff": 79
+  },
+  {
+   "k": 8,
+   "prompt": 1,
+   "first_diff": null
+  },
+  {
+   "k": 8,
+   "prompt": 2,
+   "first_diff": 27
+  },
+  {
+   "k": 8,
+   "prompt": 3,
+   "first_diff": 74
+  },
+  {
+   "k": 8,
+   "prompt": 4,
+   "first_diff": 19
+  },
+  {
+   "k": 8,
+   "prompt": 5,
+   "first_diff": null
+  },
+  {
+   "k": 8,
+   "prompt": 6,
+   "first_diff": null
+  }
+ ],
+ "gpu_before": {
+  "sm_clock_mhz": "1350",
+  "power_w": "69.77",
+  "compute_apps": "1435423, 4976 MiB"
+ },
+ "gpu_after": {
+  "sm_clock_mhz": "1740",
+  "power_w": "168.96",
+  "compute_apps": "1435423, 5234 MiB"
+ }
+}

@@ -1,0 +1,2 @@
+name, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.limit [W], temperature.gpu
+NVIDIA GeForce RTX 2080 Ti, 580.178.04, 1350 MHz, 2100 MHz, 250.00 W, 33

@@ -1,0 +1,121 @@
+llama32-3b.bin <- llama32-1b.bin on NVIDIA GeForce RTX 2080 Ti, 7 prompts x 128 tokens, k in [2, 4, 6, 8]
+  llama32-3b.bin <- llama32-1b.bin prompt 0 (len 6) k=2 graph=True: identical, accepted 82/90 (0.911), 2.82 tokens/round
+  llama32-3b.bin <- llama32-1b.bin prompt 0 (len 6) k=4 graph=True: identical, accepted 97/116 (0.836), 4.23 tokens/round
+  llama32-3b.bin <- llama32-1b.bin prompt 0 (len 6) k=6 graph=True: identical, accepted 104/135 (0.770), 5.52 tokens/round
+  llama32-3b.bin <- llama32-1b.bin prompt 0 (len 6) k=8 graph=True: identical, accepted 109/144 (0.757), 7.06 tokens/round
+  llama32-3b.bin <- llama32-1b.bin prompt 0 (len 6) k=6 graph=False: identical, accepted 104/135 (0.770), 5.52 tokens/round
+  llama32-3b.bin <- llama32-1b.bin prompt 1 (len 14) k=2 graph=True: identical, accepted 83/86 (0.965), 2.89 tokens/round
+  llama32-3b.bin <- llama32-1b.bin prompt 1 (len 14) k=4 graph=True: identical, accepted 98/116 (0.845), 4.38 tokens/round
+  llama32-3b.bin <- llama32-1b.bin prompt 1 (len 14) k=6 graph=True: identical, accepted 105/128 (0.820), 5.77 tokens/round
+  llama32-3b.bin <- llama32-1b.bin prompt 1 (len 14) k=8 graph=True: identical, accepted 108/144 (0.750), 6.68 tokens/round
+  llama32-3b.bin <- llama32-1b.bin prompt 1 (len 14) k=6 graph=False: identical, accepted 105/128 (0.820), 5.77 tokens/round
+  llama32-3b.bin <- llama32-1b.bin prompt 2 (len 18) k=2 graph=True: identical, accepted 79/96 (0.823), 2.65 tokens/round
+  llama32-3b.bin <- llama32-1b.bin prompt 2 (len 18) k=4 graph=True: identical, accepted 94/131 (0.718), 3.85 tokens/round
+  llama32-3b.bin <- llama32-1b.bin prompt 2 (len 18) k=6 graph=True: identical, accepted 101/156 (0.647), 4.88 tokens/round
+  llama32-3b.bin <- llama32-1b.bin prompt 2 (len 18) k=8 graph=True: identical, accepted 103/186 (0.554), 5.29 tokens/round
+  llama32-3b.bin <- llama32-1b.bin prompt 2 (len 18) k=6 graph=False: identical, accepted 101/156 (0.647), 4.88 tokens/round
+  llama32-3b.bin <- llama32-1b.bin prompt 3 (len 20) k=2 graph=True: identical, accepted 72/108 (0.667), 2.31 tokens/round
+  llama32-3b.bin <- llama32-1b.bin prompt 3 (len 20) k=4 graph=True: identical, accepted 86/161 (0.534), 3.10 tokens/round
+  llama32-3b.bin <- llama32-1b.bin prompt 3 (len 20) k=6 graph=True: identical, accepted 92/210 (0.438), 3.63 tokens/round
+  llama32-3b.bin <- llama32-1b.bin prompt 3 (len 20) k=8 graph=True: identical, accepted 94/262 (0.359), 3.85 tokens/round
+  llama32-3b.bin <- llama32-1b.bin prompt 3 (len 20) k=6 graph=False: identical, accepted 92/210 (0.438), 3.63 tokens/round
+  llama32-3b.bin <- llama32-1b.bin prompt 4 (len 16) k=2 graph=True: identical, accepted 79/94 (0.840), 2.65 tokens/round
+  llama32-3b.bin <- llama32-1b.bin prompt 4 (len 16) k=4 graph=True: identical, accepted 95/124 (0.766), 3.97 tokens/round
+  llama32-3b.bin <- llama32-1b.bin prompt 4 (len 16) k=6 graph=True: identical, accepted 102/145 (0.703), 5.08 tokens/round
+  llama32-3b.bin <- llama32-1b.bin prompt 4 (len 16) k=8 graph=True: identical, accepted 108/150 (0.720), 6.68 tokens/round
+  llama32-3b.bin <- llama32-1b.bin prompt 4 (len 16) k=6 graph=False: identical, accepted 102/145 (0.703), 5.08 tokens/round
+  llama32-3b.bin <- llama32-1b.bin prompt 5 (len 13) k=2 graph=True: identical, accepted 83/87 (0.954), 2.89 tokens/round
+  llama32-3b.bin <- llama32-1b.bin prompt 5 (len 13) k=4 graph=True: identical, accepted 101/104 (0.971), 4.88 tokens/round
+  llama32-3b.bin <- llama32-1b.bin prompt 5 (len 13) k=6 graph=True: identical, accepted 108/112 (0.964), 6.68 tokens/round
+  llama32-3b.bin <- llama32-1b.bin prompt 5 (len 13) k=8 graph=True: identical, accepted 111/121 (0.917), 7.94 tokens/round
+  llama32-3b.bin <- llama32-1b.bin prompt 5 (len 13) k=6 graph=False: identical, accepted 108/112 (0.964), 6.68 tokens/round
+  llama32-3b.bin <- llama32-1b.bin prompt 6 (len 700) k=2 graph=True: identical, accepted 84/84 (1.000), 2.95 tokens/round
+  llama32-3b.bin <- llama32-1b.bin prompt 6 (len 700) k=4 graph=True: identical, accepted 101/101 (1.000), 4.88 tokens/round
+  llama32-3b.bin <- llama32-1b.bin prompt 6 (len 700) k=6 graph=True: identical, accepted 108/108 (1.000), 6.68 tokens/round
+  llama32-3b.bin <- llama32-1b.bin prompt 6 (len 700) k=8 graph=True: identical, accepted 112/112 (1.000), 8.47 tokens/round
+  llama32-3b.bin <- llama32-1b.bin prompt 6 (len 700) k=6 graph=False: identical, accepted 108/108 (1.000), 6.68 tokens/round
+hi_verify: R 17 outside [1, 16]
+hi_verify: p0 1023 + T 2 exceeds max_seq 1024
+hi_verify: token 128256 at 0 outside vocab 128256
+hi_rewind: length 1024 outside [0, max_seq 1024)
+hi_rewind: slot 1 outside [0, max_batch 1)
+  verify with MAX_VERIFY + 1 rows: rejected
+  verify past max_seq: rejected
+  verify token outside vocab: rejected
+  rewind past max_seq: rejected
+  rewind slot >= max_batch: rejected
+llama32-1b.bin <- itself: every draft token must be accepted
+  llama32-1b.bin <- itself prompt 0 (len 6) k=2 graph=True: identical, accepted 84/84 (1.000), 2.95 tokens/round
+  llama32-1b.bin <- itself prompt 0 (len 6) k=4 graph=True: identical, accepted 101/101 (1.000), 4.88 tokens/round
+  llama32-1b.bin <- itself prompt 0 (len 6) k=6 graph=True: identical, accepted 108/108 (1.000), 6.68 tokens/round
+  llama32-1b.bin <- itself prompt 0 (len 6) k=8 graph=True: identical, accepted 112/112 (1.000), 8.47 tokens/round
+  llama32-1b.bin <- itself prompt 0 (len 6) k=6 graph=False: identical, accepted 108/108 (1.000), 6.68 tokens/round
+  llama32-1b.bin <- itself prompt 1 (len 14) k=2 graph=True: identical, accepted 84/84 (1.000), 2.95 tokens/round
+  llama32-1b.bin <- itself prompt 1 (len 14) k=4 graph=True: identical, accepted 101/101 (1.000), 4.88 tokens/round
+  llama32-1b.bin <- itself prompt 1 (len 14) k=6 graph=True: identical, accepted 108/108 (1.000), 6.68 tokens/round
+  llama32-1b.bin <- itself prompt 1 (len 14) k=8 graph=True: identical, accepted 112/112 (1.000), 8.47 tokens/round
+  llama32-1b.bin <- itself prompt 1 (len 14) k=6 graph=False: identical, accepted 108/108 (1.000), 6.68 tokens/round
+  llama32-1b.bin <- itself prompt 2 (len 18) k=2 graph=True: identical, accepted 84/84 (1.000), 2.95 tokens/round
+  llama32-1b.bin <- itself prompt 2 (len 18) k=4 graph=True: identical, accepted 101/101 (1.000), 4.88 tokens/round
+  llama32-1b.bin <- itself prompt 2 (len 18) k=6 graph=True: identical, accepted 108/108 (1.000), 6.68 tokens/round
+  llama32-1b.bin <- itself prompt 2 (len 18) k=8 graph=True: identical, accepted 112/112 (1.000), 8.47 tokens/round
+  llama32-1b.bin <- itself prompt 2 (len 18) k=6 graph=False: identical, accepted 108/108 (1.000), 6.68 tokens/round
+  llama32-1b.bin <- itself prompt 3 (len 20) k=2 graph=True: identical, accepted 84/84 (1.000), 2.95 tokens/round
+  llama32-1b.bin <- itself prompt 3 (len 20) k=4 graph=True: identical, accepted 101/101 (1.000), 4.88 tokens/round
+  llama32-1b.bin <- itself prompt 3 (len 20) k=6 graph=True: identical, accepted 108/108 (1.000), 6.68 tokens/round
+  llama32-1b.bin <- itself prompt 3 (len 20) k=8 graph=True: identical, accepted 112/112 (1.000), 8.47 tokens/round
+  llama32-1b.bin <- itself prompt 3 (len 20) k=6 graph=False: identical, accepted 108/108 (1.000), 6.68 tokens/round
+  llama32-1b.bin <- itself prompt 4 (len 16) k=2 graph=True: identical, accepted 84/84 (1.000), 2.95 tokens/round
+  llama32-1b.bin <- itself prompt 4 (len 16) k=4 graph=True: identical, accepted 101/101 (1.000), 4.88 tokens/round
+  llama32-1b.bin <- itself prompt 4 (len 16) k=6 graph=True: identical, accepted 108/108 (1.000), 6.68 tokens/round
+  llama32-1b.bin <- itself prompt 4 (len 16) k=8 graph=True: identical, accepted 112/112 (1.000), 8.47 tokens/round
+  llama32-1b.bin <- itself prompt 4 (len 16) k=6 graph=False: identical, accepted 108/108 (1.000), 6.68 tokens/round
+  llama32-1b.bin <- itself prompt 5 (len 13) k=2 graph=True: identical, accepted 84/84 (1.000), 2.95 tokens/round
+  llama32-1b.bin <- itself prompt 5 (len 13) k=4 graph=True: identical, accepted 101/101 (1.000), 4.88 tokens/round
+  llama32-1b.bin <- itself prompt 5 (len 13) k=6 graph=True: identical, accepted 108/108 (1.000), 6.68 tokens/round
+  llama32-1b.bin <- itself prompt 5 (len 13) k=8 graph=True: identical, accepted 112/112 (1.000), 8.47 tokens/round
+  llama32-1b.bin <- itself prompt 5 (len 13) k=6 graph=False: identical, accepted 108/108 (1.000), 6.68 tokens/round
+  llama32-1b.bin <- itself prompt 6 (len 700) k=2 graph=True: identical, accepted 84/84 (1.000), 2.95 tokens/round
+  llama32-1b.bin <- itself prompt 6 (len 700) k=4 graph=True: identical, accepted 101/101 (1.000), 4.88 tokens/round
+  llama32-1b.bin <- itself prompt 6 (len 700) k=6 graph=True: identical, accepted 108/108 (1.000), 6.68 tokens/round
+  llama32-1b.bin <- itself prompt 6 (len 700) k=8 graph=True: identical, accepted 112/112 (1.000), 8.47 tokens/round
+  llama32-1b.bin <- itself prompt 6 (len 700) k=6 graph=False: identical, accepted 108/108 (1.000), 6.68 tokens/round
+tinyllama.bin <- itself: every draft token must be accepted
+  tinyllama.bin <- itself prompt 0 (len 6) k=2 graph=True: identical, accepted 84/84 (1.000), 2.95 tokens/round
+  tinyllama.bin <- itself prompt 0 (len 6) k=4 graph=True: identical, accepted 101/101 (1.000), 4.88 tokens/round
+  tinyllama.bin <- itself prompt 0 (len 6) k=6 graph=True: identical, accepted 108/108 (1.000), 6.68 tokens/round
+  tinyllama.bin <- itself prompt 0 (len 6) k=8 graph=True: identical, accepted 112/112 (1.000), 8.47 tokens/round
+  tinyllama.bin <- itself prompt 0 (len 6) k=6 graph=False: identical, accepted 108/108 (1.000), 6.68 tokens/round
+  tinyllama.bin <- itself prompt 1 (len 24) k=2 graph=True: identical, accepted 84/84 (1.000), 2.95 tokens/round
+  tinyllama.bin <- itself prompt 1 (len 24) k=4 graph=True: identical, accepted 101/101 (1.000), 4.88 tokens/round
+  tinyllama.bin <- itself prompt 1 (len 24) k=6 graph=True: identical, accepted 108/108 (1.000), 6.68 tokens/round
+  tinyllama.bin <- itself prompt 1 (len 24) k=8 graph=True: identical, accepted 112/112 (1.000), 8.47 tokens/round
+  tinyllama.bin <- itself prompt 1 (len 24) k=6 graph=False: identical, accepted 108/108 (1.000), 6.68 tokens/round
+  tinyllama.bin <- itself prompt 2 (len 18) k=2 graph=True: identical, accepted 84/84 (1.000), 2.95 tokens/round
+  tinyllama.bin <- itself prompt 2 (len 18) k=4 graph=True: identical, accepted 101/101 (1.000), 4.88 tokens/round
+  tinyllama.bin <- itself prompt 2 (len 18) k=6 graph=True: identical, accepted 108/108 (1.000), 6.68 tokens/round
+  tinyllama.bin <- itself prompt 2 (len 18) k=8 graph=True: identical, accepted 112/112 (1.000), 8.47 tokens/round
+  tinyllama.bin <- itself prompt 2 (len 18) k=6 graph=False: identical, accepted 108/108 (1.000), 6.68 tokens/round
+  tinyllama.bin <- itself prompt 3 (len 20) k=2 graph=True: identical, accepted 84/84 (1.000), 2.95 tokens/round
+  tinyllama.bin <- itself prompt 3 (len 20) k=4 graph=True: identical, accepted 101/101 (1.000), 4.88 tokens/round
+  tinyllama.bin <- itself prompt 3 (len 20) k=6 graph=True: identical, accepted 108/108 (1.000), 6.68 tokens/round
+  tinyllama.bin <- itself prompt 3 (len 20) k=8 graph=True: identical, accepted 112/112 (1.000), 8.47 tokens/round
+  tinyllama.bin <- itself prompt 3 (len 20) k=6 graph=False: identical, accepted 108/108 (1.000), 6.68 tokens/round
+  tinyllama.bin <- itself prompt 4 (len 19) k=2 graph=True: identical, accepted 84/84 (1.000), 2.95 tokens/round
+  tinyllama.bin <- itself prompt 4 (len 19) k=4 graph=True: identical, accepted 101/101 (1.000), 4.88 tokens/round
+  tinyllama.bin <- itself prompt 4 (len 19) k=6 graph=True: identical, accepted 108/108 (1.000), 6.68 tokens/round
+  tinyllama.bin <- itself prompt 4 (len 19) k=8 graph=True: identical, accepted 112/112 (1.000), 8.47 tokens/round
+  tinyllama.bin <- itself prompt 4 (len 19) k=6 graph=False: identical, accepted 108/108 (1.000), 6.68 tokens/round
+  tinyllama.bin <- itself prompt 5 (len 16) k=2 graph=True: identical, accepted 84/84 (1.000), 2.95 tokens/round
+  tinyllama.bin <- itself prompt 5 (len 16) k=4 graph=True: identical, accepted 101/101 (1.000), 4.88 tokens/round
+  tinyllama.bin <- itself prompt 5 (len 16) k=6 graph=True: identical, accepted 108/108 (1.000), 6.68 tokens/round
+  tinyllama.bin <- itself prompt 5 (len 16) k=8 graph=True: identical, accepted 112/112 (1.000), 8.47 tokens/round
+  tinyllama.bin <- itself prompt 5 (len 16) k=6 graph=False: identical, accepted 108/108 (1.000), 6.68 tokens/round
+  tinyllama.bin <- itself prompt 6 (len 700) k=2 graph=True: identical, accepted 84/84 (1.000), 2.95 tokens/round
+  tinyllama.bin <- itself prompt 6 (len 700) k=4 graph=True: identical, accepted 101/101 (1.000), 4.88 tokens/round
+  tinyllama.bin <- itself prompt 6 (len 700) k=6 graph=True: identical, accepted 108/108 (1.000), 6.68 tokens/round
+  tinyllama.bin <- itself prompt 6 (len 700) k=8 graph=True: identical, accepted 112/112 (1.000), 8.47 tokens/round
+  tinyllama.bin <- itself prompt 6 (len 700) k=6 graph=False: identical, accepted 108/108 (1.000), 6.68 tokens/round
+
+105/105 runs pass
+SPEC PASS

@@ -1,0 +1,11 @@
+llama32-1b.bin <- llama32-1b.bin on NVIDIA GeForce RTX 2080 Ti: 7 prompts x 128 tokens, reps 3
+GPU before: {'sm_clock_mhz': '1350', 'power_w': '69.77', 'compute_apps': '1435423, 4976 MiB'}
+decode step: target 4.670 ms, draft 4.672 ms (ratio 1.000)
+verify pass (wall ms) by rows: 1: 4.676, 2: 4.782, 3: 5.180, 4: 4.994, 5: 5.146, 6: 5.283, 7: 5.539, 8: 5.777, 9: 6.027
+plain: 212.3 tok/s (median of [212.4, 212.3, 212.0])
+k=1: 139.4 tok/s, speed-up 0.657x (model 0.663x), acceptance 1.000, 1.98 tokens/round, draft 66% / verify 34% of the loop, exact=True
+k=2: 153.3 tok/s, speed-up 0.722x (model 0.727x), acceptance 1.000, 2.95 tokens/round, draft 72% / verify 28% of the loop, exact=True
+k=4: 171.6 tok/s, speed-up 0.809x (model 0.805x), acceptance 1.000, 4.88 tokens/round, draft 81% / verify 19% of the loop, exact=True
+k=8: 184.5 tok/s, speed-up 0.869x (model 0.833x), acceptance 1.000, 8.47 tokens/round, draft 87% / verify 13% of the loop, exact=True
+verify='prefill': 16/28 runs diverge from plain greedy output
+GPU after: {'sm_clock_mhz': '1740', 'power_w': '168.96', 'compute_apps': '1435423, 5234 MiB'}
