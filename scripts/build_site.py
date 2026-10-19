@@ -94,7 +94,7 @@ def collect(root):
                             "pass": None, "ppl_hi": pp["ppl_hipinfer"], "ppl_hf": pp["ppl_hf"],
                             "top1": pp["top1_agreement"], "kl": pp["mean_kl_hf_to_hipinfer"]})
     return {"gpu": t, "decode": decode, "prefill": prefill, "ctx": ctx_lines, "batched": batched, "tp": tp, "ar": ar,
-            "correct": correct, "a100": collect_a100(root, gpus)}
+            "correct": correct, "a100": collect_a100(root, gpus), "int8": collect_int8(root)}
 
 
 ENGINES = [("hipinfer", "hipinfer"), ("llamacpp", "llama.cpp"), ("vllm", "vLLM"), ("torch_compile", "torch.compile")]
@@ -267,6 +267,129 @@ def a100_limit(d, root):
             f"faster than hipinfer; hipinfer's GEMMs run at {span(f['gemm'])} cuBLAS on that GPU.</li>")
 
 
+INT8 = ["tinyllama", "llama32-1b", "llama32-3b"]
+
+
+def collect_int8(root):
+    """int8 weights vs fp16 and llama.cpp Q8_0, all measured back to back in one session. Speed from
+    results/2080ti/<model>/int8/; Llama-3.2-3B's from rerun/, started on a cool card (MERGED_RUN.md)."""
+    rows = []
+    for m in INT8:
+        d = os.path.join(root, "2080ti", m, "int8")
+        if m == "llama32-3b":
+            rr = os.path.join(root, "2080ti", "rerun", "llama32-3b_")
+            b, f, q = (jload(rr + x + ".json") for x in ("bench_int8", "bench_fp16", "llamacpp_q8_0"))
+        else:
+            b, f, q = (jload(os.path.join(d, x + ".json")) for x in ("bench", "bench_fp16", "llamacpp_q8_0"))
+        pp, pr, gt = (jload(os.path.join(d, x + ".json")) for x in ("ppl", "ppl_int8ref", "gate_int8ref"))
+        if not (b and f and q):
+            continue
+        e, g = b["e2e"], f["e2e"]
+        row = {"label": name(m), "decode": {}, "prefill": {}, "util": [], "util_fp16": []}
+        for c in (128, 1024):
+            row["decode"][c] = {"int8": at(e["decode_b1"], "ctx", c, "ours_ms"),
+                                "fp16": at(g["decode_b1"], "ctx", c, "ours_ms"),
+                                "q8": at(q["decode_b1"], "ctx", c, "ms")}
+            row["util"].append(at(e["decode_b1"], "ctx", c, "bw_util"))
+            row["util_fp16"].append(at(g["decode_b1"], "ctx", c, "bw_util"))
+        row["floor"] = at(e["decode_b1"], "ctx", 128, "bw_floor_ms")
+        for t in (128, 512, 2000):
+            row["prefill"][t] = {"int8": at(e["prefill"], "T", t, "ours_ms"), "fp16": at(g["prefill"], "T", t, "ours_ms"),
+                                 "q8": at(q["prefill"], "T", t, "ms")}
+        row["acc"] = pp and pr and gt and {
+            "ppl_hf": pp["ppl_hf"], "ppl_hi": pp["ppl_hipinfer"], "chg": pp["ppl_change_pct"],
+            "kl": pp["mean_kl_hf_to_hipinfer"], "ppl_ref": pr["ppl_hf"], "chg_ref": pr["ppl_change_pct"],
+            "kl_ref": pr["mean_kl_hf_to_hipinfer"], "gate": f"{gt['identical']}/{gt['runs']}", "pass": gt["pass"]}
+        rows.append(row)
+    return rows or None
+
+
+def sci(v):
+    m, e = f"{v:.1e}".split("e")
+    return f"{m}e{int(e)}"
+
+
+def int8_facts(rows):
+    dec = lambda c, a, b: [r["decode"][c][a] / r["decode"][c][b] for r in rows]
+    pf = lambda ts: [r["prefill"][t]["int8"] / r["prefill"][t]["fp16"] - 1 for r in rows for t in ts]
+    acc = [r["acc"] for r in rows if r["acc"]]
+    return {"fp16": dec(128, "fp16", "int8"), "fp16_1k": dec(1024, "fp16", "int8"),
+            "q8": dec(128, "q8", "int8"), "q8_1k": dec(1024, "q8", "int8"),
+            "util": [u for r in rows for u in r["util"]], "util_fp16": [u for r in rows for u in r["util_fp16"]],
+            "pf_short": pf([128]), "pf_long": pf([512, 2000]),
+            "pf_q8": [r["prefill"][t]["q8"] / r["prefill"][t]["int8"] for r in rows for t in r["prefill"]],
+            "kl_ref": [a["kl_ref"] for a in acc], "kl": [a["kl"] for a in acc],
+            "chg_ref": [abs(a["chg_ref"]) for a in acc], "acc": acc}
+
+
+def int8_section(d):
+    rows = d["int8"]
+    if not rows:
+        return ""
+    f = int8_facts(rows)
+    pct = lambda v: span([100 * x for x in v], 0, "%")
+    dec_tbl = table(["model", "context", "int8 ms/token", "fp16 ms/token", "int8 speed-up", "llama.cpp Q8_0 ms/token",
+                     "int8 vs Q8_0", "int8 % of floor"],
+                    [[r["label"], f"{c:,}", fnum(x["int8"]), fnum(x["fp16"]),
+                      f"{x['fp16'] / x['int8']:.2f}×", fnum(x["q8"]), f"{x['q8'] / x['int8']:.2f}× faster",
+                      f"{100 * r['util'][i]:.0f}%"]
+                     for c, i in ((128, 0), (1024, 1)) for r in rows for x in [r["decode"][c]]])
+    pf_tbl = table(["model", "tokens", "int8 ms", "fp16 ms", "int8 vs fp16", "llama.cpp Q8_0 ms", "int8 vs Q8_0"],
+                   [[r["label"], f"{t:,}", fnum(x["int8"], 1), fnum(x["fp16"], 1),
+                     f"{100 * (x['int8'] / x['fp16'] - 1):.0f}% slower", fnum(x["q8"], 1),
+                     f"{x['q8'] / x['int8']:.2f}× faster"] for r in rows for t, x in r["prefill"].items()])
+    acc_tbl = table(["model", "PPL HF fp16", "PPL hipinfer int8", "change", "PPL HF, same int8 weights", "change",
+                     "mean KL vs HF int8", "greedy runs identical to HF int8"],
+                    [[r["label"], fnum(a["ppl_hf"], 4), fnum(a["ppl_hi"], 4), f"{a['chg']:+.2f}%", fnum(a["ppl_ref"], 4),
+                      f"{a['chg_ref']:+.4f}%", f"{a['kl_ref']:.1e}", a["gate"]] for r in rows for a in [r["acc"]] if a])
+    n = len(rows)
+    return f"""
+<h2>int8 weights (W8A16)</h2>
+<p>The projections and the lm_head are stored as int8 with one fp16 scale per output row (symmetric round-to-nearest);
+activations, the KV cache, norms and the embedding stay fp16. Batch-1 decode reads every weight once per token, so int8
+halves the bytes the GEMVs stream. Decode converts the weights to fp32 in registers; prefill dequantizes each weight tile
+to fp16 on its way into shared memory and runs the existing tensor-core GEMM. RTX 2080 Ti, batch 1. hipinfer's int8 and
+fp16 weights and llama.cpp's Q8_0 GGUF were measured back to back in one session, so the fp16 times here differ slightly
+from the charts above. Llama-3.2-3B's rows come from a rerun started on a cool card, where the int8 and fp16 runs' median
+clocks are within 2 % (<a href="%%REPO%%/blob/main/results/2080ti/MERGED_RUN.md">MERGED_RUN.md</a>).</p>
+<div class="card"><div class="ctitle">Decode latency per token with int8 weights (lower is better)</div>
+<div class="csub">ms/token at a 128-token context; the marker is int8's own bandwidth floor</div>
+<div class="legend"><span><i class="sw" style="background:var(--s1)"></i>hipinfer int8</span>
+<span><i class="sw" style="background:var(--s3)"></i>hipinfer fp16</span>
+<span><i class="sw" style="background:var(--s2)"></i>llama.cpp Q8_0</span><span><i class="mk"></i>int8 bandwidth floor</span></div>
+<div class="chart" id="c-int8-decode"></div>
+<details><summary>Data table</summary>{dec_tbl}</details></div>
+<div class="card"><div class="ctitle">Prefill time for 2,000 tokens with int8 weights (lower is better)</div>
+<div class="csub">ms, same session</div>
+<div class="legend"><span><i class="sw" style="background:var(--s1)"></i>hipinfer int8</span>
+<span><i class="sw" style="background:var(--s3)"></i>hipinfer fp16</span>
+<span><i class="sw" style="background:var(--s2)"></i>llama.cpp Q8_0</span></div>
+<div class="chart" id="c-int8-prefill"></div>
+<details><summary>Data table</summary>{pf_tbl}</details></div>
+<p><b>Decode is {span(f["fp16"])} faster than fp16, not 2×.</b> The weight bytes halve, but the KV-cache reads and each
+kernel's fixed cost don't, and the conversion costs instructions: int8 decode reaches {pct(f["util"])} of its bandwidth
+floor, against {pct(f["util_fp16"])} for fp16. At a 1,024-token context it is {span(f["fp16_1k"])} faster than fp16.
+Against llama.cpp's Q8_0 it is {span(f["q8"])} faster at 128 tokens of context and {span(f["q8_1k"])} at 1,024.</p>
+<p><b>Prefill is slower than fp16</b>: {pct(f["pf_short"])} at 128 tokens and {pct(f["pf_long"])} at 512–2,000, because
+each weight tile is converted on its way to shared memory. It is still {span(f["pf_q8"])} faster than llama.cpp's Q8_0
+prefill at every length measured.</p>
+<p><b>Accuracy.</b> Against fp16 HF, WikiText-2 perplexity rises by
+{" / ".join(f"{a['chg']:.2f} %" for a in f["acc"])}, the cost of rounding the weights. Against HF running the same rounded
+weights it is within {max(f["chg_ref"]):.3f} % (mean KL {sci(min(f["kl_ref"]))} to {sci(max(f["kl_ref"]))}), and the strict
+token gate passes with {" / ".join(a["gate"].split("/")[0] for a in f["acc"])} of 20 runs identical, so the int8 kernels add
+no error of their own beyond fp16 rounding.</p>
+<div class="card"><div class="ctitle">int8 perplexity and token gate</div>
+<div class="csub">WikiText-2, 16 × 1,024-token windows; the gate is 7 prompts × 128 tokens, 20 runs, against HF on the same int8 weights</div>
+{acc_tbl}</div>
+<div class="note"><ul>
+<li><b>Q8_0 is not the same format.</b> It keeps one scale per 32 weights instead of one per row, so it reads about 6 %
+more bytes and should round a little more accurately. llama.cpp's perplexity was not measured, and there is no 4-bit
+comparison.</li>
+<li><b>Scope.</b> {n} models, one GPU type (RTX 2080 Ti), batch 1, int8 weights only (no int8 activations or KV cache).</li>
+</ul></div>
+"""
+
+
 def git_info():
     sha = os.environ.get("GITHUB_SHA")
     try:
@@ -308,6 +431,10 @@ def tiles(d):
     if vl:
         out.append(("Batch-1 decode on an A100 vs vLLM", f"{min(vl):.2f}–{max(vl):.2f}× faster",
                     f"{len(vl)} models, one session; slower on long-prompt prefill"))
+    if d["int8"]:
+        f = int8_facts(d["int8"])
+        out.append(("int8 weights vs fp16, batch-1 decode", f"{span(f['fp16'])} faster",
+                    f"and {span(f['q8'])} faster than llama.cpp Q8_0; RTX 2080 Ti"))
     if ppl:
         out.append(("WikiText-2 perplexity vs HF transformers", f"within {max(ppl):.3f}%", f"{len(ppl)} model/GPU checks"))
     return "".join(f'<div class="tile"><div class="tl">{html.escape(a)}</div><div class="tv">{html.escape(b)}</div>'
@@ -341,11 +468,12 @@ def build(root, out_dir):
                     [[r["model"], r["gpu"], r["setup"], r["gate"] or "–", fnum(r["ppl_hi"], 4), fnum(r["ppl_hf"], 4),
                       f"{100 * r['top1']:.2f}%" if r["top1"] else "–", f"{r['kl']:.1e}" if r["kl"] else "–"]
                      for r in d["correct"]])
-    data = json.dumps({k: d[k] for k in ("decode", "prefill", "ctx", "tp", "a100")}).replace("</", "<\\/")
+    data = json.dumps({k: d[k] for k in ("decode", "prefill", "ctx", "tp", "a100", "int8")}).replace("</", "<\\/")
     page = PAGE
     for k, v in {"%%TILES%%": tiles(d), "%%GPU%%": html.escape(gpu), "%%DEC_TBL%%": dec_tbl, "%%CTX_TBL%%": ctx_tbl,
                  "%%PF_TBL%%": pf_tbl, "%%TP_TBL%%": tp_tbl, "%%AR_TBL%%": ar_tbl, "%%COR_TBL%%": cor_tbl,
                  "%%A100%%": a100_section(d, root), "%%A100_LIMIT%%": a100_limit(d, root),
+                 "%%INT8%%": int8_section(d),
                  "%%DATA%%": data, "%%REPO%%": REPO, "%%SHA%%": sha, "%%DATE%%": date}.items():
         page = page.replace(k, v)
     os.makedirs(out_dir, exist_ok=True)
@@ -476,6 +604,7 @@ close to the worst case for multi-GPU inference. Llama-3.1-8B and Mistral-7B don
 <div class="card"><div class="ctitle">All-reduce latency: hipinfer's one-shot kernel vs NCCL</div>
 <div class="csub">fp16, in place, two GPUs. Decode-sized messages use the one-shot kernel; large prefill messages use NCCL.</div>
 %%AR_TBL%%</div>
+%%INT8%%
 
 <h2>Correctness</h2>
 <p>Speed only counts if the output is right. <b>Greedy runs</b>: 7 prompts × 128 tokens, single-sequence with and without
@@ -649,11 +778,21 @@ Akash Dasarraju.</footer>
            D.a100.rows.map(r => ({ label: r.label, values: r.prefill, missing: miss(r) })), ser,
            { unit: "ms", digits: 1, aria: "A100 prefill time for 2,000 tokens, four engines" });
     }
+    if (D.int8) {
+      const ser = [["int8", "hipinfer int8", "--s1"], ["fp16", "hipinfer fp16", "--s3"], ["q8", "llama.cpp Q8_0", "--s2"]]
+        .map(([key, label, color]) => ({ key, label, color }));
+      bars(document.getElementById("c-int8-decode"),
+           D.int8.map(r => ({ label: r.label, values: r.decode["128"], marker: r.floor })), ser,
+           { unit: "ms", digits: 2, markerLabel: "int8 bandwidth floor", aria: "Decode latency per token, int8 vs fp16 vs llama.cpp Q8_0" });
+      bars(document.getElementById("c-int8-prefill"),
+           D.int8.map(r => ({ label: r.label, values: r.prefill["2000"] })), ser,
+           { unit: "ms", digits: 1, aria: "Prefill time for 2,000 tokens, int8 vs fp16 vs llama.cpp Q8_0" });
+    }
   }
   render();
   // redraw at the new width whenever a chart's box changes size (window resize, late layout, zoom)
   let raf, widths = "";
-  const hosts = ["c-decode", "c-ctx", "c-prefill", "c-tp", "c-a100-decode", "c-a100-prefill"]
+  const hosts = ["c-decode", "c-ctx", "c-prefill", "c-tp", "c-a100-decode", "c-a100-prefill", "c-int8-decode", "c-int8-prefill"]
     .map(id => document.getElementById(id)).filter(Boolean);
   const key = () => hosts.map(h => h.clientWidth).join(",");
   widths = key();
