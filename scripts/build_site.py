@@ -733,7 +733,8 @@ footer { margin-top: 48px; font-size: 12px; color: var(--muted); }
 <main>
 <h1>hipinfer</h1>
 <div class="lede">An LLM inference engine written from scratch in HIP: tensor-core GEMMs, fused GEMV / RMSNorm / RoPE
-kernels, FlashAttention-style attention, a graph-captured decode loop, and tensor parallelism across GPUs. One source
+kernels, FlashAttention-style attention, a graph-captured decode loop, tensor parallelism across GPUs, int8 weights,
+speculative decoding and KV-cache eviction scoring. One source
 tree builds with <code>nvcc</code> for NVIDIA and <code>hipcc</code> for AMD. These are its measured results.</div>
 <div class="links"><a href="%%REPO%%">Source on GitHub</a><a href="%%REPO%%#readme">README</a>
 <a href="%%REPO%%/blob/main/results/SUMMARY.md">All tables (SUMMARY.md)</a><a href="%%REPO%%/tree/main/results">Raw results</a></div>
@@ -801,6 +802,9 @@ Llama-3.2-1B, Qwen2.5-1.5B, Llama-3.2-3B and Mistral-7B-v0.3 benchmarks ran part
 so the main charts here use the RTX 2080 Ti. The A100 ran in one Colab session with no throttling
 (<a href="%%REPO%%/blob/main/results/a100/THERMAL.md">THERMAL.md</a>). Correctness results are unaffected.</li>
 %%A100_LIMIT%%
+<li><b>int8, speculative decoding and eviction ran on one GPU type for speed.</b> Their benchmarks are RTX 2080 Ti only,
+batch 1; speculative decoding is one model pair (Llama-3.2-3B with a 1B draft), and int8 prefill is 1–18 % slower than
+fp16. Eviction scoring has no accuracy result at any cache budget.</li>
 <li><b>AMD support.</b> Because this project was built in HIP, it has full AMD support, and compiles properly. However, I had no available AMD GPUs and the cloud solutions available were either at capacity or too expensive.</li>
 <li><b>Peer-to-peer multi-GPU.</b> The P2P all-reduce path is implemented but untested; only two GPUs have been tested.</li>
 </ul></div>
