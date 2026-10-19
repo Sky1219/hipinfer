@@ -130,6 +130,10 @@ for name, (Hq, Hkv, D, layers) in SHAPES.items():
 
 # ------------------------------------------------------------------ engine
 if args.model:
+    # the selection benchmarks above leave their tensors in PyTorch's cache; the engine allocates
+    # with hipMalloc, outside it
+    torch.cuda.empty_cache()
+    print(f"engine: free GPU memory {torch.cuda.mem_get_info()[0] / 2**30:.1f} GB", flush=True)
     e = hi.Engine(args.model, max_batch=1, max_seq=8192, max_prefill=1024)
     prompt = torch.randint(100, e.vocab - 100, (4096,)).tolist()
     for track in (False, True):
