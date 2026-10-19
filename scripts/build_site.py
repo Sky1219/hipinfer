@@ -6,6 +6,7 @@ python scripts/build_site.py [results_dir] [out_dir]
 import html
 import json
 import os
+import re
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -94,7 +95,8 @@ def collect(root):
                             "pass": None, "ppl_hi": pp["ppl_hipinfer"], "ppl_hf": pp["ppl_hf"],
                             "top1": pp["top1_agreement"], "kl": pp["mean_kl_hf_to_hipinfer"]})
     return {"gpu": t, "decode": decode, "prefill": prefill, "ctx": ctx_lines, "batched": batched, "tp": tp, "ar": ar,
-            "correct": correct, "a100": collect_a100(root, gpus), "int8": collect_int8(root)}
+            "correct": correct, "a100": collect_a100(root, gpus), "int8": collect_int8(root),
+            "spec": collect_spec(root)}
 
 
 ENGINES = [("hipinfer", "hipinfer"), ("llamacpp", "llama.cpp"), ("vllm", "vLLM"), ("torch_compile", "torch.compile")]
@@ -390,6 +392,83 @@ comparison.</li>
 """
 
 
+def spec_passes(path):
+    """'105/105 runs pass' from a tests/test_spec.py log -> (passed, runs)"""
+    if not os.path.exists(path):
+        return None
+    m = re.search(r"(\d+)/(\d+) runs pass", open(path, encoding="utf-8", errors="replace").read())
+    return m and (int(m.group(1)), int(m.group(2)))
+
+
+def collect_spec(root):
+    """Llama-3.2-3B with a Llama-3.2-1B draft, and Llama-3.2-1B drafting for itself, from the cool-card rerun"""
+    rr = os.path.join(root, "2080ti", "rerun")
+    p, s = jload(os.path.join(rr, "spec_llama32-3b_llama32-1b.json")), jload(os.path.join(rr, "spec_llama32-1b_self.json"))
+    if not p:
+        return None
+    return {"plain": p["plain_tok_s"], "t_target": p["t_target_ms"], "t_draft": p["t_draft_ms"],
+            "t_verify": {int(k): v for k, v in p["t_verify_ms"].items()},
+            "rows": [{"k": r["k"], "tok_s": r["tok_s"], "speedup": r["speedup"], "pred": r["predicted_speedup"],
+                      "acc": r["acceptance"], "tpr": r["tokens_per_round"], "exact": r["exact"]} for r in p["spec"]],
+            "pv": (p["prefill_verify_divergent"], p["prefill_verify_runs"]),
+            "self": s and {"speedup": [r["speedup"] for r in s["spec"]], "ks": [r["k"] for r in s["spec"]],
+                           "acc": [r["acceptance"] for r in s["spec"]],
+                           "pv": (s["prefill_verify_divergent"], s["prefill_verify_runs"])},
+            "tests": {"RTX 2080 Ti": spec_passes(os.path.join(root, "2080ti", "spec", "test_spec.log")),
+                      "RTX A6000": spec_passes(os.path.join(root, "a6000", "merged", "test_spec.log"))}}
+
+
+def spec_section(d):
+    s = d["spec"]
+    if not s:
+        return ""
+    rows = s["rows"]
+    best = max(rows, key=lambda r: r["speedup"])
+    top = [r["k"] for r in rows if f"{r['speedup']:.2f}" == f"{best['speedup']:.2f}"]
+    err = max(abs(r["pred"] / r["speedup"] - 1) for r in rows)
+    tbl = table(["k", "tok/s", "speed-up", "predicted by the cost model", "draft tokens accepted", "tokens per round"],
+                [[r["k"], fnum(r["tok_s"], 1), f"{r['speedup']:.2f}×", f"{r['pred']:.2f}×", f"{100 * r['acc']:.0f}%",
+                  fnum(r["tpr"])] for r in rows])
+    tests = [f"{v[0]} of {v[1]} on the {html.escape(g)}" for g, v in s["tests"].items() if v]
+    rv = max(s["t_verify"])
+    sf = s["self"]
+    self_txt = f"""<li><b>Self-draft</b> (Llama-3.2-1B drafting for itself): every draft token accepted, and
+{min(sf["speedup"]):.2f}× (k = {sf["ks"][0]}) to {max(sf["speedup"]):.2f}× (k = {sf["ks"][-1]}) plain speed. This is the
+overhead of drafting with a model as expensive as the target; the run exists to check exactness.</li>""" \
+        if sf and all(a == 1 for a in sf["acc"]) else ""
+    pv_txt = f"""<li><b>Verifying through the prefill path would have broken exactness.</b> Its GEMMs round differently
+from decode: it diverged from plain greedy output in {sf["pv"][0]} of {sf["pv"][1]} self-draft runs ({s["pv"][0]} of
+{s["pv"][1]} with the 3B target).</li>""" if sf else ""
+    return f"""
+<h2>Speculative decoding</h2>
+<p>Greedy speculative decoding with two engines on one GPU. Llama-3.2-1B drafts <code>k</code> tokens with its normal
+graph-captured decode steps, and Llama-3.2-3B checks all of them in one pass. The longest agreeing prefix is accepted,
+plus the target's own next token, and both caches roll back by resetting their lengths. The target verifies through the
+batch-1 decode kernels, so every row's logits are bit-identical to the decode step they replace and the output is the
+same as plain greedy decoding <b>token for token</b>, with no near-tie tolerance: <code>tests/test_spec.py</code> passes
+{" and ".join(tests)} (7 prompts × 128 tokens at k = 2, 4, 6, 8, with and without CUDA graphs, plus self-drafting).</p>
+<div class="card"><div class="ctitle">Speed-up over plain greedy decoding (higher is better)</div>
+<div class="csub">Llama-3.2-3B with a Llama-3.2-1B draft, RTX 2080 Ti, 7 prompts × 128 new tokens; plain greedy decoding gives
+{s["plain"]:.1f} tok/s</div>
+<div class="legend"><span><i class="sw" style="background:var(--s1)"></i>measured</span>
+<span><i class="sw" style="background:var(--s3)"></i>cost model</span><span><i class="mk"></i>plain greedy decoding</span></div>
+<div class="chart" id="c-spec"></div>
+<details><summary>Data table</summary>{tbl}</details></div>
+<p><b>Up to {best["speedup"]:.2f}× at k = {" and ".join(map(str, top))}.</b> The draft is not much cheaper than the target:
+both are weight-bandwidth bound, so a 1B decode step costs {100 * s["t_draft"] / s["t_target"]:.0f} % of a 3B one
+({s["t_draft"]:.2f} vs {s["t_target"]:.2f} ms), and gains level off around k = 5. Verification is cheap: checking {rv}
+rows in one pass costs {s["t_verify"][rv] / s["t_target"]:.2f}× a single 3B decode step
+({s["t_verify"][rv]:.1f} vs {s["t_target"]:.1f} ms), because the weights are read once for all rows. The cost model,
+<code>k·t_draft + t_verify(k + 1)</code> per round, is within {100 * err:.0f} % at every k.</p>
+<div class="note"><ul>
+{self_txt}
+{pv_txt}
+<li><b>Scope.</b> One model pair on one GPU type (RTX 2080 Ti), greedy, batch 1, dense models only; the draft must
+share the target's vocabulary.</li>
+</ul></div>
+"""
+
+
 def git_info():
     sha = os.environ.get("GITHUB_SHA")
     try:
@@ -435,6 +514,10 @@ def tiles(d):
         f = int8_facts(d["int8"])
         out.append(("int8 weights vs fp16, batch-1 decode", f"{span(f['fp16'])} faster",
                     f"and {span(f['q8'])} faster than llama.cpp Q8_0; RTX 2080 Ti"))
+    if d["spec"]:
+        best = max(r["speedup"] for r in d["spec"]["rows"])
+        out.append(("Speculative decoding, Llama-3.2-3B with a 1B draft", f"up to {best:.2f}× faster",
+                    "output identical to greedy; one model pair, RTX 2080 Ti"))
     if ppl:
         out.append(("WikiText-2 perplexity vs HF transformers", f"within {max(ppl):.3f}%", f"{len(ppl)} model/GPU checks"))
     return "".join(f'<div class="tile"><div class="tl">{html.escape(a)}</div><div class="tv">{html.escape(b)}</div>'
@@ -468,12 +551,12 @@ def build(root, out_dir):
                     [[r["model"], r["gpu"], r["setup"], r["gate"] or "–", fnum(r["ppl_hi"], 4), fnum(r["ppl_hf"], 4),
                       f"{100 * r['top1']:.2f}%" if r["top1"] else "–", f"{r['kl']:.1e}" if r["kl"] else "–"]
                      for r in d["correct"]])
-    data = json.dumps({k: d[k] for k in ("decode", "prefill", "ctx", "tp", "a100", "int8")}).replace("</", "<\\/")
+    data = json.dumps({k: d[k] for k in ("decode", "prefill", "ctx", "tp", "a100", "int8", "spec")}).replace("</", "<\\/")
     page = PAGE
     for k, v in {"%%TILES%%": tiles(d), "%%GPU%%": html.escape(gpu), "%%DEC_TBL%%": dec_tbl, "%%CTX_TBL%%": ctx_tbl,
                  "%%PF_TBL%%": pf_tbl, "%%TP_TBL%%": tp_tbl, "%%AR_TBL%%": ar_tbl, "%%COR_TBL%%": cor_tbl,
                  "%%A100%%": a100_section(d, root), "%%A100_LIMIT%%": a100_limit(d, root),
-                 "%%INT8%%": int8_section(d),
+                 "%%INT8%%": int8_section(d), "%%SPEC%%": spec_section(d),
                  "%%DATA%%": data, "%%REPO%%": REPO, "%%SHA%%": sha, "%%DATE%%": date}.items():
         page = page.replace(k, v)
     os.makedirs(out_dir, exist_ok=True)
@@ -605,6 +688,7 @@ close to the worst case for multi-GPU inference. Llama-3.1-8B and Mistral-7B don
 <div class="csub">fp16, in place, two GPUs. Decode-sized messages use the one-shot kernel; large prefill messages use NCCL.</div>
 %%AR_TBL%%</div>
 %%INT8%%
+%%SPEC%%
 
 <h2>Correctness</h2>
 <p>Speed only counts if the output is right. <b>Greedy runs</b>: 7 prompts × 128 tokens, single-sequence with and without
@@ -701,8 +785,9 @@ Akash Dasarraju.</footer>
                      style: `fill:var(${s.color})` }, svg);
         txt(fmt(v, opts.digits), { x: x1 + 6, y: y + bh - 3 }, svg);
         const hit = el("rect", { x: x0, y: y - gap, width: Math.max(x1 - x0, 24) + 40, height: bh + 2 * gap, fill: "transparent" }, svg);
-        const rowsT = [[`var(${s.color})`, fmt(v, opts.digits) + " " + opts.unit, s.label]];
-        if (r.marker) rowsT.push(["var(--ink)", fmt(r.marker, opts.digits) + " " + opts.unit, opts.markerLabel]);
+        const u = opts.unit === "×" ? "×" : " " + opts.unit;
+        const rowsT = [[`var(${s.color})`, fmt(v, opts.digits) + u, s.label]];
+        if (r.marker) rowsT.push(["var(--ink)", fmt(r.marker, opts.digits) + u, opts.markerLabel]);
         hit.addEventListener("pointermove", ev => { const b = host.getBoundingClientRect(); tip.show(ev.clientX - b.left, ev.clientY - b.top, r.label, rowsT); });
         hit.addEventListener("pointerleave", () => tip.hide());
       });
@@ -778,6 +863,12 @@ Akash Dasarraju.</footer>
            D.a100.rows.map(r => ({ label: r.label, values: r.prefill, missing: miss(r) })), ser,
            { unit: "ms", digits: 1, aria: "A100 prefill time for 2,000 tokens, four engines" });
     }
+    if (D.spec) {
+      bars(document.getElementById("c-spec"),
+           D.spec.rows.map(r => ({ label: `k = ${r.k}`, values: { m: r.speedup, p: r.pred }, marker: 1 })),
+           [{ key: "m", label: "measured", color: "--s1" }, { key: "p", label: "cost model", color: "--s3" }],
+           { unit: "×", digits: 2, markerLabel: "plain greedy decoding", aria: "Speculative decoding speed-up per k" });
+    }
     if (D.int8) {
       const ser = [["int8", "hipinfer int8", "--s1"], ["fp16", "hipinfer fp16", "--s3"], ["q8", "llama.cpp Q8_0", "--s2"]]
         .map(([key, label, color]) => ({ key, label, color }));
@@ -792,7 +883,7 @@ Akash Dasarraju.</footer>
   render();
   // redraw at the new width whenever a chart's box changes size (window resize, late layout, zoom)
   let raf, widths = "";
-  const hosts = ["c-decode", "c-ctx", "c-prefill", "c-tp", "c-a100-decode", "c-a100-prefill", "c-int8-decode", "c-int8-prefill"]
+  const hosts = ["c-decode", "c-ctx", "c-prefill", "c-tp", "c-a100-decode", "c-a100-prefill", "c-int8-decode", "c-int8-prefill", "c-spec"]
     .map(id => document.getElementById(id)).filter(Boolean);
   const key = () => hosts.map(h => h.clientWidth).join(",");
   widths = key();
