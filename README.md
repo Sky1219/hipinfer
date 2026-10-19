@@ -10,6 +10,9 @@ TinyLlama models in fp16 **5–47 % faster than llama.cpp at batch-1 decode** (1
 3–43 % at 1,024), and its outputs match Hugging Face transformers (WikiText-2 perplexity within
 0.01 %). On an A100 it is 10–27 % faster than llama.cpp and 23–31 % faster than vLLM at batch-1
 decode, measured in one session, though slower than vLLM and torch.compile on long-prompt prefill.
+With int8 weights, decode on the 2080 Ti is 1.6–1.8× faster than fp16 and 16–26 % faster than
+llama.cpp's Q8_0. Greedy speculative decoding gives up to 1.39× on Llama-3.2-3B with output
+identical to plain greedy decoding.
 
 The same source tree builds with `hipcc` for AMD GPUs and with plain `nvcc` for NVIDIA GPUs. There
 are no vendor libraries in the hot path: the GEMV, GEMM, RMSNorm, RoPE and FlashAttention-style
@@ -29,7 +32,8 @@ Hardware:
 
 - **NVIDIA, tested:** RTX 2080 Ti (Turing, sm_75), on one card and on two with tensor parallelism;
   RTX A6000 (Ampere, sm_86); and A100-SXM4-40GB (Ampere, sm_80, on Google Colab). The dense-model
-  kernel tests pass on all three; the MoE kernel tests have run on the 2080 Ti only.
+  kernel tests pass on all three; the MoE kernel tests have run on the 2080 Ti only. The int8,
+  speculative-decoding and eviction code has run on the 2080 Ti and the A6000.
 - **AMD support:** Because this project was built in HIP, it has full AMD support, and compiles
   properly. However, I had no available AMD GPUs and the cloud solutions available were either at
   capacity or too expensive.
@@ -57,9 +61,12 @@ All affected runtimes are listed below.
   depend on clock speed and are valid for every model. The engine comparisons (llama.cpp, vLLM) are
   only fair when every engine ran unthrottled, which on the A6000 holds only for TinyLlama; the other
   models' comparison runs are listed in THERMAL.md and not used anywhere.
-- **RTX 2080 Ti.** These didn't overheat, but under sustained load their 250 W power cap held the
-  clock at 1.4–1.55 GHz. That affects Llama-3.2-3B prefill in the full suite: 289.7 ms against
-  273.6 ms in a short isolated run (marked ✱ in the results table).
+- **RTX 2080 Ti.** Under sustained load their 250 W power cap holds the clock at 1.4–1.55 GHz.
+  That affects Llama-3.2-3B prefill in the full suite: 289.7 ms against 273.6 ms in a short isolated
+  run (marked ✱ in the results table). The int8 and speculative-decoding runs also logged the
+  driver's throttle reasons. On the longer benchmarks the cards reached their ~84 °C thermal target
+  too, so the comparisons where the two sides throttled unevenly were rerun from a cool card. The
+  reruns agree with the first run within 2 % ([results/2080ti/MERGED_RUN.md](results/2080ti/MERGED_RUN.md)).
 
 ## Quick start
 
@@ -321,10 +328,34 @@ fp16. Batch-1 decode reads every weight once per token, so int8 halves the bytes
 
 Design: [docs/quantization.md](docs/quantization.md).
 
-**Status: not yet measured on a GPU.** The code compiles for sm_75. CPU tests check the file
-layout, the rounding and the kernel's int8-to-fp32 conversion. The GPU kernel tests, token gates,
-perplexity and KL against fp16 HF, benchmarks and the llama.cpp Q8_0 comparison are written
-(`scripts/run_int8.sh`) but haven't run yet, so there are no int8 numbers here.
+RTX 2080 Ti, batch 1, hipinfer's int8 and fp16 weights and llama.cpp's Q8_0 and F16 GGUFs measured
+back to back:
+
+| decode ms/token, ctx 128 | hipinfer int8 | hipinfer fp16 | int8 speed-up | llama.cpp Q8_0 | int8 vs Q8_0 |
+|---|---|---|---|---|---|
+| TinyLlama-1.1B | **2.54** | 4.15 | 1.63× | 3.21 | **1.26× faster** |
+| Llama-3.2-1B | **2.73** | 4.72 | 1.73× | 3.32 | **1.22× faster** |
+| Llama-3.2-3B | **6.71** | 12.01 | 1.79× | 7.94 | **1.18× faster** |
+
+- **Decode is 1.6–1.8× faster than fp16, not 2×.** The weight bytes halve, but the KV-cache reads
+  and each kernel's fixed cost don't, and the conversion costs instructions. int8 decode reaches
+  66–78 % of its bandwidth floor, against 80–87 % for fp16. At a 1,024-token context it is
+  1.61–1.75× faster than fp16 and 1.16–1.24× faster than Q8_0.
+- **Prefill is 1–18 % slower than fp16** (2,000 tokens: 117 vs 102 ms on TinyLlama, 328 vs 282 ms
+  on Llama-3.2-3B), because each weight tile is converted on its way to shared memory. It is still
+  1.05–1.72× faster than llama.cpp's Q8_0 prefill.
+- **Accuracy:** against fp16 HF, WikiText-2 perplexity rises by 0.04 % (TinyLlama), 0.23 %
+  (Llama-3.2-1B) and 0.20 % (Llama-3.2-3B), which is the cost of rounding the weights. Against HF
+  running the same rounded weights, it is within 0.003 % (mean KL 7e-6 to 1.3e-5), and the strict
+  token gate passes with 15–18 of 20 runs identical. So the kernels add no error of their own
+  beyond fp16 rounding.
+- **Q8_0 is not the same format.** It keeps one scale per 32 weights instead of one per row, so it
+  reads about 6 % more bytes and should round a little more accurately. I didn't measure
+  llama.cpp's perplexity.
+
+The 3B rows come from a rerun started on a cool card. In the first run, the fp16 benchmark had
+throttled more than the int8 one. In the rerun, the two runs' median clocks are within 2 %
+([results/2080ti/MERGED_RUN.md](results/2080ti/MERGED_RUN.md)).
 
 ## Speculative decoding
 
@@ -345,13 +376,63 @@ split-K decode attention), with each row's arithmetic independent of the row cou
 logits are therefore bit-identical to the decode step they replace.
 [docs/speculative.md](docs/speculative.md) explains the design and the cost model.
 
-**Status: implemented but not yet measured.** The code compiles for sm_75, and the round loop
-(accept, roll back, draft catch-up) passes a CPU test with stub engines,
-[tests/test_spec_logic.py](tests/test_spec_logic.py). Neither the GPU exact-match test
-([tests/test_spec.py](tests/test_spec.py), k = 2, 4, 6, 8 on the gate prompts) nor the speed-up
-benchmark has been run yet. `scripts/run_spec.sh` runs both on a 2080 Ti and writes
-`results/2080ti/spec/`. Expect modest gains: on a 2080 Ti a 1B draft step costs about 40 % of a 3B
-step, so only small `k` can pay off.
+**Exact match:** [tests/test_spec.py](tests/test_spec.py) passes all 105 runs on a 2080 Ti and on
+an A6000. Each run is one of the 7 gate prompts × 128 tokens at k = 2, 4, 6 or 8, plus k = 6
+without CUDA graphs. That covers Llama-3.2-3B with a 1B draft, and Llama-3.2-1B and TinyLlama
+drafting for themselves, where every draft token must be accepted.
+
+**Speed on a 2080 Ti**, Llama-3.2-3B with a Llama-3.2-1B draft, 128 new tokens per prompt, against
+plain greedy decoding of the same target (83.7 tok/s):
+
+| k | 1 | 2 | 3 | 4 | **5** | 6 | 8 |
+|---|---|---|---|---|---|---|---|
+| tok/s | 89.7 | 102.1 | 111.8 | 115.0 | **116.7** | 116.1 | 111.7 |
+| speed-up | 1.07× | 1.22× | 1.34× | 1.37× | **1.39×** | 1.39× | 1.33× |
+| draft tokens accepted | 91 % | 87 % | 83 % | 79 % | 76 % | 72 % | 67 % |
+
+- **The draft is not much cheaper than the target.** A 1B decode step costs 39 % of a 3B one
+  (4.66 vs 11.85 ms), because both are weight-bandwidth bound. Gains level off around k = 5.
+- **The cost model predicts every k within 2 %** ([docs/speculative.md](docs/speculative.md)).
+- **Verification is cheap.** Checking 9 rows in one pass costs 1.31× a single 3B decode step
+  (15.5 vs 11.8 ms), because the weights are read once for all rows.
+- **Verifying through the prefill path would have broken exactness.** With prefill-path
+  verification, the self-draft runs diverged from plain greedy output in 16 of 28 runs (none of the
+  49 with the 3B target).
+
+## KV-cache eviction scoring (H2O, WFL)
+
+Eviction policies decide which cached keys to drop when a sequence outgrows its cache budget. H2O
+keeps the keys that have received the most attention. WFL prune, from SubCache, removes the keys
+that another kept key can best stand in for, judged by key-and-value similarity and attention
+mass. Both need numbers the FlashAttention-style kernels don't produce, so with
+`Engine.set_tracking(True)` the attention kernels also record them:
+
+- **Decode:** the split-K kernels store each key's logit and each head's log-sum-exp, and a small
+  kernel turns them into attention weights and adds them to a per-key score.
+- **Prefill:** the flash kernel saves each row's log-sum-exp, and a second, key-parallel pass
+  recomputes QKᵀ and sums each key's column, with no atomics.
+- **Selection:** H2O is a radix-select top-k. WFL prune computes the key-and-value similarity on the
+  fly (no n × n matrix) and rescans only the rows a removal can change.
+- **`Engine.evict`** compacts the kept keys, values and scores to the front of the cache; decode
+  continues at the true positions.
+
+Tracking is off by default, and turning it on changes no output.
+
+**Checked on a 2080 Ti and an A6000:** 475 kernel checks against PyTorch, and an engine test on
+four models (two on the A6000). Attention outputs and greedy tokens with tracking on are bitwise
+equal to tracking off, scores are within 2e-6 relative of a float64 reference, and the kept slots
+equal PyTorch's choice from the engine's own state. The first GPU run found a bug the CPU
+emulation couldn't: after an eviction, decode added each new key's weight on top of an evicted
+key's stale score. Fixed and re-tested.
+
+**Cost on the 2080 Ti:** tracking slows the decode-attention kernel by 5–33 %, but a whole
+Llama-3.2-1B decode step at a 4k context by only 1.7 % (4.96 → 5.05 ms). Choosing 1,024 of 4,096
+keys takes 0.1 ms with H2O and 0.9 s with full WFL (63 ms with WFL limited to a candidate pool and 8
+rounds), plus 0.9 ms to compact the cache. The WFL kernels are 6–25× faster than the PyTorch
+version of the same algorithm.
+
+This shows the kernels compute the policies as specified. It says nothing about how well either
+policy preserves a model's answers at a given budget. Details: [docs/eviction.md](docs/eviction.md).
 
 ## Correctness
 
@@ -467,8 +548,12 @@ each product explicitly.
 - **MoE decode runs at 63 % of the bandwidth floor** on Granite-3.1-1B-A400M (2.26 ms/token on the
   2080 Ti), against 81–87 % for the dense models. Each token reads 8 of 32 small experts, so the
   GEMVs are short and the reads scattered. MoE runs on one GPU only; there's no expert parallelism yet.
-- **Not supported:** quantization beyond int8 weights (no int4, no int8 activations or KV cache;
-  int8 weights are [not yet measured](#int8-weights-w8a16)), a paged KV cache (each slot's cache is
+- **int8 prefill is slower than fp16** (1–18 %): the GEMM converts each weight tile on its way
+  into shared memory instead of using integer tensor-core instructions.
+- **Speculative decoding is greedy, batch 1, one GPU, dense models only,** and needs a draft model
+  that shares the target's vocabulary.
+- **Not supported:** quantization beyond int8 weights (no int4, no int8 activations or KV cache),
+  a paged KV cache (each slot's cache is
   contiguous), sampling other than greedy, MoE models with shared experts or QK-norm (Qwen-MoE,
   DeepSeek, OLMoE) and sliding-window attention.
 - **Sliding-window models:** Mistral-7B-v0.1 (4,096-token window) loads only with `max_seq` within
@@ -482,6 +567,9 @@ each product explicitly.
 - [docs/profiling.md](docs/profiling.md): where a decode step's time goes, kernel by kernel.
 - [docs/porting-a-model.md](docs/porting-a-model.md): the weight format, what a new model family
   costs, and how each unsupported feature fails.
+- [docs/quantization.md](docs/quantization.md), [docs/speculative.md](docs/speculative.md),
+  [docs/eviction.md](docs/eviction.md): the int8, speculative-decoding and eviction designs, with
+  their full results.
 - [docs/moe-design.md](docs/moe-design.md), [docs/layer-diff.md](docs/layer-diff.md),
   [docs/turing-prefill-gemm.md](docs/turing-prefill-gemm.md).
 
