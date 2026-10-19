@@ -1,0 +1,28 @@
+NVIDIA GeForce RTX 2080 Ti peak BW 616.0 GB/s | TinyLlama/TinyLlama-1.1B-Chat-v1.0 {'vocab': 32000, 'hidden': 2048, 'inter': 5632, 'layers': 22, 'heads': 32, 'kv_heads': 4, 'head_dim': 64, 'max_pos': 2048, 'window': 0, 'tied': False, 'qkv_bias': False, 'weight_bytes': 2069024768, 'quant': 0}
+
+== HF reference skipped (--no-hf) ==
+
+== Prefill latency (ms) ==
+T=  128  hipinfer    8.64 ms (   14806 tok/s)
+T=  512  hipinfer   26.80 ms (   19106 tok/s)
+T= 1024  hipinfer   50.82 ms (   20149 tok/s)
+T= 2000  hipinfer  101.60 ms (   19685 tok/s)
+
+== Decode, batch 1 (ms/token) ==
+ctx=  128  hipinfer  4.150 ms (graph) /  4.164 ms (no graph)   roofline 3.368 ms -> 81% of peak BW
+ctx= 1024  hipinfer  4.234 ms (graph) /  4.251 ms (no graph)   roofline 3.401 ms -> 80% of peak BW
+
+== Decode latency vs context length (batch 1, 128 new tokens) ==
+ctx=   128   4.147 ms/token   KV read     4.3 MB/step   roofline 3.366 ms  81% BW
+ctx=   512   4.176 ms/token   KV read    13.0 MB/step   roofline 3.380 ms  81% BW
+ctx=  1024   4.230 ms/token   KV read    24.5 MB/step   roofline 3.399 ms  80% BW
+
+== Batched decode throughput (ctx 512, 128 new tokens; up to 64 sequences fit) ==
+B=  1   4.165 ms/step        240 tok/s     258 W   1074.61 mJ/token
+B=  2   4.308 ms/step        464 tok/s     247 W   531.43 mJ/token
+B=  4   4.639 ms/step        862 tok/s     245 W   284.62 mJ/token
+B=  8   4.859 ms/step       1646 tok/s     245 W   148.93 mJ/token
+B= 16   5.169 ms/step       3096 tok/s     246 W    79.43 mJ/token
+B= 32   6.660 ms/step       4805 tok/s     249 W    51.72 mJ/token
+B= 64   8.335 ms/step       7678 tok/s     247 W    32.10 mJ/token
+wrote results/2080ti/tinyllama/int8/bench_fp16.json

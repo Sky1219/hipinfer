@@ -1,0 +1,183 @@
+{
+ "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+ "gpu": "NVIDIA GeForce RTX 2080 Ti",
+ "new_tokens": 128,
+ "pass": true,
+ "identical": 8,
+ "runs": 20,
+ "router_accepted": 0,
+ "router_tie": 0.01,
+ "max_prefill_logit_diff": 0.65625,
+ "engine_weights": "int8",
+ "hf_ref": "fp16",
+ "allow_divergence": true,
+ "allowed_divergences": 11,
+ "matched_prefix": [
+  128,
+  128,
+  128,
+  128,
+  60,
+  60,
+  77,
+  77,
+  90,
+  90,
+  1,
+  1,
+  128,
+  128,
+  128,
+  128,
+  60,
+  82,
+  90,
+  1
+ ],
+ "prompt_lens": [
+  6,
+  24,
+  18,
+  20,
+  19,
+  16,
+  700
+ ],
+ "log": [
+  {
+   "run": "prompt 0 single graph=True",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "prompt 0 single graph=False",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "prompt 1 single graph=True",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "prompt 1 single graph=False",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "prompt 2 single graph=True",
+   "identical": false,
+   "step": 60,
+   "hf_gap": 0.109375,
+   "allowed_divergence": true,
+   "accepted": true
+  },
+  {
+   "run": "prompt 2 single graph=False",
+   "identical": false,
+   "step": 60,
+   "hf_gap": 0.109375,
+   "allowed_divergence": true,
+   "accepted": true
+  },
+  {
+   "run": "prompt 3 single graph=True",
+   "identical": false,
+   "step": 77,
+   "hf_gap": 0.1640625,
+   "allowed_divergence": true,
+   "accepted": true
+  },
+  {
+   "run": "prompt 3 single graph=False",
+   "identical": false,
+   "step": 77,
+   "hf_gap": 0.1640625,
+   "allowed_divergence": true,
+   "accepted": true
+  },
+  {
+   "run": "prompt 4 single graph=True",
+   "identical": false,
+   "step": 90,
+   "hf_gap": 0.109375,
+   "allowed_divergence": true,
+   "accepted": true
+  },
+  {
+   "run": "prompt 4 single graph=False",
+   "identical": false,
+   "step": 90,
+   "hf_gap": 0.109375,
+   "allowed_divergence": true,
+   "accepted": true
+  },
+  {
+   "run": "prompt 5 single graph=True",
+   "identical": false,
+   "step": 1,
+   "hf_gap": 0.140625,
+   "allowed_divergence": true,
+   "accepted": true
+  },
+  {
+   "run": "prompt 5 single graph=False",
+   "identical": false,
+   "step": 1,
+   "hf_gap": 0.140625,
+   "allowed_divergence": true,
+   "accepted": true
+  },
+  {
+   "run": "prompt 6 single graph=True",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "prompt 6 single graph=False",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "batched B=6 slot 0",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "batched B=6 slot 1",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "batched B=6 slot 2",
+   "identical": false,
+   "step": 60,
+   "hf_gap": 0.109375,
+   "allowed_divergence": true,
+   "accepted": true
+  },
+  {
+   "run": "batched B=6 slot 3",
+   "identical": false,
+   "step": 82,
+   "hf_gap": 0.0234375,
+   "accepted": true
+  },
+  {
+   "run": "batched B=6 slot 4",
+   "identical": false,
+   "step": 90,
+   "hf_gap": 0.109375,
+   "allowed_divergence": true,
+   "accepted": true
+  },
+  {
+   "run": "batched B=6 slot 5",
+   "identical": false,
+   "step": 1,
+   "hf_gap": 0.140625,
+   "allowed_divergence": true,
+   "accepted": true
+  }
+ ]
+}

@@ -1,0 +1,16 @@
+== llama32-3b gate int8 vs fp16 HF
+17/20 runs token-identical, max prefill-logit |diff| 0.7148, 0 allowed divergences (int8 vs fp16); tokens matched before the first difference: mean 113.2, min 29 of 128
+GATE PASS
+== llama32-3b gate int8 vs int8 HF
+18/20 runs token-identical, max prefill-logit |diff| 0.0234
+GATE PASS
+== llama32-3b gate fp16 (this build)
+20/20 runs token-identical, max prefill-logit |diff| 0.0234
+GATE PASS
+== llama32-3b ppl int8 vs fp16 HF
+ "max_logit_diff": 6.15625
+}
+== llama32-3b ppl int8 vs int8 HF
+ "max_logit_diff": 0.6484375
+}
+all int8 steps passed

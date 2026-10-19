@@ -1,0 +1,43 @@
+Loading weights:   0%|          | 0/254 [00:00<?, ?it/s]Loading weights:  19%|█▉        | 48/254 [00:00<00:00, 443.83it/s]Loading weights:  40%|████      | 102/254 [00:00<00:00, 473.33it/s]Loading weights:  61%|██████    | 154/254 [00:00<00:00, 489.54it/s]Loading weights:  80%|████████  | 204/254 [00:00<00:00, 490.67it/s]Loading weights: 100%|██████████| 254/254 [00:00<00:00, 492.68it/s]
+HF phase done; free GPU memory 10.4 GB
+hi_prefill: p0 1019 + T 6 exceeds max_seq 1024
+hi_prefill: slot 8 outside [0, max_batch 8)
+hi_prefill: token 128256 at 0 outside vocab 128256
+hi_decode: B 9 outside [1, max_batch 8]
+hi_decode: slot 0 at position 1023 + 2 steps exceeds max_seq 1024
+unsloth/Llama-3.2-3B: layers 28 hidden 3072 heads 24/8 head_dim 128 vocab 128256 tied=False qkv_bias=False weights=int8 HF reference=int8
+prompt 0 (len 6): prefill logits max |diff| = 0.0156
+  prompt 0 single graph=True: diverges at step 24 (hf gap 0.0469) -> near-tie, OK
+  prompt 0 single graph=False: diverges at step 24 (hf gap 0.0469) -> near-tie, OK
+prompt 1 (len 14): prefill logits max |diff| = 0.0205
+  prompt 1 single graph=True: 128/128 tokens identical
+  prompt 1 single graph=False: 128/128 tokens identical
+prompt 2 (len 18): prefill logits max |diff| = 0.0156
+  prompt 2 single graph=True: 128/128 tokens identical
+  prompt 2 single graph=False: 128/128 tokens identical
+prompt 3 (len 20): prefill logits max |diff| = 0.0234
+  prompt 3 single graph=True: 128/128 tokens identical
+  prompt 3 single graph=False: 128/128 tokens identical
+prompt 4 (len 16): prefill logits max |diff| = 0.0195
+  prompt 4 single graph=True: 128/128 tokens identical
+  prompt 4 single graph=False: 128/128 tokens identical
+prompt 5 (len 13): prefill logits max |diff| = 0.0205
+  prompt 5 single graph=True: 128/128 tokens identical
+  prompt 5 single graph=False: 128/128 tokens identical
+prompt 6 (len 700): prefill logits max |diff| = 0.0215
+  prompt 6 single graph=True: 128/128 tokens identical
+  prompt 6 single graph=False: 128/128 tokens identical
+  batched B=6 slot 0: 128/128 tokens identical
+  batched B=6 slot 1: 128/128 tokens identical
+  batched B=6 slot 2: 128/128 tokens identical
+  batched B=6 slot 3: 128/128 tokens identical
+  batched B=6 slot 4: 128/128 tokens identical
+  batched B=6 slot 5: 128/128 tokens identical
+  prefill past max_seq: rejected
+  prefill slot >= max_batch: rejected
+  token outside vocab: rejected
+  decode B > max_batch: rejected
+  decode past max_seq: rejected
+
+18/20 runs token-identical, max prefill-logit |diff| 0.0234
+GATE PASS

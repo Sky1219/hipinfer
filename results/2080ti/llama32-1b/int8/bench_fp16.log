@@ -1,0 +1,32 @@
+NVIDIA GeForce RTX 2080 Ti peak BW 616.0 GB/s | unsloth/Llama-3.2-1B {'vocab': 128256, 'hidden': 2048, 'inter': 8192, 'layers': 16, 'heads': 32, 'kv_heads': 8, 'head_dim': 64, 'max_pos': 131072, 'window': 0, 'tied': True, 'qkv_bias': False, 'weight_bytes': 2471628800, 'quant': 0}
+
+== HF reference skipped (--no-hf) ==
+
+== Prefill latency (ms) ==
+T=  128  hipinfer    8.37 ms (   15294 tok/s)
+T=  512  hipinfer   25.60 ms (   20003 tok/s)
+T= 1024  hipinfer   48.58 ms (   21080 tok/s)
+T= 2000  hipinfer   97.52 ms (   20509 tok/s)
+T= 4096  hipinfer  206.04 ms (   19879 tok/s)
+
+== Decode, batch 1 (ms/token) ==
+ctx=  128  hipinfer  4.718 ms (graph) /  4.732 ms (no graph)   roofline 4.026 ms -> 85% of peak BW
+ctx= 1024  hipinfer  4.795 ms (graph) /  4.808 ms (no graph)   roofline 4.074 ms -> 85% of peak BW
+
+== Decode latency vs context length (batch 1, 128 new tokens) ==
+ctx=   128   4.713 ms/token   KV read     6.3 MB/step   roofline 4.023 ms  85% BW
+ctx=   512   4.746 ms/token   KV read    18.9 MB/step   roofline 4.043 ms  85% BW
+ctx=  1024   4.792 ms/token   KV read    35.7 MB/step   roofline 4.070 ms  85% BW
+ctx=  2048   4.840 ms/token   KV read    69.2 MB/step   roofline 4.125 ms  85% BW
+ctx=  4096   4.957 ms/token   KV read   136.3 MB/step   roofline 4.234 ms  85% BW
+ctx=  8192   5.193 ms/token   KV read   270.5 MB/step   roofline 4.452 ms  86% BW
+
+== Batched decode throughput (ctx 512, 128 new tokens; up to 64 sequences fit) ==
+B=  1   4.742 ms/step        211 tok/s     247 W   1172.24 mJ/token
+B=  2   4.898 ms/step        408 tok/s     247 W   603.66 mJ/token
+B=  4   5.181 ms/step        772 tok/s     246 W   318.06 mJ/token
+B=  8   5.283 ms/step       1514 tok/s     245 W   161.94 mJ/token
+B= 16   5.624 ms/step       2845 tok/s     246 W    86.54 mJ/token
+B= 32   6.792 ms/step       4711 tok/s     246 W    52.27 mJ/token
+B= 64   8.460 ms/step       7565 tok/s     246 W    32.48 mJ/token
+wrote results/2080ti/llama32-1b/int8/bench_fp16.json

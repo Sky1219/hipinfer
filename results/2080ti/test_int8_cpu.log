@@ -1,0 +1,16 @@
+OK   max |q| = 127 per non-zero row, zero rows stay zero
+OK   round to nearest: |w - q s| <= s / 2
+OK   row chunking does not change the result
+OK   int8 -> fp32 via byte permute + subtract: exact for all bytes and positions
+OK   row-parallel split: per-rank s * partial sums to s * full
+OK   column-parallel split: rows with their own scales concatenate to the full result
+Writing model shards:   0%|          | 0/1 [00:00<?, ?it/s]Writing model shards: 100%|██████████| 1/1 [00:00<00:00, 418.84it/s]
+OK   version-4 header: version 4, qtype 1, tied flag clear
+Loading weights:   0%|          | 0/20 [00:00<?, ?it/s]Loading weights: 100%|██████████| 20/20 [00:00<00:00, 5864.93it/s]
+Loading weights:   0%|          | 0/20 [00:00<?, ?it/s]Loading weights: 100%|██████████| 20/20 [00:00<00:00, 6759.01it/s]
+OK   embedding stays fp16 (file and fake-quantized HF)
+OK   lm_head: int8 + scales, = fake-quantized HF head
+OK   every layer's projections = fake-quantized HF (zero row kept)
+OK   file size = the tensors load_shard reads (466240 bytes)
+
+ALL PASS

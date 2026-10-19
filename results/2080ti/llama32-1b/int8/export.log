@@ -1,0 +1,3 @@
+Loading weights:   0%|          | 0/146 [00:00<?, ?it/s]Loading weights:  46%|████▌     | 67/146 [00:00<00:00, 664.20it/s]Loading weights:  96%|█████████▌| 140/146 [00:00<00:00, 702.60it/s]Loading weights: 100%|██████████| 146/146 [00:00<00:00, 724.57it/s]
+unsloth/Llama-3.2-1B: hidden 2048 inter 8192 layers 16 heads 32/8 head_dim 64 vocab 128256 tied=False qkv_bias=False rope={'factor': 32.0, 'high_freq_factor': 4.0, 'low_freq_factor': 1.0, 'original_max_position_embeddings': 8192, 'rope_type': 'llama3', 'rope_theta': 500000.0} sliding_window=None weights=int8 (version 4)
+wrote /data/axd200066/hipinfer_all/gpu0/weights/llama32-1b-int8.bin

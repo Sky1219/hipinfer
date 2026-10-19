@@ -1,0 +1,16 @@
+{
+ "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+ "gpu": "NVIDIA GeForce RTX 2080 Ti",
+ "tp": 1,
+ "seq": 1024,
+ "windows": 16,
+ "tokens": 16368,
+ "engine_weights": "int8",
+ "hf_ref": "fp16",
+ "ppl_hf": 8.515104633963936,
+ "ppl_hipinfer": 8.518632604396073,
+ "ppl_change_pct": 0.04143190933980634,
+ "top1_agreement": 0.9839931573802542,
+ "mean_kl_hf_to_hipinfer": 0.0009863252106522332,
+ "max_logit_diff": 1.427734375
+}

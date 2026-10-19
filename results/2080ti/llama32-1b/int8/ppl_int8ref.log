@@ -1,0 +1,35 @@
+[transformers] Token indices sequence length is longer than the specified maximum sequence length for this model (289076 > 131072). Running this sequence through the model will result in indexing errors
+unsloth/Llama-3.2-1B: 289076 test tokens, 16 windows of 1024
+Loading weights:   0%|          | 0/146 [00:00<?, ?it/s]Loading weights:  39%|███▉      | 57/146 [00:00<00:00, 558.60it/s]Loading weights:  95%|█████████▍| 138/146 [00:00<00:00, 670.89it/s]Loading weights: 100%|██████████| 146/146 [00:00<00:00, 687.36it/s]
+window   0: ppl HF 6.1218  hipinfer 6.1222  top-1 agree 99.902%  mean KL 1.06e-05  max |dlogit| 0.063
+window   1: ppl HF 8.8377  hipinfer 8.8371  top-1 agree 99.853%  mean KL 1.18e-05  max |dlogit| 0.063
+window   2: ppl HF 10.2880  hipinfer 10.2875  top-1 agree 99.870%  mean KL 1.22e-05  max |dlogit| 0.063
+window   3: ppl HF 11.5178  hipinfer 11.5173  top-1 agree 99.902%  mean KL 1.25e-05  max |dlogit| 0.063
+window   4: ppl HF 12.7897  hipinfer 12.7890  top-1 agree 99.883%  mean KL 1.26e-05  max |dlogit| 0.171
+window   5: ppl HF 13.1597  hipinfer 13.1588  top-1 agree 99.886%  mean KL 1.27e-05  max |dlogit| 0.171
+window   6: ppl HF 13.2055  hipinfer 13.2044  top-1 agree 99.874%  mean KL 1.28e-05  max |dlogit| 0.171
+window   7: ppl HF 12.5822  hipinfer 12.5810  top-1 agree 99.841%  mean KL 1.28e-05  max |dlogit| 0.171
+window   8: ppl HF 12.2018  hipinfer 12.2006  top-1 agree 99.837%  mean KL 1.28e-05  max |dlogit| 0.171
+window   9: ppl HF 11.9583  hipinfer 11.9573  top-1 agree 99.834%  mean KL 1.29e-05  max |dlogit| 0.171
+window  10: ppl HF 11.6798  hipinfer 11.6791  top-1 agree 99.840%  mean KL 1.29e-05  max |dlogit| 0.171
+window  11: ppl HF 11.0027  hipinfer 11.0024  top-1 agree 99.829%  mean KL 1.30e-05  max |dlogit| 0.171
+window  12: ppl HF 10.5762  hipinfer 10.5759  top-1 agree 99.820%  mean KL 1.29e-05  max |dlogit| 0.171
+window  13: ppl HF 10.4563  hipinfer 10.4560  top-1 agree 99.825%  mean KL 1.29e-05  max |dlogit| 0.171
+window  14: ppl HF 10.4694  hipinfer 10.4690  top-1 agree 99.818%  mean KL 1.29e-05  max |dlogit| 0.171
+window  15: ppl HF 10.4874  hipinfer 10.4871  top-1 agree 99.823%  mean KL 1.29e-05  max |dlogit| 0.171
+{
+ "model": "unsloth/Llama-3.2-1B",
+ "gpu": "NVIDIA GeForce RTX 2080 Ti",
+ "tp": 1,
+ "seq": 1024,
+ "windows": 16,
+ "tokens": 16368,
+ "engine_weights": "int8",
+ "hf_ref": "int8",
+ "ppl_hf": 10.487410226253612,
+ "ppl_hipinfer": 10.487056354448372,
+ "ppl_change_pct": -0.0033742534868763663,
+ "top1_agreement": 0.9982282502443792,
+ "mean_kl_hf_to_hipinfer": 1.2932924908175719e-05,
+ "max_logit_diff": 0.1708984375
+}
