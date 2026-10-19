@@ -47,10 +47,11 @@ case "${1:-}" in
         | $SSH "mkdir -p $R/$d && cd $R/$d && rm -rf src tests scripts && tar -xmf -"
     done
     vars="MODELS='$MODELS' INT8_ONLY='$INT8_ONLY' SPEC_STEPS='$SPEC_STEPS' EVICT_STEPS='$EVICT_STEPS' SKIP_TP=${SKIP_TP:-0}"
+    # each whole background job redirected, so none of them holds the ssh session open
     $SSH "rm -f $R/gpu0/done $R/gpu2/done
-      cd $R/gpu0 && $vars setsid nohup bash scripts/edmonds_all.sh _q0 > queue.log 2>&1 < /dev/null &
-      cd $R/gpu2 && $vars setsid nohup bash scripts/edmonds_all.sh _q2 > queue.log 2>&1 < /dev/null &
-      cd $R/gpu2 && $vars setsid nohup bash scripts/edmonds_all.sh _tp > queue_tp.log 2>&1 < /dev/null &
+      (cd $R/gpu0 && $vars setsid nohup bash scripts/edmonds_all.sh _q0) > $R/gpu0/queue.log 2>&1 < /dev/null &
+      (cd $R/gpu2 && $vars setsid nohup bash scripts/edmonds_all.sh _q2) > $R/gpu2/queue.log 2>&1 < /dev/null &
+      (cd $R/gpu2 && $vars setsid nohup bash scripts/edmonds_all.sh _tp) > $R/gpu2/queue_tp.log 2>&1 < /dev/null &
       sleep 10; tail -n 3 $R/gpu0/run_int8.log $R/gpu2/run_spec.log"
     ;;
   _q0)  # on edmonds, in $R/gpu0: int8, then eviction (its steps refuse while another process is on the GPU)
