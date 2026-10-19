@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Every GPU check of the merged tree on edmonds' two RTX 2080 Tis, in one go (GPU 1, the A6000, is
-# never used). Two queues run side by side under nohup, each in its own copy of the tree
+# Every GPU check of the merged tree on edmonds' two RTX 2080 Tis, in one go (GPU 1, the A6000, only
+# through start-a6000 below). Two queues run side by side under nohup, each in its own copy of the tree
 # ($R/gpu0, $R/gpu2) so their builds don't collide, then one step needs both GPUs:
 #   GPU 0  scripts/run_int8.sh (kernel tests, int8 gates / perplexity / benchmarks, llama.cpp Q8_0),
 #          then scripts/eviction_gpu.sh (eviction kernels, engine test, benchmark)
@@ -11,13 +11,19 @@
 #   scripts/edmonds_all.sh check    nvidia-smi on edmonds (every GPU and its processes)
 #   scripts/edmonds_all.sh start    sync src/ tests/ scripts/ Makefile into both copies and start
 #                                   (refuses if GPU 0 or 2 has a compute process, unless FORCE=1)
-#   scripts/edmonds_all.sh status   step lines of every log, and the two GPUs' state
-#   scripts/edmonds_all.sh fetch    copy results/2080ti/ from both copies into this checkout, and
-#                                   compare the new fp16 gates with the committed ones
+#   scripts/edmonds_all.sh status   step lines of every log, and the GPUs' state
+#   scripts/edmonds_all.sh fetch    copy results/2080ti/ (and results/a6000/merged/) into this
+#                                   checkout, and compare the new fp16 gates with the committed ones
+#   scripts/edmonds_all.sh start-a6000
+#                                   GPU 1, the A6000, only when its owner has said yes for this run:
+#                                   correctness on Ampere (sm_86 build, kernel tests, fp16 and int8
+#                                   gates, speculative exact match, eviction tests), no benchmarks,
+#                                   in its own copy $R/gpu1; each step is skipped while another
+#                                   process is on the GPU
 # Env: MODELS (int8 models, default "tinyllama llama32-1b llama32-3b"), INT8_ONLY (run_int8.sh
 #      steps), SPEC_STEPS (run_spec.sh steps), EVICT_STEPS (eviction_gpu.sh steps), SKIP_TP=1.
 # Expected time: GPU 0 several hours (int8 is most of it), GPU 2 one to two hours.
-# (_q0, _q2 and _tp are the queues themselves, run on edmonds by `start`.)
+# (_q0, _q2, _tp and _a6000 are the queues themselves, run on edmonds by start / start-a6000.)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 R=/data/axd200066/hipinfer_all
@@ -76,6 +82,64 @@ case "${1:-}" in
     echo "run_spec exit $rc" >> run_spec.log
     touch done
     ;;
+  start-a6000)  # GPU 1, only with the owner's OK for this run: correctness only, no benchmarks
+    apps=$($SSH "nvidia-smi -i 1 --query-compute-apps=pid,process_name,used_memory --format=csv,noheader")
+    if [ -n "$apps" ]; then echo "GPU 1 is in use, not starting:"; echo "$apps"; exit 1; fi
+    if $SSH "pgrep -f 'edmonds_all[.]sh _a6000' >/dev/null"; then echo "an A6000 run is already going"; exit 1; fi
+    tar --exclude=__pycache__ -cf - src tests scripts Makefile \
+      | $SSH "mkdir -p $R/gpu1 && cd $R/gpu1 && rm -rf src tests scripts && tar -xmf -"
+    $SSH "(cd $R/gpu1 && setsid nohup bash scripts/edmonds_all.sh _a6000) > $R/gpu1/queue.log 2>&1 < /dev/null &
+      sleep 10; tail -n 3 $R/gpu1/results/a6000/merged/run.log"
+    ;;
+  _a6000)  # on edmonds, in $R/gpu1: the merged tree's correctness checks on Ampere (sm_86)
+    on_edmonds
+    export CUDA_VISIBLE_DEVICES=1
+    O=results/a6000/merged W=/data/axd200066/models
+    mkdir -p $O weights
+    exec > $O/run.log 2>&1
+    echo "== a6000 $(date -Is) on $(hostname)"
+    nvidia-smi -i 1 --query-gpu=name,driver_version,clocks.sm,clocks.max.sm,temperature.gpu --format=csv
+    nohup nvidia-smi -i 1 --query-gpu=timestamp,clocks.sm,temperature.gpu,power.draw,utilization.gpu \
+      --format=csv -l 5 > $O/gpu_log.csv 2>&1 < /dev/null & logger=$!
+    FAILED=()
+    step() {  # step NAME LOG CMD...: skipped (and counted as failed) while another process is on GPU 1
+      local name=$1 log=$2 apps; shift 2
+      apps=$(nvidia-smi -i 1 --query-compute-apps=pid,process_name --format=csv,noheader)
+      if [ -n "$apps" ]; then echo "== $name skipped: GPU 1 in use: $apps"; FAILED+=("$name (GPU busy)"); return; fi
+      echo "== $name"
+      if "$@" > "$O/$log" 2>&1; then tail -n 2 "$O/$log"; else tail -n 5 "$O/$log"; FAILED+=("$name"); fi
+    }
+    rm -f build/libhipinfer.so
+    step build build.log make NVCC="$NVCC" NV_ARCH="-gencode arch=compute_86,code=sm_86"
+    [ -f build/libhipinfer.so ] || { echo "no library; stopping"; kill $logger; exit 1; }
+    step "kernel tests" test_kernels.log $PY tests/test_kernels.py
+    step "int8 CPU checks" test_int8_cpu.log $PY tests/test_int8_cpu.py
+    for spec in "tinyllama TinyLlama/TinyLlama-1.1B-Chat-v1.0" "llama32-1b unsloth/Llama-3.2-1B" \
+                "llama32-3b unsloth/Llama-3.2-3B" "qwen25-1.5b Qwen/Qwen2.5-1.5B"; do
+      set -- $spec
+      step "$1 gate fp16" "$1_gate.log" $PY tests/gate.py --model "$2" --weights "$W/$1.bin" --out "$O/$1_gate.json"
+    done
+    for spec in "tinyllama TinyLlama/TinyLlama-1.1B-Chat-v1.0" "llama32-1b unsloth/Llama-3.2-1B"; do
+      set -- $spec
+      [ -f weights/$1-int8.bin ] || step "$1 export --int8" "$1_export_int8.log" \
+        $PY scripts/export.py --model "$2" --out weights/$1-int8.bin --int8
+      step "$1 gate int8 vs fp16 HF" "$1_gate_int8.log" $PY tests/gate.py --model "$2" --weights weights/$1-int8.bin \
+        --out "$O/$1_gate_int8.json"
+      step "$1 gate int8 vs int8 HF" "$1_gate_int8ref.log" $PY tests/gate.py --model "$2" --weights weights/$1-int8.bin \
+        --ref int8 --out "$O/$1_gate_int8ref.json"
+    done
+    step "speculative exact match" test_spec.log $PY tests/test_spec.py --model unsloth/Llama-3.2-3B \
+      --target "$W/llama32-3b.bin" --draft "$W/llama32-1b.bin" --self "$W/llama32-1b.bin" "$W/tinyllama.bin" \
+      --self-model unsloth/Llama-3.2-1B TinyLlama/TinyLlama-1.1B-Chat-v1.0 --ks 2,4,6,8 --new 128 --out "$O/test_spec.json"
+    step "eviction kernels" test_eviction.log $PY tests/test_eviction.py
+    step "eviction kernels (portable)" test_eviction_portable.log \
+      env HIPINFER_DECODE_SCALAR=1 HIPINFER_FLASH_WMMA=1 $PY tests/test_eviction.py
+    for m in llama32-1b qwen25-1.5b; do
+      step "eviction engine $m" "test_eviction_engine_$m.log" $PY tests/test_eviction_engine.py "$W/$m.bin"
+    done
+    kill $logger
+    echo "== done $(date -Is); failed: ${FAILED[*]:-none}"
+    ;;
   _tp)  # on edmonds, in $R/gpu2 (its sm_75 build): tensor parallelism once both queues are done
     on_edmonds
     while [ ! -f $R/gpu0/done ] || [ ! -f $R/gpu2/done ]; do sleep 60; done
@@ -86,38 +150,43 @@ case "${1:-}" in
     echo "test_tp exit $rc" >> results/2080ti/test_tp_merged.log
     ;;
   status)
-    $SSH "cd $R; for f in gpu0/run_int8.log gpu0/results/2080ti/eviction/run.log gpu2/run_spec.log gpu2/results/2080ti/test_tp_merged.log; do
+    $SSH "cd $R; for f in gpu0/run_int8.log gpu0/results/2080ti/eviction/run.log gpu2/run_spec.log gpu2/results/2080ti/test_tp_merged.log gpu1/results/a6000/merged/run.log; do
         [ -f \$f ] || continue; echo \"=== \$f\"
         grep -E '^(== |FAILED|all int8|run_int8 exit|eviction exit|run_spec exit|test_tp exit)|ALL PASS|FAILURES|GATE|   ok|   FAILED' \$f | tail -25
       done
       ls gpu0/done gpu2/done 2>/dev/null
-      nvidia-smi -i 0,2 --query-gpu=index,clocks.sm,temperature.gpu,utilization.gpu,memory.used --format=csv"
+      nvidia-smi -i 0,1,2 --query-gpu=index,clocks.sm,temperature.gpu,utilization.gpu,memory.used --format=csv"
     ;;
   fetch)
     $SSH "cd $R/gpu0 && tar -cf - results/2080ti run_int8.log" | tar -xf - -C .
     mv run_int8.log results/2080ti/run_int8.log
     $SSH "cd $R/gpu2 && tar -cf - results/2080ti run_spec.log" | tar -xf - -C .
     mv run_spec.log results/2080ti/run_spec.log
+    if $SSH "test -d $R/gpu1/results/a6000/merged"; then
+      $SSH "cd $R/gpu1 && tar -cf - results/a6000/merged" | tar -xf - -C .
+    fi
     # run_spec.sh's regression check: the new fp16 gates must match the committed ones run for run
     python - . <<'EOF' || echo "gate regression: DIFFERS (see above)"
 import json, os, sys
 here = sys.argv[1]
 ok = True
-for m in ["llama32-1b", "llama32-3b", "tinyllama"]:
-    new_p = os.path.join(here, "results/2080ti/spec/regression", f"{m}_gate.json")
+runs = [("2080ti", m, f"results/2080ti/spec/regression/{m}_gate.json") for m in ["llama32-1b", "llama32-3b", "tinyllama"]]
+runs += [("a6000", m, f"results/a6000/merged/{m}_gate.json") for m in ["tinyllama", "llama32-1b", "llama32-3b", "qwen25-1.5b"]]
+for gpu, m, new_rel in runs:
+    new_p = os.path.join(here, new_rel)
     if not os.path.exists(new_p):
-        print(f"{m}: no new gate result"); ok = False; continue
-    old, new = (json.load(open(p)) for p in (os.path.join(here, "results/2080ti", m, "gate.json"), new_p))
+        print(f"{gpu} {m}: no new gate result"); ok = gpu == "a6000" and ok; continue
+    old, new = (json.load(open(p)) for p in (os.path.join(here, "results", gpu, m, "gate.json"), new_p))
     key = lambda j: [(r["run"], r["identical"], r.get("step"), r.get("accepted")) for r in j["log"]]
     same = old["pass"] == new["pass"] and key(old) == key(new)
     ok &= same
-    print(f"{m}: gate pass={new['pass']} {new['identical']}/{new['runs']} identical, "
+    print(f"{gpu} {m}: gate pass={new['pass']} {new['identical']}/{new['runs']} identical, "
           f"{'same as committed' if same else 'DIFFERS from committed'}")
 sys.exit(0 if ok else 1)
 EOF
     git status --short results/
     ;;
   *)
-    sed -n 2,21p "$0"; exit 2
+    sed -n 2,27p "$0"; exit 2
     ;;
 esac
