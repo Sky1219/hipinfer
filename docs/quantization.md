@@ -143,8 +143,41 @@ results will show how much that matters on these models.
 
 ## Results (RTX 2080 Ti)
 
-**Not measured yet.** The code compiles for sm_75 with CUDA 12.0, and `tests/test_int8_cpu.py`
-passes on CPU. No GPU has run any of it. Everything below is what the run will produce.
+From the merged tree on 2026-10-18 ([results/2080ti/MERGED_RUN.md](../results/2080ti/MERGED_RUN.md)).
+TinyLlama and Llama-3.2-1B come from `results/2080ti/<model>/int8/`; Llama-3.2-3B's benchmarks come
+from the cool-start rerun in `results/2080ti/rerun/`, its gates and perplexity from
+`results/2080ti/llama32-3b/int8/`. The kernel tests (`results/2080ti/test_kernels_int8.log`) and the
+AMD compile check pass.
+
+**Accuracy.** Perplexity on WikiText-2, 16 × 1,024 tokens, and the token gates (20 runs each):
+
+| model | PPL fp16 HF | PPL int8 hipinfer | change | mean KL vs fp16 HF | PPL vs int8 HF | KL vs int8 HF | gate vs int8 HF | gate vs fp16 HF |
+|---|---|---|---|---|---|---|---|---|
+| TinyLlama-1.1B | 8.5151 | 8.5186 | +0.041 % | 9.9e-4 | −0.0003 % | 6.6e-6 | pass, 15/20 | 8/20 identical |
+| Llama-3.2-1B | 10.4631 | 10.4871 | +0.229 % | 1.9e-3 | −0.003 % | 1.3e-5 | pass, 18/20 | 7/20 |
+| Llama-3.2-3B | 8.2768 | 8.2930 | +0.195 % | 1.3e-3 | −0.001 % | 9.5e-6 | pass, 18/20 | 17/20 |
+
+The "vs int8 HF" columns compare against HF running the exporter's own rounded weights
+(`--ref int8`). They measure the kernels' error, which is fp16-sized. The "vs fp16 HF" columns
+measure the cost of quantizing. The fp16 weights on the int8 build still pass their gates (20/20,
+14/20 and 20/20 identical).
+
+**Speed.** Batch-1 decode at a 128-token context, and prefill at 2,000 tokens, against llama.cpp
+`a0e6dc7` on Q8_0 and F16 GGUFs in the same session:
+
+| model | decode int8 | decode fp16 | int8 speed-up | llama.cpp Q8_0 | int8 vs Q8_0 | % of floor, int8 / fp16 | prefill int8 / fp16 / Q8_0 |
+|---|---|---|---|---|---|---|---|
+| TinyLlama-1.1B | 2.54 ms | 4.15 ms | 1.63× | 3.21 ms | 1.26× | 67 / 81 % | 117 / 102 / 145 ms |
+| Llama-3.2-1B | 2.73 ms | 4.72 ms | 1.73× | 3.32 ms | 1.22× | 74 / 85 % | 115 / 98 / 124 ms |
+| Llama-3.2-3B | 6.71 ms | 12.01 ms | 1.79× | 7.94 ms | 1.18× | 78 / 87 % | 328 / 282 / 346 ms |
+
+- **The bytes predicted a 2× decode speed-up; it reaches 1.6–1.8×.** The fixed per-kernel costs and
+  the KV reads (above) stay, so the smallest model gains least.
+- **Prefill is 1–18 % slower than fp16** (1–9 % at 128 tokens, 11–18 % at 512–2,000). Converting
+  each tile on its way to shared memory costs more than the prediction above assumed. The int8
+  prefill is still faster than llama.cpp's Q8_0 prefill at every length measured (1.05–1.72×).
+- **llama.cpp gains less from Q8_0** (1.47–1.62× over its F16) than hipinfer does from int8
+  (1.63–1.79× over its fp16).
 
 Register spills, compared with main's build (`ptxas -warn-spills`, sm_75):
 
@@ -157,19 +190,5 @@ Register spills, compared with main's build (`ptxas -warn-spills`, sm_75):
   - the 256×128 mma.sync tile
   - the 64×128×64 WMMA tile
 
-`scripts/edmonds_int8.sh start` runs `scripts/run_int8.sh` on the 2080 Ti (GPU 0) for TinyLlama,
-Llama-3.2-1B and Llama-3.2-3B, and `scripts/edmonds_int8.sh fetch` brings back:
-
-- `results/2080ti/test_kernels_int8.log`: every fp16 kernel test plus the int8 ones, on the new build.
-- `results/2080ti/<model>/int8/`:
-  - `gate.json`: int8 against fp16 HF, divergences allowed; `matched_prefix` holds the tokens
-    identical before each run's first difference.
-  - `gate_int8ref.json`: int8 against fake-quantized HF (strict).
-  - `gate_fp16_weights.json`: the fp16 weights on this build (unchanged path).
-  - `ppl.json`: perplexity change and mean KL against fp16 HF.
-  - `ppl_int8ref.json`: the engine's own error against fake-quantized HF.
-  - `bench.json`, `bench_fp16.json`: int8 and fp16 decode/prefill in one session. `bw_util` uses
-    the int8 bytes. The int8 kernel rows sit next to hipinfer's fp16 kernels.
-  - `llamacpp_q8_0.json`, `llamacpp_f16.json`: llama.cpp on Q8_0 and F16 GGUFs, same session.
-- `results/2080ti/int8_gpu_log.csv`: SM clock, temperature and power every 5 s.
-- `results/2080ti/hip_compile_int8.log`: an AMD (gfx90a wave64 and gfx1100 wave32) compile check.
+`scripts/run_int8.sh <gpu_tag> [models]` runs every step above on the visible GPU;
+`scripts/edmonds_all.sh` runs it on edmonds as part of the whole merged-tree check.
