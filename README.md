@@ -388,7 +388,7 @@ plain greedy decoding of the same target (83.7 tok/s):
 |---|---|---|---|---|---|---|---|
 | tok/s | 89.7 | 102.1 | 111.8 | 115.0 | **116.7** | 116.1 | 111.7 |
 | speed-up | 1.07× | 1.22× | 1.34× | 1.37× | **1.39×** | 1.39× | 1.33× |
-| draft tokens accepted | 91 % | 87 % | 83 % | 79 % | 76 % | 72 % | 67 % |
+| draft tokens accepted | 91 % | 87 % | 82 % | 79 % | 76 % | 72 % | 67 % |
 
 - **The draft is not much cheaper than the target.** A 1B decode step costs 39 % of a 3B one
   (4.66 vs 11.85 ms), because both are weight-bandwidth bound. Gains level off around k = 5.
