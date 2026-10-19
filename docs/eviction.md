@@ -27,7 +27,7 @@ clears both score arrays' tails after the move.
 From `results/2080ti/eviction/bench_eviction.json`, on the fixed build, with no other process on
 the GPU and no thermal throttling (median SM clock 1,770 MHz, peak 83 °C):
 
-- **Decode attention with tracking:** +5–33 % on the attention kernel itself, across the shapes of
+- **Decode attention with tracking:** +5–32 % on the attention kernel itself, across the shapes of
   four models, 1k–32k keys and batch 1 and 8 (Llama-3.2-1B, G = 8, D = 64: +20–31 %; Llama-3.2-3B
   and Llama-3.1-8B, D = 128: +14–26 %; Qwen2.5-1.5B: +5–32 %). Attention is a small part of a decode step: **a whole Llama-3.2-1B decode
   step at a 4.1k context goes from 4.96 to 5.05 ms (+1.7 %)**.

@@ -425,7 +425,7 @@ equal PyTorch's choice from the engine's own state. The first GPU run found a bu
 emulation couldn't: after an eviction, decode added each new key's weight on top of an evicted
 key's stale score. Fixed and re-tested.
 
-**Cost on the 2080 Ti:** tracking slows the decode-attention kernel by 5–33 %, but a whole
+**Cost on the 2080 Ti:** tracking slows the decode-attention kernel by 5–32 %, but a whole
 Llama-3.2-1B decode step at a 4k context by only 1.7 % (4.96 → 5.05 ms). Choosing 1,024 of 4,096
 keys takes 0.1 ms with H2O and 0.9 s with full WFL (63 ms with WFL limited to a candidate pool and 8
 rounds), plus 0.9 ms to compact the cache. The WFL kernels are 6–25× faster than the PyTorch
