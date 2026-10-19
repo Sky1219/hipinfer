@@ -2355,6 +2355,11 @@ EXPORT int hi_evict(Engine* e, int slot, int capacity, int policy, int sink, int
     const int* kl = klist + (size_t)l * hkv * capacity;
     for (int phase = 0; phase < 2; phase++)
       evict_move_kernel<<<dim3(capacity, hkv), 128, 0, s>>>(phase, kl, capacity, K, V, lst, D, s0, s1, lst, tkv, ts);
+    // Clear the scores left behind in [capacity, n): decode after the eviction writes there
+    // (cache index pos - shift) and adds each new key's mass to whatever the slot holds.
+    const size_t pitch = (size_t)e->max_seq * 4, tail = (size_t)(n - capacity) * 4;
+    HI_CHECK(hipMemset2DAsync(s0 + capacity, pitch, 0, tail, hkv, s));
+    if (s1) HI_CHECK(hipMemset2DAsync(s1 + capacity, pitch, 0, tail, hkv, s));
   }
   HI_CHECK(hipEventRecord(ev[3], s));
   if (kept_out) HI_CHECK(hipMemcpyAsync(kept_out, klist, (size_t)P * capacity * 4, hipMemcpyDeviceToHost, s));

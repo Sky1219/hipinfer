@@ -30,6 +30,7 @@
   #define hipMemcpyAsync            cudaMemcpyAsync
   #define hipMemset                 cudaMemset
   #define hipMemsetAsync            cudaMemsetAsync
+  #define hipMemset2DAsync          cudaMemset2DAsync
   #define hipMemcpyHostToDevice     cudaMemcpyHostToDevice
   #define hipMemcpyDeviceToHost     cudaMemcpyDeviceToHost
   #define hipMemcpyDeviceToDevice   cudaMemcpyDeviceToDevice
