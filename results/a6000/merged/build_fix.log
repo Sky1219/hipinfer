@@ -1,0 +1,8 @@
+mkdir -p build
+/usr/local/cuda/bin/nvcc -O3 -std=c++17 -lineinfo -gencode arch=compute_86,code=sm_86 -Xcompiler -fPIC,-fvisibility=hidden -shared src/api.cu  -lpthread -o build/libhipinfer.so
+src/api.cu(1056): warning #177-D: function "ar_nccl" was declared but never referenced
+  static bool ar_nccl(const TPGroup* g, size_t bytes) {
+              ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+

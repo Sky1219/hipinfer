@@ -1,0 +1,166 @@
+{
+ "model": "unsloth/Llama-3.2-1B",
+ "gpu": "NVIDIA RTX A6000",
+ "new_tokens": 128,
+ "pass": true,
+ "identical": 11,
+ "runs": 20,
+ "router_accepted": 0,
+ "router_tie": 0.01,
+ "max_prefill_logit_diff": 0.03125,
+ "engine_weights": "fp16",
+ "hf_ref": "fp16",
+ "allow_divergence": false,
+ "allowed_divergences": 0,
+ "matched_prefix": [
+  128,
+  128,
+  128,
+  128,
+  27,
+  27,
+  74,
+  74,
+  17,
+  17,
+  128,
+  128,
+  128,
+  128,
+  79,
+  128,
+  27,
+  128,
+  19,
+  128
+ ],
+ "prompt_lens": [
+  6,
+  14,
+  18,
+  20,
+  16,
+  13,
+  700
+ ],
+ "log": [
+  {
+   "run": "prompt 0 single graph=True",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "prompt 0 single graph=False",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "prompt 1 single graph=True",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "prompt 1 single graph=False",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "prompt 2 single graph=True",
+   "identical": false,
+   "step": 27,
+   "hf_gap": 0.0,
+   "accepted": true
+  },
+  {
+   "run": "prompt 2 single graph=False",
+   "identical": false,
+   "step": 27,
+   "hf_gap": 0.0,
+   "accepted": true
+  },
+  {
+   "run": "prompt 3 single graph=True",
+   "identical": false,
+   "step": 74,
+   "hf_gap": 0.015625,
+   "accepted": true
+  },
+  {
+   "run": "prompt 3 single graph=False",
+   "identical": false,
+   "step": 74,
+   "hf_gap": 0.015625,
+   "accepted": true
+  },
+  {
+   "run": "prompt 4 single graph=True",
+   "identical": false,
+   "step": 17,
+   "hf_gap": 0.015625,
+   "accepted": true
+  },
+  {
+   "run": "prompt 4 single graph=False",
+   "identical": false,
+   "step": 17,
+   "hf_gap": 0.015625,
+   "accepted": true
+  },
+  {
+   "run": "prompt 5 single graph=True",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "prompt 5 single graph=False",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "prompt 6 single graph=True",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "prompt 6 single graph=False",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "batched B=6 slot 0",
+   "identical": false,
+   "step": 79,
+   "hf_gap": 0.0,
+   "accepted": true
+  },
+  {
+   "run": "batched B=6 slot 1",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "batched B=6 slot 2",
+   "identical": false,
+   "step": 27,
+   "hf_gap": 0.0,
+   "accepted": true
+  },
+  {
+   "run": "batched B=6 slot 3",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "batched B=6 slot 4",
+   "identical": false,
+   "step": 19,
+   "hf_gap": 0.03125,
+   "accepted": true
+  },
+  {
+   "run": "batched B=6 slot 5",
+   "identical": true,
+   "step": 128
+  }
+ ]
+}

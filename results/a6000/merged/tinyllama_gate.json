@@ -1,0 +1,148 @@
+{
+ "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+ "gpu": "NVIDIA RTX A6000",
+ "new_tokens": 128,
+ "pass": true,
+ "identical": 20,
+ "runs": 20,
+ "router_accepted": 0,
+ "router_tie": 0.01,
+ "max_prefill_logit_diff": 0.02734375,
+ "engine_weights": "fp16",
+ "hf_ref": "fp16",
+ "allow_divergence": false,
+ "allowed_divergences": 0,
+ "matched_prefix": [
+  128,
+  128,
+  128,
+  128,
+  128,
+  128,
+  128,
+  128,
+  128,
+  128,
+  128,
+  128,
+  128,
+  128,
+  128,
+  128,
+  128,
+  128,
+  128,
+  128
+ ],
+ "prompt_lens": [
+  6,
+  24,
+  18,
+  20,
+  19,
+  16,
+  700
+ ],
+ "log": [
+  {
+   "run": "prompt 0 single graph=True",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "prompt 0 single graph=False",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "prompt 1 single graph=True",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "prompt 1 single graph=False",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "prompt 2 single graph=True",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "prompt 2 single graph=False",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "prompt 3 single graph=True",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "prompt 3 single graph=False",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "prompt 4 single graph=True",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "prompt 4 single graph=False",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "prompt 5 single graph=True",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "prompt 5 single graph=False",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "prompt 6 single graph=True",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "prompt 6 single graph=False",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "batched B=6 slot 0",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "batched B=6 slot 1",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "batched B=6 slot 2",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "batched B=6 slot 3",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "batched B=6 slot 4",
+   "identical": true,
+   "step": 128
+  },
+  {
+   "run": "batched B=6 slot 5",
+   "identical": true,
+   "step": 128
+  }
+ ]
+}

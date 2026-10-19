@@ -1,0 +1,3 @@
+Loading weights:   0%|          | 0/201 [00:00<?, ?it/s]Loading weights:  39%|███▉      | 78/201 [00:00<00:00, 749.83it/s]Loading weights:  88%|████████▊ | 177/201 [00:00<00:00, 888.72it/s]Loading weights: 100%|██████████| 201/201 [00:00<00:00, 915.81it/s]
+TinyLlama/TinyLlama-1.1B-Chat-v1.0: hidden 2048 inter 5632 layers 22 heads 32/4 head_dim 64 vocab 32000 tied=False qkv_bias=False rope={'rope_theta': 10000.0, 'rope_type': 'default'} sliding_window=None weights=int8 (version 4)
+wrote weights/tinyllama-int8.bin
