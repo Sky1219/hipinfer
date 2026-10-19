@@ -126,8 +126,34 @@ a target step, and the useful k is small.
   the kernel tests and the 1B, 3B and TinyLlama HF token gates and checks them against the
   committed results. Everything goes to `results/2080ti/spec/`.
 
-**Not run on a GPU yet** (edmonds was unreachable when this was written). No speed-up is claimed
-until `results/2080ti/spec/` holds one.
+### Results (2026-10-18, merged tree)
+
+- **Exact match:** `tests/test_spec.py` passes all 105 runs on the 2080 Ti
+  ([results/2080ti/spec/test_spec.log](../results/2080ti/spec/test_spec.log)) and on the A6000
+  ([results/a6000/merged/test_spec.log](../results/a6000/merged/test_spec.log)). The argument checks
+  refuse R = 17, a verify past `max_seq`, an out-of-vocabulary token and bad rewind arguments.
+- **Speed, Llama-3.2-3B ← Llama-3.2-1B on a 2080 Ti**
+  ([results/2080ti/rerun/spec_llama32-3b_llama32-1b.json](../results/2080ti/rerun/spec_llama32-3b_llama32-1b.json);
+  the first run, throttled unevenly, gave the same speed-ups to three digits). Plain greedy decoding
+  gives 83.7 tok/s. The cost model's prediction is `predicted`:
+
+  | k | tok/s | speed-up | predicted | acceptance | tokens per round |
+  |---|---|---|---|---|---|
+  | 1 | 89.7 | 1.07× | 1.08× | 0.91 | 1.91 |
+  | 2 | 102.1 | 1.22× | 1.24× | 0.87 | 2.72 |
+  | 3 | 111.8 | 1.34× | 1.36× | 0.83 | 3.45 |
+  | 4 | 115.0 | 1.37× | 1.39× | 0.79 | 4.10 |
+  | 5 | 116.7 | **1.39×** | 1.41× | 0.76 | 4.70 |
+  | 6 | 116.1 | 1.39× | 1.40× | 0.72 | 5.26 |
+  | 8 | 111.7 | 1.33× | 1.33× | 0.67 | 6.17 |
+
+  Per-step costs: target decode 11.85 ms, draft decode 4.66 ms (`t_d / t_t` = 0.39), and a verify
+  pass of R rows from 11.85 ms (R = 1) to 15.50 ms (R = 9). The model is within 2 % at every k.
+- **Self-draft, Llama-3.2-1B ← itself:** every draft token accepted, 0.66× (k = 1) to 0.87× (k = 8)
+  plain speed. This is the overhead of drafting with a model as expensive as the target.
+- **`verify="prefill"` breaks exactness:** verifying through the prefill path (GEMMs instead of the
+  decode kernels) diverges from plain greedy output in 16 of 28 self-draft runs (0 of 49 with the
+  3B target). This is why `verify()` uses the decode kernels.
 
 ## Limits
 
