@@ -96,7 +96,7 @@ def collect(root):
                             "top1": pp["top1_agreement"], "kl": pp["mean_kl_hf_to_hipinfer"]})
     return {"gpu": t, "decode": decode, "prefill": prefill, "ctx": ctx_lines, "batched": batched, "tp": tp, "ar": ar,
             "correct": correct, "a100": collect_a100(root, gpus), "int8": collect_int8(root),
-            "spec": collect_spec(root)}
+            "spec": collect_spec(root), "evict": collect_evict(root)}
 
 
 ENGINES = [("hipinfer", "hipinfer"), ("llamacpp", "llama.cpp"), ("vllm", "vLLM"), ("torch_compile", "torch.compile")]
@@ -469,6 +469,98 @@ share the target's vocabulary.</li>
 """
 
 
+def collect_evict(root):
+    """eviction-scoring costs from results/2080ti/eviction/bench_eviction.json (no accuracy result exists)"""
+    b = jload(os.path.join(root, "2080ti", "eviction", "bench_eviction.json"))
+    if not b:
+        return None
+    models = list(dict.fromkeys(r["model"] for r in b["decode"]))
+    lines = [{"label": name(m), "points": [[r["len"], round(100 * r["overhead"], 1), r["plain_us"], r["track_us"]]
+                                           for r in b["decode"] if r["model"] == m and r["B"] == 1]} for m in models]
+    eng = {r["what"]: r for r in b["engine"]}
+    return {"decode": b["decode"], "lines": lines, "prefill": b["prefill"], "select": b["select"], "engine": eng}
+
+
+def evict_section(d):
+    e = d["evict"]
+    if not e:
+        return ""
+    ov = [r["overhead"] for r in e["decode"]]
+    pf = e["prefill"]
+    ratio = lambda ts: [r["score_pass_ms"] / r["flash_ms"] for r in pf if r["T"] in ts]
+    lse = max(r["flash_lse_ms"] / r["flash_ms"] - 1 for r in pf)
+    sel = e["select"]
+    h2o = [r["kernel_ms"] for r in sel if r["what"] == "h2o top-k"]
+    ev64 = lambda n: [r["kernel_ms"] for r in sel if r["what"].startswith("wfl prune: evict 64") and r["n"] == n]
+    full = [r["kernel_ms"] for r in sel if r["what"].startswith("wfl prune to") and r["n"] == 4096]
+    # the docs quote the PyTorch comparison at 1,024 slots, the size it ran at for both models
+    vs = [r["torch_ms"] / r["kernel_ms"] for r in sel if r["torch_ms"] and r["n"] == 1024]
+    eng = e["engine"]
+    off, on = eng["decode step, ctx ~4.1k, tracking off"]["ms"], eng["decode step, ctx ~4.1k, tracking on"]["ms"]
+    h, w = eng.get("evict 4096 -> 1024, h2o"), eng.get("evict 4096 -> 1024, wfl")
+    wp = next((v for k, v in eng.items() if k.startswith("evict 4096 -> 1024, wfl {")), None)
+    dec_tbl = table(["model", "batch", "keys", "plain µs", "with tracking µs", "overhead"],
+                    [[name(r["model"]), r["B"], f"{r['len']:,}", fnum(r["plain_us"], 1), fnum(r["track_us"], 1),
+                      f"+{100 * r['overhead']:.0f}%"] for r in e["decode"]])
+    pf_tbl = table(["model", "prompt tokens", "flash attention ms", "with LSE stored ms", "score pass ms",
+                    "score pass / flash"],
+                   [[name(r["model"]), f"{r['T']:,}", fnum(r["flash_ms"], 3), fnum(r["flash_lse_ms"], 3),
+                     fnum(r["score_pass_ms"], 3), f"{r['score_pass_ms'] / r['flash_ms']:.2f}×"] for r in pf])
+    sel_tbl = table(["model", "(layer, kv head) problems", "slots", "policy", "kernel ms", "PyTorch matrix version"],
+                    [[name(r["model"]), r["problems"], f"{r['n']:,}", r["what"].replace("wfl", "WFL").replace("h2o", "H2O"),
+                      fnum(r["kernel_ms"], 2 if r["kernel_ms"] < 10 else 1),
+                      f"{r['torch_ms']:,.0f} ms ({r['torch_ms'] / r['kernel_ms']:.1f}× slower)"
+                      if r["torch_ms"] and r["n"] == 1024 else "–"] for r in sel])
+    eng_rows = [["decode step, 4.1k context, tracking off → on", f"{off:.2f} → {on:.2f} ms (+{100 * (on / off - 1):.1f}%)"]]
+    if h:
+        eng_rows.append(["evict 4,096 → 1,024 slots, H2O", f"select {h['select_ms']:.2f} ms + compact {h['compact_ms']:.2f} ms"])
+    if w:
+        eng_rows.append(["evict 4,096 → 1,024 slots, WFL", f"select {w['select_ms']:,.0f} ms + compact {w['compact_ms']:.2f} ms"])
+    if wp:
+        eng_rows.append(["evict 4,096 → 1,024 slots, WFL with a pool of 2 × m, 8 rounds",
+                         f"select {wp['select_ms']:.0f} ms + compact {wp['compact_ms']:.2f} ms"])
+    if h:
+        eng_rows.append(["decode step after the eviction", f"{h['decode_after_ms']:.2f} ms"])
+    eng_tbl = table(["Llama-3.2-1B in the engine", "time"], eng_rows)
+    return f"""
+<h2>KV-cache eviction scoring (H2O, WFL)</h2>
+<p>Eviction policies decide which cached keys to drop when a sequence outgrows its cache budget. H2O keeps the keys that
+have received the most attention; WFL prune, from SubCache, removes the keys another kept key can best stand in for. Both
+need numbers the FlashAttention-style kernels don't produce, so with tracking on the attention kernels also record them:
+decode stores each key's logit and each head's log-sum-exp and adds the attention weights to a per-key score; prefill saves
+each row's log-sum-exp and a second, key-parallel pass sums each key's column. <code>Engine.evict</code> then compacts the
+kept keys, values and scores to the front of the cache. Tracking is off by default, and turning it on changes no output:
+attention outputs and greedy tokens are bitwise equal to tracking off, and scores are within 2e-6 relative of a float64
+reference (475 kernel checks and an engine test on the RTX 2080 Ti and the RTX A6000). Costs below are on an RTX 2080 Ti,
+with no thermal throttling.</p>
+<div class="card"><div class="ctitle">Decode-attention time added by score tracking (lower is better)</div>
+<div class="csub">the attention kernel alone, batch 1, % over the plain kernel; batch 8 is in the table</div>
+<div class="legend" id="l-evict"></div>
+<div class="chart" id="c-evict"></div>
+<details><summary>Data table</summary>{dec_tbl}</details></div>
+<p><b>Tracking slows the decode-attention kernel by {span([100 * v for v in ov], 0, " %")}</b> across four models, 1k–32k
+keys and batch 1 and 8, but attention is a small part of a decode step: a whole Llama-3.2-1B step at a 4.1k context goes
+from {off:.2f} to {on:.2f} ms (+{100 * (on / off - 1):.1f} %). In prefill, the second, key-parallel pass costs
+{span(ratio([2048, 4096]), 1)} the FlashAttention kernel's own time at 2–4k tokens and {span(ratio([512]), 1)} at 512
+(few kv heads launch few blocks); storing the log-sum-exp in the first pass adds at most {100 * lse:.0f} %.</p>
+<p><b>Choosing what to keep.</b> Over every (layer, kv head), H2O's top-k takes {span(h2o, 2, " ms")} at 1k–4k slots.
+WFL prune is the expensive policy: {span(ev64(1024), 0, " ms")} to evict 64 slots from 1,024 (8 rounds),
+{span([v / 1000 for v in ev64(4096)], 1, " s")} at 4,096, and {min(full) / 1000:.2f}–{max(full) / 1000:.1f} s for a full prune from
+4,096 to 512. Against a PyTorch matrix version of the same algorithm at 1,024 slots (Llama-3.2-1B and Qwen2.5-1.5B), the
+kernels are {span(vs, 1)} faster.</p>
+<div class="card"><div class="ctitle">Prefill score pass, selection and eviction times</div>
+<div class="csub">RTX 2080 Ti, from results/2080ti/eviction/bench_eviction.json</div>
+{eng_tbl}
+<details><summary>Prefill score pass</summary>{pf_tbl}</details>
+<details><summary>Selection over every (layer, kv head)</summary>{sel_tbl}</details></div>
+<div class="note"><ul>
+<li><b>No accuracy result.</b> These numbers show the kernels compute the policies as specified and what that costs. They
+say nothing about how well either policy preserves a model's answers at any cache budget.</li>
+<li><b>Scope.</b> Costs measured on one GPU type (RTX 2080 Ti); correctness checks also ran on the RTX A6000.</li>
+</ul></div>
+"""
+
+
 def git_info():
     sha = os.environ.get("GITHUB_SHA")
     try:
@@ -551,12 +643,15 @@ def build(root, out_dir):
                     [[r["model"], r["gpu"], r["setup"], r["gate"] or "–", fnum(r["ppl_hi"], 4), fnum(r["ppl_hf"], 4),
                       f"{100 * r['top1']:.2f}%" if r["top1"] else "–", f"{r['kl']:.1e}" if r["kl"] else "–"]
                      for r in d["correct"]])
-    data = json.dumps({k: d[k] for k in ("decode", "prefill", "ctx", "tp", "a100", "int8", "spec")}).replace("</", "<\\/")
+    data = {k: d[k] for k in ("decode", "prefill", "ctx", "tp", "a100", "int8", "spec")}
+    data["evict"] = d["evict"] and d["evict"]["lines"]
+    data = json.dumps(data).replace("</", "<\\/")
     page = PAGE
     for k, v in {"%%TILES%%": tiles(d), "%%GPU%%": html.escape(gpu), "%%DEC_TBL%%": dec_tbl, "%%CTX_TBL%%": ctx_tbl,
                  "%%PF_TBL%%": pf_tbl, "%%TP_TBL%%": tp_tbl, "%%AR_TBL%%": ar_tbl, "%%COR_TBL%%": cor_tbl,
                  "%%A100%%": a100_section(d, root), "%%A100_LIMIT%%": a100_limit(d, root),
                  "%%INT8%%": int8_section(d), "%%SPEC%%": spec_section(d),
+                 "%%EVICT%%": evict_section(d),
                  "%%DATA%%": data, "%%REPO%%": REPO, "%%SHA%%": sha, "%%DATE%%": date}.items():
         page = page.replace(k, v)
     os.makedirs(out_dir, exist_ok=True)
@@ -689,6 +784,7 @@ close to the worst case for multi-GPU inference. Llama-3.1-8B and Mistral-7B don
 %%AR_TBL%%</div>
 %%INT8%%
 %%SPEC%%
+%%EVICT%%
 
 <h2>Correctness</h2>
 <p>Speed only counts if the output is right. <b>Greedy runs</b>: 7 prompts × 128 tokens, single-sequence with and without
@@ -809,7 +905,7 @@ Akash Dasarraju.</footer>
     const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": opts.aria });
     for (let v = opts.yMin; v <= opts.yMax; v += opts.yStep) {
       el("line", { x1: L, x2: W - R, y1: Y(v), y2: Y(v), style: `stroke:var(${v === opts.yMin ? "--axis" : "--grid"});stroke-width:1` }, svg);
-      txt(v + "%", { x: L - 6, y: Y(v) + 4, "text-anchor": "end", class: "ax" }, svg);
+      txt((opts.yPlus && v ? "+" : "") + v + "%", { x: L - 6, y: Y(v) + 4, "text-anchor": "end", class: "ax" }, svg);
     }
     for (const v of xs) txt(v >= 1024 ? v / 1024 + "k" : String(v), { x: X(v), y: H - 8, "text-anchor": "middle", class: "ax" }, svg);
     for (const s of series) {
@@ -825,10 +921,11 @@ Akash Dasarraju.</footer>
       const b = svg.getBoundingClientRect(), px = (ev.clientX - b.left) * W / b.width;
       const v = xs.reduce((a, c) => Math.abs(X(c) - px) < Math.abs(X(a) - px) ? c : a, xs[0]);
       cross.setAttribute("x1", X(v)); cross.setAttribute("x2", X(v)); cross.style.opacity = 1;
-      const rowsT = series.map(s => { const p = s.points.find(q => q[0] === v); return p && [`var(${s.color})`, p[1].toFixed(0) + "%", `${s.label} (${p[2].toFixed(2)} ms)`, true]; }).filter(Boolean)
+      const lab = opts.tipLabel || ((s, p) => `${s.label} (${p[2].toFixed(2)} ms)`);
+      const rowsT = series.map(s => { const p = s.points.find(q => q[0] === v); return p && [`var(${s.color})`, (opts.yPlus ? "+" : "") + p[1].toFixed(0) + "%", lab(s, p), true]; }).filter(Boolean)
                           .sort((a, c) => parseFloat(c[1]) - parseFloat(a[1]));
       const hb = host.getBoundingClientRect();
-      tip.show(ev.clientX - hb.left, ev.clientY - hb.top, `context ${v.toLocaleString("en-US")} tokens`, rowsT);
+      tip.show(ev.clientX - hb.left, ev.clientY - hb.top, opts.tipTitle ? opts.tipTitle(v) : `context ${v.toLocaleString("en-US")} tokens`, rowsT);
     });
     hit.addEventListener("pointerleave", () => { tip.hide(); cross.style.opacity = 0; });
     host.prepend(svg);
@@ -840,9 +937,9 @@ Akash Dasarraju.</footer>
          D.decode.map(r => ({ label: r.label, values: { h: r.hipinfer, l: r.llamacpp }, marker: r.floor })),
          [{ key: "h", label: "hipinfer", color: "--s1" }, { key: "l", label: "llama.cpp", color: "--s2" }],
          { unit: "ms", digits: 2, markerLabel: "bandwidth floor", aria: "Decode latency per token, hipinfer vs llama.cpp" });
+    const legend = (id, ser) => document.getElementById(id).replaceChildren(...ser.map(s => { const sp = document.createElement("span"); const k = document.createElement("i"); k.className = "lk"; k.style.borderColor = `var(${s.color})`; sp.append(k, document.createTextNode(s.label)); return sp; }));
     const ctx = D.ctx.slice(0, COLORS.length).map((s, i) => ({ label: s.label, color: COLORS[i], points: s.points }));
-    const lg = document.getElementById("l-ctx");
-    lg.replaceChildren(...ctx.map(s => { const sp = document.createElement("span"); const k = document.createElement("i"); k.className = "lk"; k.style.borderColor = `var(${s.color})`; sp.append(k, document.createTextNode(s.label)); return sp; }));
+    legend("l-ctx", ctx);
     lines(document.getElementById("c-ctx"), ctx, { yMin: 50, yMax: 100, yStep: 10, aria: "Share of the bandwidth floor vs context length" });
     bars(document.getElementById("c-prefill"),
          D.prefill.map(r => ({ label: r.label, values: { h: r.hipinfer, l: r.llamacpp } })),
@@ -862,6 +959,14 @@ Akash Dasarraju.</footer>
       bars(document.getElementById("c-a100-prefill"),
            D.a100.rows.map(r => ({ label: r.label, values: r.prefill, missing: miss(r) })), ser,
            { unit: "ms", digits: 1, aria: "A100 prefill time for 2,000 tokens, four engines" });
+    }
+    if (D.evict) {
+      const ev = D.evict.slice(0, COLORS.length).map((s, i) => ({ label: s.label, color: COLORS[i], points: s.points }));
+      legend("l-evict", ev);
+      lines(document.getElementById("c-evict"), ev,
+            { yMin: 0, yMax: 40, yStep: 10, yPlus: true, aria: "Decode-attention time added by eviction score tracking vs cached keys",
+              tipTitle: v => `${v.toLocaleString("en-US")} cached keys, batch 1`,
+              tipLabel: (s, p) => `${s.label} (${fmt(p[2], 1)} → ${fmt(p[3], 1)} µs)` });
     }
     if (D.spec) {
       bars(document.getElementById("c-spec"),
@@ -883,7 +988,7 @@ Akash Dasarraju.</footer>
   render();
   // redraw at the new width whenever a chart's box changes size (window resize, late layout, zoom)
   let raf, widths = "";
-  const hosts = ["c-decode", "c-ctx", "c-prefill", "c-tp", "c-a100-decode", "c-a100-prefill", "c-int8-decode", "c-int8-prefill", "c-spec"]
+  const hosts = ["c-decode", "c-ctx", "c-prefill", "c-tp", "c-a100-decode", "c-a100-prefill", "c-int8-decode", "c-int8-prefill", "c-spec", "c-evict"]
     .map(id => document.getElementById(id)).filter(Boolean);
   const key = () => hosts.map(h => h.clientWidth).join(",");
   widths = key();
