@@ -177,7 +177,8 @@ for gpu, m, new_rel in runs:
     if not os.path.exists(new_p):
         print(f"{gpu} {m}: no new gate result"); ok = gpu == "a6000" and ok; continue
     old, new = (json.load(open(p)) for p in (os.path.join(here, "results", gpu, m, "gate.json"), new_p))
-    key = lambda j: [(r["run"], r["identical"], r.get("step"), r.get("accepted")) for r in j["log"]]
+    # gate.py records step on matching runs too since the int8 merge: compare it only where a run diverged
+    key = lambda j: [(r["run"], r["identical"], None if r["identical"] else r.get("step"), r.get("accepted")) for r in j["log"]]
     same = old["pass"] == new["pass"] and key(old) == key(new)
     ok &= same
     print(f"{gpu} {m}: gate pass={new['pass']} {new['identical']}/{new['runs']} identical, "

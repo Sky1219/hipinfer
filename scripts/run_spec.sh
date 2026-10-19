@@ -41,7 +41,8 @@ for m in ["llama32-1b", "llama32-3b", "tinyllama"]:
     if not os.path.exists(new_p):
         print(f"{m}: no new gate result"); continue
     old, new = (json.load(open(p)) for p in (os.path.join(here, "results/2080ti", m, "gate.json"), new_p))
-    key = lambda j: [(r["run"], r["identical"], r.get("step"), r.get("accepted")) for r in j["log"]]
+    # gate.py records step on matching runs too since the int8 merge: compare it only where a run diverged
+    key = lambda j: [(r["run"], r["identical"], None if r["identical"] else r.get("step"), r.get("accepted")) for r in j["log"]]
     same = old["pass"] == new["pass"] and key(old) == key(new)
     ok &= same
     print(f"{m}: gate pass={new['pass']} {new['identical']}/{new['runs']} identical, "
