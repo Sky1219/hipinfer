@@ -1,0 +1,131 @@
+== eviction_gpu 2026-10-18T21:59:17-05:00 on csr-90011, GPU 2, steps: cpu kernels evict engine
+Sun Oct 18 21:59:18 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.178.04             Driver Version: 580.178.04     CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA GeForce RTX 2080 Ti     Off |   00000000:5E:00.0 Off |                  N/A |
+| 51%   85C    P2            246W /  250W |    9633MiB /  11264MiB |    100%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   1  NVIDIA RTX A6000               Off |   00000000:86:00.0 Off |                  Off |
+| 30%   33C    P8             22W /  300W |       0MiB /  49140MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   2  NVIDIA GeForce RTX 2080 Ti     Off |   00000000:AF:00.0 Off |                  N/A |
+| 29%   28C    P8             24W /  250W |       0MiB /  11264MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|    0   N/A  N/A         1460133      C   ...066/envs/baselines/bin/python       9630MiB |
++-----------------------------------------------------------------------------------------+
+-- thermal log /data/axd200066/gpu_thermal/gpu_thermal.csv
+2026-10-18T21:59:05,1,33,30,22.60,300.00,210,405,0,0,0,0,0,0,0
+2026-10-18T21:59:05,2,30,29,24.35,250.00,300,405,0,0,0,0,0,0,0
+2026-10-18T21:59:10,0,83,49,247.70,250.00,1800,6800,100,9633,0,0,1,0,1
+2026-10-18T21:59:10,1,33,30,22.49,300.00,210,405,0,0,0,0,0,0,0
+2026-10-18T21:59:10,2,29,29,24.58,250.00,300,405,0,0,0,0,0,0,0
+2026-10-18T21:59:15,0,83,51,211.86,250.00,1650,6800,100,9633,1,0,0,0,1
+2026-10-18T21:59:15,1,33,30,22.58,300.00,210,405,0,0,0,0,0,0,0
+2026-10-18T21:59:15,2,28,29,24.40,250.00,300,405,0,0,0,0,0,0,0
+    Clocks Event Reasons
+        Idle                                           : Active
+        Applications Clocks Setting                    : Not Active
+        SW Power Cap                                   : Not Active
+        HW Slowdown                                    : Not Active
+            HW Thermal Slowdown                        : Not Active
+            HW Power Brake Slowdown                    : Not Active
+        Sync Boost                                     : Not Active
+        SW Thermal Slowdown                            : Not Active
+        Display Clock Setting                          : Not Active
+    Clocks Event Reasons Counters
+        SW Power Capping                               : 39994 us
+        Sync Boost                                     : 0 us
+        SW Thermal Slowdown                            : 0 us
+        HW Thermal Slowdown                            : 32874890 us
+        HW Power Braking                               : 0 us
+    Sparse Operation Mode                              : N/A
+
+-- 2026-10-18T21:59:18-05:00 nvidia-smi GPU 2 before: cpu
+index, name, temperature.gpu, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], memory.used [MiB]
+2, NVIDIA GeForce RTX 2080 Ti, 28, 300 MHz, 2100 MHz, 24.66 W, 0 MiB
+== cpu -> test_eviction_cpu.log
+   ok
+OK   incremental rescan P=3 n=300 step=5                              rows rescanned 2104 vs 3600 for full rescans (58.4%)
+skip ref_wfl_prune vs SubCache policies.wfl_prune (set SUBCACHE_DIR)
+
+ALL PASS
+-- 2026-10-18T21:59:22-05:00 nvidia-smi GPU 2 before: kernels
+index, name, temperature.gpu, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], memory.used [MiB]
+2, NVIDIA GeForce RTX 2080 Ti, 28, 300 MHz, 2100 MHz, 24.66 W, 0 MiB
+== kernels -> test_kernels.log
+   ok
+OK   gemm int8 split-K=4 M=64 +bias                       max_abs_err=1.952e-03
+OK   gemm int8 split-K=4 M=64 +swiglu                     max_abs_err=3.906e-03
+
+ALL PASS
+-- 2026-10-18T21:59:38-05:00 nvidia-smi GPU 2 before: evict
+index, name, temperature.gpu, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], memory.used [MiB]
+2, NVIDIA GeForce RTX 2080 Ti, 42, 1875 MHz, 2100 MHz, 100.84 W, 0 MiB
+== evict -> test_eviction.log
+   ok
+OK   wfl P=2 n=1500 D=128 m=300 mix=0.5 step=64 rounds=0 power=1: incremental rescan == full rescan 0 differ
+skip wfl reference vs SubCache policies.wfl_prune (set SUBCACHE_DIR)
+
+ALL PASS
+-- 2026-10-18T21:59:43-05:00 nvidia-smi GPU 2 before: evict-portable
+index, name, temperature.gpu, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], memory.used [MiB]
+2, NVIDIA GeForce RTX 2080 Ti, 41, 1890 MHz, 2100 MHz, 97.11 W, 0 MiB
+== evict-portable -> test_eviction_portable.log
+   ok
+OK   wfl P=2 n=1500 D=128 m=300 mix=0.5 step=64 rounds=0 power=1: incremental rescan == full rescan 0 differ
+skip wfl reference vs SubCache policies.wfl_prune (set SUBCACHE_DIR)
+
+ALL PASS
+-- 2026-10-18T21:59:47-05:00 nvidia-smi GPU 2 before: engine tinyllama
+index, name, temperature.gpu, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], memory.used [MiB]
+2, NVIDIA GeForce RTX 2080 Ti, 41, 1890 MHz, 2100 MHz, 93.71 W, 0 MiB
+== engine tinyllama -> test_eviction_engine_tinyllama.log
+   ok
+OK   evict wfl pool 2.0 740 -> 256: 8 more steps add 8 * G of score mass max_abs=6.15e-04 max_rel=9.61e-06
+tokens after the last eviction: [29900, 29900, 29900, 29900, 29900, 29900, 29900, 29900]
+
+ALL PASS
+-- 2026-10-18T21:59:57-05:00 nvidia-smi GPU 2 before: engine llama32-1b
+index, name, temperature.gpu, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], memory.used [MiB]
+2, NVIDIA GeForce RTX 2080 Ti, 42, 1890 MHz, 2100 MHz, 99.34 W, 0 MiB
+== engine llama32-1b -> test_eviction_engine_llama32-1b.log
+   ok
+OK   evict wfl pool 2.0 740 -> 256: 8 more steps add 8 * G of score mass max_abs=4.56e-04 max_rel=1.42e-05
+tokens after the last eviction: [13, 15, 13, 15, 13, 15, 13, 15]
+
+ALL PASS
+-- 2026-10-18T22:00:10-05:00 nvidia-smi GPU 2 before: engine llama32-3b
+index, name, temperature.gpu, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], memory.used [MiB]
+2, NVIDIA GeForce RTX 2080 Ti, 41, 1350 MHz, 2100 MHz, 68.98 W, 0 MiB
+== engine llama32-3b -> test_eviction_engine_llama32-3b.log
+   ok
+OK   evict wfl pool 2.0 740 -> 256: 8 more steps add 8 * G of score mass max_abs=3.71e-04 max_rel=1.55e-05
+tokens after the last eviction: [13, 15, 13, 15, 13, 15, 13, 15]
+
+ALL PASS
+-- 2026-10-18T22:00:32-05:00 nvidia-smi GPU 2 before: engine qwen25-1.5b
+index, name, temperature.gpu, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], memory.used [MiB]
+2, NVIDIA GeForce RTX 2080 Ti, 45, 1875 MHz, 2100 MHz, 93.92 W, 0 MiB
+== engine qwen25-1.5b -> test_eviction_engine_qwen25-1.5b.log
+   ok
+OK   evict wfl pool 2.0 740 -> 256: 8 more steps add 8 * G of score mass max_abs=1.04e-03 max_rel=2.17e-05
+tokens after the last eviction: [15, 15, 15, 15, 15, 15, 15, 15]
+
+ALL PASS
+index, temperature.gpu, clocks.current.sm [MHz]
+2, 47, 1860 MHz
+== done 2026-10-18T22:00:43-05:00; failed: none

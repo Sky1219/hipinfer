@@ -1,0 +1,28 @@
+OK   radix select n=5 k=2 [0,5) largest                               
+OK   radix select n=5 k=2 [0,5) smallest                              
+OK   radix select n=1000 k=100 [4,900) largest                        
+OK   radix select n=1000 k=100 [4,900) smallest                       
+OK   radix select n=1000 k=100 [4,900) largest 7-level ties           
+OK   radix select n=1000 k=100 [4,900) smallest 7-level ties          
+OK   radix select n=4096 k=1 [0,4096) largest signed                  
+OK   radix select n=4096 k=1 [0,4096) smallest signed                 
+OK   radix select n=4096 k=4095 [0,4096) largest 3-level ties signed  
+OK   radix select n=4096 k=4095 [0,4096) smallest 3-level ties signed 
+OK   radix select n=3000 k=1900 [100,2000) largest signed             
+OK   radix select n=3000 k=1900 [100,2000) smallest signed            
+OK   radix select n=777 k=300 [10,700) largest 2-level ties           
+OK   radix select n=777 k=300 [10,700) smallest 2-level ties          
+OK   top-2 decomposition n=37 kept 1.0                                
+OK   top-2 decomposition n=200 4-level ties kept 0.7                  
+OK   top-2 decomposition n=300 2-level ties kept 0.5                  
+OK   top-2 decomposition n=130 kept 0.3                               
+OK   top-2 decomposition n=64 1-level ties kept 0.9                   
+OK   top-2 decomposition n=2 kept 1.0                                 
+OK   incremental rescan P=4 n=64 step=8                               rows rescanned 384 vs 768 for full rescans (50.0%)
+OK   incremental rescan P=4 n=200 step=1                              rows rescanned 2213 vs 96000 for full rescans (2.3%)
+OK   incremental rescan P=4 n=200 step=8 4-level sim ties             rows rescanned 1496 vs 12000 for full rescans (12.5%)
+OK   incremental rescan P=2 n=400 step=8 2-level sim ties             rows rescanned 1731 vs 33600 for full rescans (5.2%)
+OK   incremental rescan P=3 n=300 step=5                              rows rescanned 2104 vs 3600 for full rescans (58.4%)
+skip ref_wfl_prune vs SubCache policies.wfl_prune (set SUBCACHE_DIR)
+
+ALL PASS

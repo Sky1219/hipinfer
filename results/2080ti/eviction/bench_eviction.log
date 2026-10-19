@@ -1,0 +1,88 @@
+NVIDIA GeForce RTX 2080 Ti | decode kernel: default
+decode llama32-1b   B=1 len=  1024: plain    11.5 us, tracked    14.9 us (+ 30.0%)
+decode llama32-1b   B=1 len=  4096: plain    25.4 us, tracked    31.4 us (+ 23.2%)
+decode llama32-1b   B=1 len= 16384: plain    70.9 us, tracked    90.8 us (+ 28.0%)
+decode llama32-1b   B=1 len= 32768: plain   128.7 us, tracked   168.3 us (+ 30.8%)
+decode llama32-1b   B=8 len=  1024: plain    45.1 us, tracked    54.3 us (+ 20.3%)
+decode llama32-1b   B=8 len=  4096: plain   137.3 us, tracked   168.8 us (+ 22.9%)
+decode llama32-1b   B=8 len= 16384: plain   504.4 us, tracked   613.2 us (+ 21.6%)
+decode llama32-1b   B=8 len= 32768: plain   932.8 us, tracked  1220.7 us (+ 30.9%)
+decode llama32-3b   B=1 len=  1024: plain    13.9 us, tracked    17.5 us (+ 26.0%)
+decode llama32-3b   B=1 len=  4096: plain    42.0 us, tracked    48.8 us (+ 16.1%)
+decode llama32-3b   B=1 len= 16384: plain   130.1 us, tracked   150.0 us (+ 15.3%)
+decode llama32-3b   B=1 len= 32768: plain   244.2 us, tracked   284.9 us (+ 16.7%)
+decode llama32-3b   B=8 len=  1024: plain    73.0 us, tracked    83.4 us (+ 14.3%)
+decode llama32-3b   B=8 len=  4096: plain   244.3 us, tracked   280.2 us (+ 14.7%)
+decode llama32-3b   B=8 len= 16384: plain   930.2 us, tracked  1070.4 us (+ 15.1%)
+decode llama32-3b   B=8 len= 32768: plain  1845.2 us, tracked  2140.1 us (+ 16.0%)
+decode qwen25-1.5b  B=1 len=  1024: plain    11.5 us, tracked    15.2 us (+ 32.5%)
+decode qwen25-1.5b  B=1 len=  4096: plain    27.6 us, tracked    29.1 us (+  5.3%)
+decode qwen25-1.5b  B=1 len= 16384: plain    52.9 us, tracked    60.2 us (+ 13.8%)
+decode qwen25-1.5b  B=1 len= 32768: plain    81.9 us, tracked    95.7 us (+ 16.8%)
+decode qwen25-1.5b  B=8 len=  1024: plain    33.1 us, tracked    38.1 us (+ 15.0%)
+decode qwen25-1.5b  B=8 len=  4096: plain    87.7 us, tracked   102.9 us (+ 17.3%)
+decode qwen25-1.5b  B=8 len= 16384: plain   294.6 us, tracked   356.1 us (+ 20.9%)
+decode qwen25-1.5b  B=8 len= 32768: plain   570.8 us, tracked   697.2 us (+ 22.1%)
+decode llama31-8b   B=1 len=  1024: plain    14.6 us, tracked    17.4 us (+ 18.9%)
+decode llama31-8b   B=1 len=  4096: plain    43.9 us, tracked    50.6 us (+ 15.3%)
+decode llama31-8b   B=1 len= 16384: plain   132.0 us, tracked   155.4 us (+ 17.7%)
+decode llama31-8b   B=1 len= 32768: plain   245.8 us, tracked   291.4 us (+ 18.5%)
+decode llama31-8b   B=8 len=  1024: plain    74.8 us, tracked    85.6 us (+ 14.5%)
+decode llama31-8b   B=8 len=  4096: plain   246.1 us, tracked   286.6 us (+ 16.4%)
+decode llama31-8b   B=8 len= 16384: plain   931.6 us, tracked  1098.9 us (+ 18.0%)
+decode llama31-8b   B=8 len= 32768: plain  1845.3 us, tracked  2186.4 us (+ 18.5%)
+prefill llama32-1b   T=  512: flash   0.045 ms, +lse   0.045 ms, score pass   0.105 ms (+235.9% attention time)
+prefill llama32-1b   T= 2048: flash   0.484 ms, +lse   0.480 ms, score pass   0.669 ms (+137.2% attention time)
+prefill llama32-1b   T= 4096: flash   1.760 ms, +lse   1.763 ms, score pass   2.079 ms (+118.3% attention time)
+prefill llama32-3b   T=  512: flash   0.075 ms, +lse   0.075 ms, score pass   0.104 ms (+139.4% attention time)
+prefill llama32-3b   T= 2048: flash   0.796 ms, +lse   0.801 ms, score pass   0.943 ms (+119.1% attention time)
+prefill llama32-3b   T= 4096: flash   2.946 ms, +lse   2.959 ms, score pass   3.057 ms (+104.2% attention time)
+prefill qwen25-1.5b  T=  512: flash   0.045 ms, +lse   0.045 ms, score pass   0.201 ms (+451.3% attention time)
+prefill qwen25-1.5b  T= 2048: flash   0.430 ms, +lse   0.430 ms, score pass   0.782 ms (+182.2% attention time)
+prefill qwen25-1.5b  T= 4096: flash   1.524 ms, +lse   1.526 ms, score pass   1.545 ms (+101.5% attention time)
+prefill llama31-8b   T=  512: flash   0.090 ms, +lse   0.093 ms, score pass   0.138 ms (+157.3% attention time)
+prefill llama31-8b   T= 2048: flash   1.050 ms, +lse   1.046 ms, score pass   1.249 ms (+118.5% attention time)
+prefill llama31-8b   T= 4096: flash   3.892 ms, +lse   3.896 ms, score pass   4.062 ms (+104.5% attention time)
+select llama32-1b   P=128 n= 1024 h2o top-k                                       0.03 ms
+select llama32-1b   P=128 n= 1024 wfl prune to 128 (step 8), 112 rounds          62.47 ms   PyTorch matrix version   1563.44 ms (x25.0)
+select llama32-1b   P=128 n= 1024 wfl prune: evict 64 (step 8), 8 rounds          9.73 ms   PyTorch matrix version    128.11 ms (x13.2)
+select llama32-1b   P=128 n= 2048 h2o top-k                                       0.04 ms
+select llama32-1b   P=128 n= 2048 wfl prune to 256 (step 8), 224 rounds         248.30 ms   PyTorch matrix version  12330.54 ms (x49.7)
+select llama32-1b   P=128 n= 2048 wfl prune: evict 64 (step 8), 8 rounds         33.51 ms
+select llama32-1b   P=128 n= 4096 h2o top-k                                       0.06 ms
+select llama32-1b   P=128 n= 4096 wfl prune to 512 (step 8), 448 rounds        1011.99 ms
+select llama32-1b   P=128 n= 4096 wfl prune: evict 64 (step 8), 8 rounds        118.95 ms
+select llama32-3b   P=224 n= 1024 h2o top-k                                       0.06 ms
+select llama32-3b   P=224 n= 1024 wfl prune to 128 (step 8), 112 rounds         225.13 ms
+select llama32-3b   P=224 n= 1024 wfl prune: evict 64 (step 8), 8 rounds         34.94 ms
+select llama32-3b   P=224 n= 2048 h2o top-k                                       0.06 ms
+select llama32-3b   P=224 n= 2048 wfl prune to 256 (step 8), 224 rounds         904.82 ms
+select llama32-3b   P=224 n= 2048 wfl prune: evict 64 (step 8), 8 rounds        115.70 ms
+select llama32-3b   P=224 n= 4096 h2o top-k                                       0.09 ms
+select llama32-3b   P=224 n= 4096 wfl prune to 512 (step 8), 448 rounds        3653.94 ms
+select llama32-3b   P=224 n= 4096 wfl prune: evict 64 (step 8), 8 rounds        416.17 ms
+select qwen25-1.5b  P= 56 n= 1024 h2o top-k                                       0.10 ms
+select qwen25-1.5b  P= 56 n= 1024 wfl prune to 128 (step 8), 112 rounds          61.09 ms   PyTorch matrix version    694.47 ms (x11.4)
+select qwen25-1.5b  P= 56 n= 1024 wfl prune: evict 64 (step 8), 8 rounds          9.17 ms   PyTorch matrix version     58.33 ms (x6.4)
+select qwen25-1.5b  P= 56 n= 2048 h2o top-k                                       0.04 ms
+select qwen25-1.5b  P= 56 n= 2048 wfl prune to 256 (step 8), 224 rounds         243.17 ms
+select qwen25-1.5b  P= 56 n= 2048 wfl prune: evict 64 (step 8), 8 rounds         30.04 ms
+select qwen25-1.5b  P= 56 n= 4096 h2o top-k                                       0.04 ms
+select qwen25-1.5b  P= 56 n= 4096 wfl prune to 512 (step 8), 448 rounds         980.02 ms
+select qwen25-1.5b  P= 56 n= 4096 wfl prune: evict 64 (step 8), 8 rounds        106.35 ms
+select llama31-8b   P=256 n= 1024 h2o top-k                                       0.05 ms
+select llama31-8b   P=256 n= 1024 wfl prune to 128 (step 8), 112 rounds         248.45 ms
+select llama31-8b   P=256 n= 1024 wfl prune: evict 64 (step 8), 8 rounds         40.06 ms
+select llama31-8b   P=256 n= 2048 h2o top-k                                       0.06 ms
+select llama31-8b   P=256 n= 2048 wfl prune to 256 (step 8), 224 rounds        1000.66 ms
+select llama31-8b   P=256 n= 2048 wfl prune: evict 64 (step 8), 8 rounds        132.70 ms
+select llama31-8b   P=256 n= 4096 h2o top-k                                       0.09 ms
+select llama31-8b   P=256 n= 4096 wfl prune to 512 (step 8), 448 rounds        4152.18 ms
+select llama31-8b   P=256 n= 4096 wfl prune: evict 64 (step 8), 8 rounds        605.40 ms
+engine: free GPU memory 10.2 GB
+engine decode step at ~4.1k context, tracking off: 4.963 ms
+engine decode step at ~4.1k context, tracking on : 5.047 ms
+engine evict 4096 -> 1024, h2o: select 0.10 ms, compact 0.88 ms (call 29.3 ms wall); decode step after: 4.851 ms
+engine evict 4096 -> 1024, wfl: select 884.86 ms, compact 0.82 ms (call 913.3 ms wall); decode step after: 4.856 ms
+engine evict 4096 -> 1024, wfl {'pool': 2.0, 'rounds': 8}: select 62.75 ms, compact 0.83 ms (call 90.1 ms wall); decode step after: 4.860 ms
+wrote results/2080ti/eviction/bench_eviction.json

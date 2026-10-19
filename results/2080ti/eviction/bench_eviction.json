@@ -1,0 +1,680 @@
+{
+ "gpu": "NVIDIA GeForce RTX 2080 Ti",
+ "decode": [
+  {
+   "model": "llama32-1b",
+   "B": 1,
+   "len": 1024,
+   "plain_us": 11.468800157308578,
+   "track_us": 14.908800274133682,
+   "overhead": 0.29994420250081166
+  },
+  {
+   "model": "llama32-1b",
+   "B": 1,
+   "len": 4096,
+   "plain_us": 25.443200767040253,
+   "track_us": 31.358399987220764,
+   "overhead": 0.2324864420298569
+  },
+  {
+   "model": "llama32-1b",
+   "B": 1,
+   "len": 16384,
+   "plain_us": 70.9087997674942,
+   "track_us": 90.79679846763611,
+   "overhead": 0.28047292811827984
+  },
+  {
+   "model": "llama32-1b",
+   "B": 1,
+   "len": 32768,
+   "plain_us": 128.69760394096375,
+   "track_us": 168.3471977710724,
+   "overhead": 0.30808338784843836
+  },
+  {
+   "model": "llama32-1b",
+   "B": 8,
+   "len": 1024,
+   "plain_us": 45.12479901313782,
+   "track_us": 54.27360236644745,
+   "overhead": 0.2027444676406427
+  },
+  {
+   "model": "llama32-1b",
+   "B": 8,
+   "len": 4096,
+   "plain_us": 137.34880089759827,
+   "track_us": 168.7696039676666,
+   "overhead": 0.22876648987634352
+  },
+  {
+   "model": "llama32-1b",
+   "B": 8,
+   "len": 16384,
+   "plain_us": 504.3519973754883,
+   "track_us": 613.2224082946777,
+   "overhead": 0.21586196046753403
+  },
+  {
+   "model": "llama32-1b",
+   "B": 8,
+   "len": 32768,
+   "plain_us": 932.7919960021973,
+   "track_us": 1220.7183837890625,
+   "overhead": 0.3086715891869498
+  },
+  {
+   "model": "llama32-3b",
+   "B": 1,
+   "len": 1024,
+   "plain_us": 13.900800049304962,
+   "track_us": 17.51679927110672,
+   "overhead": 0.2601288565389124
+  },
+  {
+   "model": "llama32-3b",
+   "B": 1,
+   "len": 4096,
+   "plain_us": 42.00800061225891,
+   "track_us": 48.75999987125397,
+   "overhead": 0.16073126929598902
+  },
+  {
+   "model": "llama32-3b",
+   "B": 1,
+   "len": 16384,
+   "plain_us": 130.07999658584595,
+   "track_us": 150.0432014465332,
+   "overhead": 0.15346867608128045
+  },
+  {
+   "model": "llama32-3b",
+   "B": 1,
+   "len": 32768,
+   "plain_us": 244.2271947860718,
+   "track_us": 284.91519689559937,
+   "overhead": 0.16659898233351034
+  },
+  {
+   "model": "llama32-3b",
+   "B": 8,
+   "len": 1024,
+   "plain_us": 72.95199930667877,
+   "track_us": 83.38719904422759,
+   "overhead": 0.14304199798117767
+  },
+  {
+   "model": "llama32-3b",
+   "B": 8,
+   "len": 4096,
+   "plain_us": 244.3023920059204,
+   "track_us": 280.19360303878784,
+   "overhead": 0.14691305614395134
+  },
+  {
+   "model": "llama32-3b",
+   "B": 8,
+   "len": 16384,
+   "plain_us": 930.1887989044188,
+   "track_us": 1070.4432010650635,
+   "overhead": 0.15078057521853316
+  },
+  {
+   "model": "llama32-3b",
+   "B": 8,
+   "len": 32768,
+   "plain_us": 1845.2159881591797,
+   "track_us": 2140.062427520752,
+   "overhead": 0.15978966216075152
+  },
+  {
+   "model": "qwen25-1.5b",
+   "B": 1,
+   "len": 1024,
+   "plain_us": 11.475200206041336,
+   "track_us": 15.203199535608292,
+   "overhead": 0.32487444773331964
+  },
+  {
+   "model": "qwen25-1.5b",
+   "B": 1,
+   "len": 4096,
+   "plain_us": 27.609600126743317,
+   "track_us": 29.060800373554226,
+   "overhead": 0.05256143660716206
+  },
+  {
+   "model": "qwen25-1.5b",
+   "B": 1,
+   "len": 16384,
+   "plain_us": 52.932801842689514,
+   "track_us": 60.21279990673065,
+   "overhead": 0.13753283050605347
+  },
+  {
+   "model": "qwen25-1.5b",
+   "B": 1,
+   "len": 32768,
+   "plain_us": 81.92799985408783,
+   "track_us": 95.72959840297699,
+   "overhead": 0.16846009390525252
+  },
+  {
+   "model": "qwen25-1.5b",
+   "B": 8,
+   "len": 1024,
+   "plain_us": 33.129601180553436,
+   "track_us": 38.10880035161972,
+   "overhead": 0.15029457022226378
+  },
+  {
+   "model": "qwen25-1.5b",
+   "B": 8,
+   "len": 4096,
+   "plain_us": 87.72160112857819,
+   "track_us": 102.8671979904175,
+   "overhead": 0.17265527152929638
+  },
+  {
+   "model": "qwen25-1.5b",
+   "B": 8,
+   "len": 16384,
+   "plain_us": 294.60960626602173,
+   "track_us": 356.1200022697449,
+   "overhead": 0.20878611795224877
+  },
+  {
+   "model": "qwen25-1.5b",
+   "B": 8,
+   "len": 32768,
+   "plain_us": 570.7952022552489,
+   "track_us": 697.1647977828978,
+   "overhead": 0.22139218239458636
+  },
+  {
+   "model": "llama31-8b",
+   "B": 1,
+   "len": 1024,
+   "plain_us": 14.640000462532043,
+   "track_us": 17.41119995713234,
+   "overhead": 0.1892895769841394
+  },
+  {
+   "model": "llama31-8b",
+   "B": 1,
+   "len": 4096,
+   "plain_us": 43.88960003852844,
+   "track_us": 50.595200061798096,
+   "overhead": 0.1527833477038556
+  },
+  {
+   "model": "llama31-8b",
+   "B": 1,
+   "len": 16384,
+   "plain_us": 131.99999928474426,
+   "track_us": 155.39039969444275,
+   "overhead": 0.17720000406395298
+  },
+  {
+   "model": "llama31-8b",
+   "B": 1,
+   "len": 32768,
+   "plain_us": 245.84800004959106,
+   "track_us": 291.37760400772095,
+   "overhead": 0.18519411973636513
+  },
+  {
+   "model": "llama31-8b",
+   "B": 8,
+   "len": 1024,
+   "plain_us": 74.75200295448303,
+   "track_us": 85.56160032749177,
+   "overhead": 0.1446061235254228
+  },
+  {
+   "model": "llama31-8b",
+   "B": 8,
+   "len": 4096,
+   "plain_us": 246.10879421234134,
+   "track_us": 286.5823984146119,
+   "overhead": 0.1644541160416646
+  },
+  {
+   "model": "llama31-8b",
+   "B": 8,
+   "len": 16384,
+   "plain_us": 931.6015720367432,
+   "track_us": 1098.8736152648926,
+   "overhead": 0.1795531998324622
+  },
+  {
+   "model": "llama31-8b",
+   "B": 8,
+   "len": 32768,
+   "plain_us": 1845.2735900878906,
+   "track_us": 2186.444854736328,
+   "overhead": 0.18488925787540667
+  }
+ ],
+ "prefill": [
+  {
+   "model": "llama32-1b",
+   "T": 512,
+   "flash_ms": 0.04464159905910492,
+   "flash_lse_ms": 0.04483200013637542,
+   "score_pass_ms": 0.10510079860687255,
+   "overhead": 2.3585893405103797
+  },
+  {
+   "model": "llama32-1b",
+   "T": 2048,
+   "flash_ms": 0.4842911958694458,
+   "flash_lse_ms": 0.47951838970184324,
+   "score_pass_ms": 0.6694063901901245,
+   "overhead": 1.3723841971343465
+  },
+  {
+   "model": "llama32-1b",
+   "T": 4096,
+   "flash_ms": 1.760091209411621,
+   "flash_lse_ms": 1.763435173034668,
+   "score_pass_ms": 2.0789055824279785,
+   "overhead": 1.1830350239332756
+  },
+  {
+   "model": "llama32-3b",
+   "T": 512,
+   "flash_ms": 0.07454720139503479,
+   "flash_lse_ms": 0.07486400008201599,
+   "score_pass_ms": 0.10362880229949951,
+   "overhead": 1.3943595338429966
+  },
+  {
+   "model": "llama32-3b",
+   "T": 2048,
+   "flash_ms": 0.795796799659729,
+   "flash_lse_ms": 0.8005184173583983,
+   "score_pass_ms": 0.942852783203125,
+   "overhead": 1.1907240658758154
+  },
+  {
+   "model": "llama32-3b",
+   "T": 4096,
+   "flash_ms": 2.9457376480102537,
+   "flash_lse_ms": 2.9592543601989747,
+   "score_pass_ms": 3.0565295219421387,
+   "overhead": 1.0421994763194786
+  },
+  {
+   "model": "qwen25-1.5b",
+   "T": 512,
+   "flash_ms": 0.04456000030040741,
+   "flash_lse_ms": 0.04482399970293045,
+   "score_pass_ms": 0.20085439682006836,
+   "overhead": 4.513428969181416
+  },
+  {
+   "model": "qwen25-1.5b",
+   "T": 2048,
+   "flash_ms": 0.42959518432617183,
+   "flash_lse_ms": 0.4302127838134766,
+   "score_pass_ms": 0.7822352170944213,
+   "overhead": 1.8223035200211695
+  },
+  {
+   "model": "qwen25-1.5b",
+   "T": 4096,
+   "flash_ms": 1.5240592002868651,
+   "flash_lse_ms": 1.5263296127319337,
+   "score_pass_ms": 1.5452479839324953,
+   "overhead": 1.0153925753581508
+  },
+  {
+   "model": "llama31-8b",
+   "T": 512,
+   "flash_ms": 0.09009919762611389,
+   "flash_lse_ms": 0.09337599873542786,
+   "score_pass_ms": 0.13845120072364808,
+   "overhead": 1.5730217978310201
+  },
+  {
+   "model": "llama31-8b",
+   "T": 2048,
+   "flash_ms": 1.0504623889923095,
+   "flash_lse_ms": 1.046398401260376,
+   "score_pass_ms": 1.2486815929412842,
+   "overhead": 1.1848283367891836
+  },
+  {
+   "model": "llama31-8b",
+   "T": 4096,
+   "flash_ms": 3.8920848846435545,
+   "flash_lse_ms": 3.8956094741821286,
+   "score_pass_ms": 4.062424087524414,
+   "overhead": 1.0446711203821435
+  }
+ ],
+ "select": [
+  {
+   "model": "llama32-1b",
+   "problems": 128,
+   "n": 1024,
+   "what": "h2o top-k",
+   "kernel_ms": 0.0344959981739521,
+   "torch_ms": null
+  },
+  {
+   "model": "llama32-1b",
+   "problems": 128,
+   "n": 1024,
+   "what": "wfl prune to 128 (step 8), 112 rounds",
+   "kernel_ms": 62.46604919433594,
+   "torch_ms": 1563.443359375
+  },
+  {
+   "model": "llama32-1b",
+   "problems": 128,
+   "n": 1024,
+   "what": "wfl prune: evict 64 (step 8), 8 rounds",
+   "kernel_ms": 9.725215911865234,
+   "torch_ms": 128.10572814941406
+  },
+  {
+   "model": "llama32-1b",
+   "problems": 128,
+   "n": 2048,
+   "what": "h2o top-k",
+   "kernel_ms": 0.04076800122857094,
+   "torch_ms": null
+  },
+  {
+   "model": "llama32-1b",
+   "problems": 128,
+   "n": 2048,
+   "what": "wfl prune to 256 (step 8), 224 rounds",
+   "kernel_ms": 248.30160522460938,
+   "torch_ms": 12330.54296875
+  },
+  {
+   "model": "llama32-1b",
+   "problems": 128,
+   "n": 2048,
+   "what": "wfl prune: evict 64 (step 8), 8 rounds",
+   "kernel_ms": 33.513214111328125,
+   "torch_ms": null
+  },
+  {
+   "model": "llama32-1b",
+   "problems": 128,
+   "n": 4096,
+   "what": "h2o top-k",
+   "kernel_ms": 0.05510399863123894,
+   "torch_ms": null
+  },
+  {
+   "model": "llama32-1b",
+   "problems": 128,
+   "n": 4096,
+   "what": "wfl prune to 512 (step 8), 448 rounds",
+   "kernel_ms": 1011.9949340820312,
+   "torch_ms": null
+  },
+  {
+   "model": "llama32-1b",
+   "problems": 128,
+   "n": 4096,
+   "what": "wfl prune: evict 64 (step 8), 8 rounds",
+   "kernel_ms": 118.9461441040039,
+   "torch_ms": null
+  },
+  {
+   "model": "llama32-3b",
+   "problems": 224,
+   "n": 1024,
+   "what": "h2o top-k",
+   "kernel_ms": 0.06176000088453293,
+   "torch_ms": null
+  },
+  {
+   "model": "llama32-3b",
+   "problems": 224,
+   "n": 1024,
+   "what": "wfl prune to 128 (step 8), 112 rounds",
+   "kernel_ms": 225.13157653808594,
+   "torch_ms": null
+  },
+  {
+   "model": "llama32-3b",
+   "problems": 224,
+   "n": 1024,
+   "what": "wfl prune: evict 64 (step 8), 8 rounds",
+   "kernel_ms": 34.94297790527344,
+   "torch_ms": null
+  },
+  {
+   "model": "llama32-3b",
+   "problems": 224,
+   "n": 2048,
+   "what": "h2o top-k",
+   "kernel_ms": 0.06339199841022491,
+   "torch_ms": null
+  },
+  {
+   "model": "llama32-3b",
+   "problems": 224,
+   "n": 2048,
+   "what": "wfl prune to 256 (step 8), 224 rounds",
+   "kernel_ms": 904.8233032226562,
+   "torch_ms": null
+  },
+  {
+   "model": "llama32-3b",
+   "problems": 224,
+   "n": 2048,
+   "what": "wfl prune: evict 64 (step 8), 8 rounds",
+   "kernel_ms": 115.69538879394531,
+   "torch_ms": null
+  },
+  {
+   "model": "llama32-3b",
+   "problems": 224,
+   "n": 4096,
+   "what": "h2o top-k",
+   "kernel_ms": 0.08953599631786346,
+   "torch_ms": null
+  },
+  {
+   "model": "llama32-3b",
+   "problems": 224,
+   "n": 4096,
+   "what": "wfl prune to 512 (step 8), 448 rounds",
+   "kernel_ms": 3653.937255859375,
+   "torch_ms": null
+  },
+  {
+   "model": "llama32-3b",
+   "problems": 224,
+   "n": 4096,
+   "what": "wfl prune: evict 64 (step 8), 8 rounds",
+   "kernel_ms": 416.17340087890625,
+   "torch_ms": null
+  },
+  {
+   "model": "qwen25-1.5b",
+   "problems": 56,
+   "n": 1024,
+   "what": "h2o top-k",
+   "kernel_ms": 0.10179200023412704,
+   "torch_ms": null
+  },
+  {
+   "model": "qwen25-1.5b",
+   "problems": 56,
+   "n": 1024,
+   "what": "wfl prune to 128 (step 8), 112 rounds",
+   "kernel_ms": 61.085758209228516,
+   "torch_ms": 694.4712524414062
+  },
+  {
+   "model": "qwen25-1.5b",
+   "problems": 56,
+   "n": 1024,
+   "what": "wfl prune: evict 64 (step 8), 8 rounds",
+   "kernel_ms": 9.170592308044434,
+   "torch_ms": 58.32944107055664
+  },
+  {
+   "model": "qwen25-1.5b",
+   "problems": 56,
+   "n": 2048,
+   "what": "h2o top-k",
+   "kernel_ms": 0.035551998764276505,
+   "torch_ms": null
+  },
+  {
+   "model": "qwen25-1.5b",
+   "problems": 56,
+   "n": 2048,
+   "what": "wfl prune to 256 (step 8), 224 rounds",
+   "kernel_ms": 243.16758728027344,
+   "torch_ms": null
+  },
+  {
+   "model": "qwen25-1.5b",
+   "problems": 56,
+   "n": 2048,
+   "what": "wfl prune: evict 64 (step 8), 8 rounds",
+   "kernel_ms": 30.042112350463867,
+   "torch_ms": null
+  },
+  {
+   "model": "qwen25-1.5b",
+   "problems": 56,
+   "n": 4096,
+   "what": "h2o top-k",
+   "kernel_ms": 0.038047999143600464,
+   "torch_ms": null
+  },
+  {
+   "model": "qwen25-1.5b",
+   "problems": 56,
+   "n": 4096,
+   "what": "wfl prune to 512 (step 8), 448 rounds",
+   "kernel_ms": 980.0166015625,
+   "torch_ms": null
+  },
+  {
+   "model": "qwen25-1.5b",
+   "problems": 56,
+   "n": 4096,
+   "what": "wfl prune: evict 64 (step 8), 8 rounds",
+   "kernel_ms": 106.34854125976562,
+   "torch_ms": null
+  },
+  {
+   "model": "llama31-8b",
+   "problems": 256,
+   "n": 1024,
+   "what": "h2o top-k",
+   "kernel_ms": 0.051231998950242996,
+   "torch_ms": null
+  },
+  {
+   "model": "llama31-8b",
+   "problems": 256,
+   "n": 1024,
+   "what": "wfl prune to 128 (step 8), 112 rounds",
+   "kernel_ms": 248.45494079589844,
+   "torch_ms": null
+  },
+  {
+   "model": "llama31-8b",
+   "problems": 256,
+   "n": 1024,
+   "what": "wfl prune: evict 64 (step 8), 8 rounds",
+   "kernel_ms": 40.06099319458008,
+   "torch_ms": null
+  },
+  {
+   "model": "llama31-8b",
+   "problems": 256,
+   "n": 2048,
+   "what": "h2o top-k",
+   "kernel_ms": 0.06419199705123901,
+   "torch_ms": null
+  },
+  {
+   "model": "llama31-8b",
+   "problems": 256,
+   "n": 2048,
+   "what": "wfl prune to 256 (step 8), 224 rounds",
+   "kernel_ms": 1000.6578369140625,
+   "torch_ms": null
+  },
+  {
+   "model": "llama31-8b",
+   "problems": 256,
+   "n": 2048,
+   "what": "wfl prune: evict 64 (step 8), 8 rounds",
+   "kernel_ms": 132.69981384277344,
+   "torch_ms": null
+  },
+  {
+   "model": "llama31-8b",
+   "problems": 256,
+   "n": 4096,
+   "what": "h2o top-k",
+   "kernel_ms": 0.09148799628019333,
+   "torch_ms": null
+  },
+  {
+   "model": "llama31-8b",
+   "problems": 256,
+   "n": 4096,
+   "what": "wfl prune to 512 (step 8), 448 rounds",
+   "kernel_ms": 4152.17578125,
+   "torch_ms": null
+  },
+  {
+   "model": "llama31-8b",
+   "problems": 256,
+   "n": 4096,
+   "what": "wfl prune: evict 64 (step 8), 8 rounds",
+   "kernel_ms": 605.3972778320312,
+   "torch_ms": null
+  }
+ ],
+ "engine": [
+  {
+   "what": "decode step, ctx ~4.1k, tracking off",
+   "ms": 4.963103771209717
+  },
+  {
+   "what": "decode step, ctx ~4.1k, tracking on",
+   "ms": 5.04728889465332
+  },
+  {
+   "what": "evict 4096 -> 1024, h2o",
+   "select_ms": 0.10089600086212158,
+   "compact_ms": 0.8796160221099854,
+   "wall_ms": 29.343617032282054,
+   "decode_after_ms": 4.850654602050781
+  },
+  {
+   "what": "evict 4096 -> 1024, wfl",
+   "select_ms": 884.8551635742188,
+   "compact_ms": 0.8208320140838623,
+   "wall_ms": 913.3353310171515,
+   "decode_after_ms": 4.856016159057617
+  },
+  {
+   "what": "evict 4096 -> 1024, wfl {'pool': 2.0, 'rounds': 8}",
+   "select_ms": 62.75129699707031,
+   "compact_ms": 0.8284159898757935,
+   "wall_ms": 90.09690198581666,
+   "decode_after_ms": 4.860461711883545
+  }
+ ]
+}

@@ -1,0 +1,42 @@
+llama32-3b.bin: layers 28, heads 24/8, head_dim 128; prompt 700 tokens (max_prefill 512: two chunks), 40 decode steps
+OK   tokens: tracking on == off (graph decode)                    
+OK   final logits: tracking on == off (bitwise)                   
+OK   cache length = prompt + decode steps                         740 vs 740
+OK   layer 0: sum of H2O scores = G * queries                     max_abs=8.83e-05 max_rel=3.98e-08
+OK   layer 0: sum of window scores = G * window                   max_abs=7.77e-06 max_rel=8.09e-08
+OK   layer 14: sum of H2O scores = G * queries                    max_abs=4.19e-04 max_rel=1.89e-07
+OK   layer 14: sum of window scores = G * window                  max_abs=6.32e-06 max_rel=6.59e-08
+OK   layer 27: sum of H2O scores = G * queries                    max_abs=2.87e-04 max_rel=1.29e-07
+OK   layer 27: sum of window scores = G * window                  max_abs=1.11e-05 max_rel=1.15e-07
+OK   scores: graph decode == eager decode (bitwise)               
+OK   evict h2o 740 -> 256: evicted count                          484
+OK   evict h2o 740 -> 256: kept slots == PyTorch from the engine's state 0 of 57344 differ; select 0.10 ms, compact 0.51 ms
+OK   evict h2o 740 -> 256: cache length                           
+OK   evict h2o 740 -> 256: keys / values moved intact             
+OK   evict h2o 740 -> 256: scores moved intact                    
+OK   evict h2o 740 -> 256: decode appends at index position - evicted 
+OK   evict h2o 740 -> 256: 8 more steps add 8 * G of score mass   max_abs=3.13e-04 max_rel=1.30e-05
+OK   evict window 740 -> 256: evicted count                       484
+OK   evict window 740 -> 256: kept slots == PyTorch from the engine's state 0 of 57344 differ; select 0.05 ms, compact 0.50 ms
+OK   evict window 740 -> 256: cache length                        
+OK   evict window 740 -> 256: keys / values moved intact          
+OK   evict window 740 -> 256: scores moved intact                 
+OK   evict window 740 -> 256: decode appends at index position - evicted 
+OK   evict window 740 -> 256: 8 more steps add 8 * G of score mass max_abs=3.94e-04 max_rel=1.64e-05
+OK   evict wfl 740 -> 256: evicted count                          484
+OK   evict wfl 740 -> 256: kept slots == PyTorch from the engine's state 0 of 57344 differ; select 85.82 ms, compact 0.52 ms
+OK   evict wfl 740 -> 256: cache length                           
+OK   evict wfl 740 -> 256: keys / values moved intact             
+OK   evict wfl 740 -> 256: scores moved intact                    
+OK   evict wfl 740 -> 256: decode appends at index position - evicted 
+OK   evict wfl 740 -> 256: 8 more steps add 8 * G of score mass   max_abs=2.69e-04 max_rel=1.12e-05
+OK   evict wfl pool 2.0 740 -> 256: evicted count                 484
+OK   evict wfl pool 2.0 740 -> 256: kept slots == PyTorch from the engine's state 0 of 57344 differ; select 26.53 ms, compact 0.50 ms
+OK   evict wfl pool 2.0 740 -> 256: cache length                  
+OK   evict wfl pool 2.0 740 -> 256: keys / values moved intact    
+OK   evict wfl pool 2.0 740 -> 256: scores moved intact           
+OK   evict wfl pool 2.0 740 -> 256: decode appends at index position - evicted 
+OK   evict wfl pool 2.0 740 -> 256: 8 more steps add 8 * G of score mass max_abs=3.71e-04 max_rel=1.55e-05
+tokens after the last eviction: [13, 15, 13, 15, 13, 15, 13, 15]
+
+ALL PASS
