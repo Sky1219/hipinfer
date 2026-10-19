@@ -1,20 +1,47 @@
 # Eviction scoring and selection in hipinfer
 
-Status: **written and compiled, not yet run on a GPU.** Nothing below has a measured GPU result yet:
-no error figures, no timings, no decision checks on the real kernels. The GPU steps are one command
-([below](#running-it)). This is the HIP counterpart of the Triton kernels in SubCache
-(`subcache/kernels.py`; literature note in SubCache `docs/eviction-kernels.md`).
+Status: **run on a GPU** (RTX 2080 Ti and RTX A6000, 2026-10-18, merged tree). The first GPU run
+found a bug in `hi_evict`, fixed in `32c801d` (below); every check passes on the fixed build. This is
+the HIP counterpart of the Triton kernels in SubCache (`subcache/kernels.py`; literature note in
+SubCache `docs/eviction-kernels.md`).
 
 | check | where | result |
 |---|---|---|
-| compiles for sm_75 and sm_86 (nvcc 13.1, Windows, with the Linux-only `visibility` attribute stubbed out) | laptop | yes; no spills in the attention or selection kernels (ptxas `-v`) |
 | the default decode path is unchanged | laptop, SASS (sm_86) of `main` vs this branch | the plain decode-attention kernels and the fused QKV/RoPE GEMV are **instruction-identical** to `main`. Changed: the 4 prefill attention kernels (one null-checked `lse` store after the main loop) and `rope_cache_kernel` (null-checked shift) |
 | selection logic: radix select, the top-2 thread decomposition, the incremental rescan | laptop, `tests/test_eviction_cpu.py` (emulates the kernels' algorithms in PyTorch) | all pass, including inputs full of exact ties; three deliberate bugs (tie direction, merge rule, rescan rule) each make it fail |
 | the WFL reference used by the GPU tests vs SubCache's `policies.wfl_prune` | laptop, same file, `SUBCACHE_DIR` set | identical kept sets in 5 of 5 cases |
-| kernels vs PyTorch (outputs, LSE, logits, scores, decisions) | GPU, `tests/test_eviction.py` | **not run** |
-| engine: tracking changes no output; eviction decisions; decode after eviction | GPU, `tests/test_eviction_engine.py` | **not run** |
-| overheads (decode, prefill, selection, engine) | GPU, `scripts/bench_eviction.py` | **not measured** |
-| AMD | — | **not compiled** (no hipcc on the laptop) |
+| kernels vs PyTorch (outputs, LSE, logits, scores, decisions) | 2080 Ti and A6000, `tests/test_eviction.py`, default and portable kernels | **475 checks pass** on each. Tracked attention outputs are **bitwise** equal to the plain kernels'. Scores against a float64 reference: decode within 9.9e-7 relative, prefill within 1.7e-6. WFL kept sets equal the reference in all 10 cases; the incremental rescan equals a full rescan |
+| engine: tracking changes no output; eviction decisions; decode after eviction | 2080 Ti (TinyLlama, Llama-3.2-1B / 3B, Qwen2.5-1.5B) and A6000 (Llama-3.2-1B, Qwen2.5-1.5B), `tests/test_eviction_engine.py` | **all 38 checks pass** per model after the fix: tokens and logits with tracking on are bitwise equal to off, the kept slots equal PyTorch's from the engine's own state, and decode after an eviction adds exactly G of score mass per step |
+| overheads | 2080 Ti, `scripts/bench_eviction.py`, no throttling (`bench_gpu_log.csv`) | below |
+| AMD | — | compiles (gfx90a, gfx942, gfx1100) as part of the merged tree; never run |
+
+**The bug the GPU run found.** `hi_evict` moved the kept slots' scores to `[0, capacity)` but left
+the evicted slots' scores in `[capacity, n)`. Decode after an eviction writes its new key at cache
+index `position - shift`, inside that range, and `decode_score_kernel` adds the new key's mass to
+whatever the slot already held. So each step after an eviction appeared to add 5.4–10 G of mass
+instead of G. The CPU emulation could not see it: it never ran decode after a compaction. The fix
+clears both score arrays' tails after the move.
+
+## Overheads (RTX 2080 Ti)
+
+From `results/2080ti/eviction/bench_eviction.json`, on the fixed build, with no other process on
+the GPU and no thermal throttling (median SM clock 1,770 MHz, peak 83 °C):
+
+- **Decode attention with tracking:** +5–33 % on the attention kernel itself, across the shapes of
+  four models, 1k–32k keys and batch 1 and 8 (Llama-3.2-1B, G = 8, D = 64: +20–31 %; Llama-3.2-3B
+  and Llama-3.1-8B, D = 128: +14–26 %; Qwen2.5-1.5B: +5–32 %). Attention is a small part of a decode step: **a whole Llama-3.2-1B decode
+  step at a 4.1k context goes from 4.96 to 5.05 ms (+1.7 %)**.
+- **Prefill score pass:** the second, key-parallel pass costs 1.0–1.8× the FlashAttention kernel's
+  own time at 2–4k tokens and 1.4–4.5× at 512 (few kv heads launch few blocks, as noted below).
+  Storing the LSE in pass 1 adds at most 4 %.
+- **Selection over every (layer, kv head):** H2O top-k takes 0.03–0.10 ms at 1k–4k slots. WFL prune
+  is the expensive policy: 9–40 ms to evict 64 slots from 1,024 (8 rounds) and 0.1–0.6 s at 4,096;
+  a full prune from 4,096 to 512 (448 rounds) takes 0.98–4.2 s. Where the PyTorch matrix version
+  of the same algorithm fit in memory, the kernels are 6.4–25× faster (Llama-3.2-1B and
+  Qwen2.5-1.5B at 1,024 slots).
+- **In the engine** (Llama-3.2-1B, 4,096 → 1,024 slots): H2O selection 0.10 ms plus 0.88 ms to
+  compact keys, values and scores; WFL 885 ms; WFL limited to a pool of 2 × m and 8 rounds 63 ms.
+  The decode step after the eviction is 4.85 ms.
 
 ## What it does
 
@@ -174,13 +201,12 @@ kernels, `tests/test_eviction_engine.py` on Llama-3.2-1B (D 64) and Qwen2.5-1.5B
 
 ## Not done / open
 
-- Everything in the table marked "not run": error figures, decision checks and timings on a GPU.
 - AMD: the code uses only portable paths there (scalar decode, WMMA prefill, ballot/popcount helpers
-  for wave64), but has never been compiled with hipcc.
+  for wave64). It compiles with hipcc 7.2.4 for gfx90a, gfx942 and gfx1100 but has never run.
 - WFL keeps no state between evictions. A streaming caller pays the full first round each time;
   carrying best/second over and scanning only the new columns would remove that.
 - `prefill_score_kernel` gives each block 64 keys of one kv head, so a short prompt with few kv heads
-  launches few blocks (T = 512, 2 kv heads: 16 blocks).
-- Merging: the speculative-decoding branch also changes the QKV epilogue and the decode-attention
-  kernels (a `kv_slot` argument), and the int8 branch changes the GEMV. Expect conflicts in
-  `RopeArgs`, `gemv_kernel`'s epilogue and the decode kernels' signatures.
+  launches few blocks (T = 512, 2 kv heads: 16 blocks). This is the 4.5× at 512 tokens above.
+- No accuracy result: these checks show the kernels compute H2O and WFL exactly as specified, not
+  how well either policy preserves a model's outputs at a given cache budget. That evaluation lives
+  in SubCache.
