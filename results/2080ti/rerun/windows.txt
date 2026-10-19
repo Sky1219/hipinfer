@@ -1,0 +1,12 @@
+3b bench int8 start 22:22:16
+3b bench int8 end 22:25:44
+3b bench fp16 start 22:25:50
+3b bench fp16 end 22:27:53
+3b llama.cpp q8_0 start 22:28:04
+3b llama.cpp q8_0 end 22:29:07
+3b llama.cpp f16 start 22:29:17
+3b llama.cpp f16 end 22:30:44
+spec 3B<-1B start 22:30:44
+spec 3B<-1B end 22:36:15
+spec 1B<-1B start 22:36:21
+spec 1B<-1B end 22:38:33

@@ -1,0 +1,19 @@
+llama32-3b.bin: tp=2 on ['NVIDIA GeForce RTX 2080 Ti', 'NVIDIA GeForce RTX 2080 Ti']  p2p=False nccl=False
+[oneshot] all-reduce self-test sizes [8, 3072, 24576, 1572864, 3145736]: max err 0.0
+[oneshot] prefill logits vs 1 GPU: max |diff| 0.3164, top-1 agreement 99.84% of 640 positions
+[oneshot]   single prompt 0 (len 7): identical
+[oneshot]   single prompt 1 (len 33): identical
+[oneshot]   single prompt 2 (len 200): identical
+[oneshot]   single prompt 3 (len 400): identical
+[oneshot]   single prompt 4 (len 700): identical
+[oneshot]   batched B=8 slot 0: identical
+[oneshot]   batched B=8 slot 1: identical
+[oneshot]   batched B=8 slot 2: identical
+[oneshot]   batched B=8 slot 3: identical
+[oneshot]   batched B=8 slot 4: identical
+[oneshot]   batched B=8 slot 5: identical
+[oneshot]   batched B=8 slot 6: identical
+[oneshot]   batched B=8 slot 7: identical
+[oneshot] 13/13 runs token-identical to 1 GPU
+TP TEST PASS
+test_tp exit 0
