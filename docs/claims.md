@@ -2,12 +2,13 @@
 
 This is the list of things hipinfer can be said to do, each with the conditions it was measured
 under and the file that backs it. Every number here was checked against the result files on
-2026-10-16. Where the README rounds or generalizes, the precise figure is given. The last two
+2026-10-16, and the int8, speculative-decoding and eviction claims (§9a) on 2026-10-18. Where the
+README rounds or generalizes, the precise figure is given. The last two
 sections list claims to avoid, and replacement wording for resume lines.
 
 Hardware abbreviations: **2080 Ti** = NVIDIA GeForce RTX 2080 Ti (Turing, sm_75, 11 GB, 616 GB/s
 datasheet). **A6000** = NVIDIA RTX A6000 (Ampere, sm_86, 48 GB, 768 GB/s datasheet). All weights
-are fp16 and all generation is greedy.
+are fp16 except the int8 rows of §9a, and all generation is greedy.
 
 ---
 
@@ -15,7 +16,7 @@ are fp16 and all generation is greedy.
 
 | claim | exact scope | evidence |
 |---|---|---|
-| Runs and passes all kernel tests on NVIDIA | 2080 Ti, A6000 and A100-SXM4-40GB (Colab). The 899 dense-model checks pass with 0 failures on each; the MoE kernel checks have run on the 2080 Ti only (on the A100 run they were skipped for a missing file). | [results/2080ti/test_kernels.log](../results/2080ti/test_kernels.log), [results/a6000/test_kernels.log](../results/a6000/test_kernels.log), [results/a100/test_kernels.log](../results/a100/test_kernels.log) |
+| Runs and passes all kernel tests on NVIDIA | 2080 Ti, A6000 and A100-SXM4-40GB (Colab). The 899 dense-model checks pass with 0 failures on each; the MoE kernel checks have run on the 2080 Ti only (on the A100 run they were skipped for a missing file). The merged tree (int8, speculative decoding, eviction) passes them again on the 2080 Ti and the A6000. | [results/2080ti/test_kernels.log](../results/2080ti/test_kernels.log), [results/a6000/test_kernels.log](../results/a6000/test_kernels.log), [results/a100/test_kernels.log](../results/a100/test_kernels.log) |
 | One source tree for NVIDIA (`nvcc`) and AMD (`hipcc`) | `src/hip_compat.h` maps the `hip*` API onto CUDA under `nvcc`. The NVIDIA fast paths (`mma.sync`, `ldmatrix`, `cp.async`) are NVIDIA-only; AMD gets the portable WMMA / rocWMMA and scalar kernels. | [src/hip_compat.h](../src/hip_compat.h), [Makefile](../Makefile) |
 | **AMD: compile-checked only** | `make hip` builds `libhipinfer_amd.so` with **no errors and no warnings** for gfx90a (MI200), gfx942 (MI300) and gfx1100 (RDNA3), each target alone and all three in one library, with and without `RCCL=1`. Toolchain: ROCm 7.2.4 (HIP 7.2.53211, AMD clang 22.0.0git), rocWMMA 2.2.0 and RCCL 2.27.7, in the `rocm/dev-ubuntu-24.04:7.2.4` Docker image, built on 2026-10-18 at commit 662ab55. The MoE kernels are included: all six are in each target's device code (113 kernels per target). `-Wall -Wextra` adds three harmless warnings. hipcc reports no register spills on gfx90a or gfx942, and three spilling kernels on gfx1100 (GEMM config 3, `flash_prefill<128, 32>`). **It has never run on AMD hardware**: no kernel test, correctness or performance result exists for any AMD GPU. The code paths that behave differently on 64-lane wavefronts (gfx90a, gfx942), to test first, are listed in docs/amd-wave64.md. | [results/amd_build/](../results/amd_build/), [docs/amd-wave64.md](amd-wave64.md) |
 
@@ -101,7 +102,10 @@ and tp > 2 has never run.
   - The A6000 llama.cpp / vLLM baselines (2026-10-14) predate the thermal logging.
 - **2080 Ti power cap:** under sustained load the 250 W cap holds the clock at 1.4–1.55 GHz. This is
   why Llama-3.2-3B prefill reads 289.7 ms in the suite and 273.6 ms in isolation. The batched runs draw
-  218–249 W.
+  218–249 W. The 2026-10-18 runs also logged clock-event reasons. On the longer benchmarks (3B,
+  speculative) the cards hit the driver's ~84 °C thermal target as well, at 1.44–1.73 GHz median. The
+  unevenly throttled comparisons were rerun from a cool card, and the reruns agree with the first
+  run within 2 % ([results/2080ti/MERGED_RUN.md](../results/2080ti/MERGED_RUN.md)).
 - **A contended A6000 run (2026-10-14/15)** shared the GPU with another job and was set aside entirely
   ([results/a6000_contended_2026-10-14/README.md](../results/a6000_contended_2026-10-14/README.md)).
 - **Tools:** all timings are CUDA/HIP events (or wall clock for HF decode), and power comes from NVML. There are
@@ -115,7 +119,25 @@ and tp > 2 has never run.
 | Families with results | TinyLlama-1.1B (Llama-2 architecture), Llama-3.2-1B / 3B, Llama-3.1-8B, Qwen2.5-0.5B / 1.5B, Mistral-7B-v0.3, and Mistral-7B-v0.1 within its 4,096-token window. **Llama 2 and Qwen2 (non-2.5) themselves have no result files**; they are claimed because their architectures match tested models. | `results/` |
 | Config features | head_dim 64 / 128, GQA groups 1–8, tied embeddings, Llama-3 RoPE scaling (no engine code; HF's `inv_freq` is exported), QKV bias. Costs per feature are in [docs/porting-a-model.md](porting-a-model.md). | `scripts/export.py`, `src/api.cu` |
 | Mixture-of-Experts | **Granite-3.1-1B-A400M only, one GPU, 2080 Ti only.** Kernel tests pass. **Token gate: passes only with an MoE-specific router near-tie rule**, in all 6 runs made with it, same weights (3 autotuned: 12/20 token-identical each; autotuning off: 15/20, 2 accepted by the router rule; forced split-K 2: 13/20; forced split-K 4: 9/20, 3 accepted by the router rule). The engine's router kernel fed HF's own inputs differs from HF only at fp16 ties (5 of 40,392 evaluations, margins ≤ 0.0039), so there is no engine rounding mismatch to fix. Without the rule it passed in 3 of 5 runs, depending on GEMM configs. The two failures (gaps 0.0625 / 0.1094) were traced to router top-8 near-ties (`scripts/moe_router_trace.py`). Every adopted router difference has an HF margin ≤ 0.0042, against a tolerance of 0.01 and rounding noise of up to 0.0098. A planted 2 % fault in one layer is rejected. The prompt 3 failure was reproduced with forced split-K 4, not with the original autotuner picks; the three autotuned runs all gave the same gate results. Don't say it "matches HF" without saying that the router rule is part of the gate; perplexity 7.7292 vs 7.7294; decode 2.26 ms/token at ctx 128, 63 % of the weight-read floor. Mixtral and OLMoE export but have no GPU result (OLMoE's QK-norm is rejected at load). No MoE with tensor or expert parallelism, no MoE on AMD (it compiles for gfx90a, gfx942 and gfx1100 but has never run). | `results/2080ti/granite-moe-1b/` (`gate_runs/`, `router_trace/`), [docs/moe-design.md](moe-design.md) |
-| Not supported | Quantization (fp16 only), paged KV cache, sampling other than greedy, MoE with shared experts or QK-norm, sliding-window attention beyond the window, norms other than RMSNorm, activations other than SiLU, o-proj/MLP biases, head_dim ∉ {64, 128}. Some of these export **silently wrong** rather than failing (see porting doc). | README "Not supported"; [porting-a-model.md](porting-a-model.md) |
+| Not supported | Quantization beyond int8 weights (no int4, no int8 activations or KV cache), paged KV cache, sampling other than greedy, MoE with shared experts or QK-norm, sliding-window attention beyond the window, norms other than RMSNorm, activations other than SiLU, o-proj/MLP biases, head_dim ∉ {64, 128}. Some of these export **silently wrong** rather than failing (see porting doc). | README "Not supported"; [porting-a-model.md](porting-a-model.md) |
+
+## 9a. int8 weights, speculative decoding, eviction scoring
+
+All on the merged tree, 2026-10-18; run notes and clock checks in
+[results/2080ti/MERGED_RUN.md](../results/2080ti/MERGED_RUN.md).
+
+| claim | exact scope | evidence |
+|---|---|---|
+| **int8 decode 1.6–1.8× faster than fp16** | W8A16 (int8 projections and lm_head, one fp16 scale per row), 2080 Ti, batch 1, ctx 128: TinyLlama 2.54 vs 4.15 ms (1.63×), Llama-3.2-1B 2.73 vs 4.72 (1.73×), Llama-3.2-3B 6.71 vs 12.01 (1.79×). At ctx 1,024: 1.61–1.75×. int8 reaches 66–78 % of its bandwidth floor (fp16: 80–87 %). | `results/2080ti/{tinyllama,llama32-1b}/int8/bench{,_fp16}.json`; 3B: `results/2080ti/rerun/llama32-3b_bench_{int8,fp16}.json` |
+| **int8 decode 16–26 % faster than llama.cpp Q8_0** | Same session, llama.cpp `a0e6dc7`, best of flash-attn on/off. ctx 128: 2.54 vs 3.21, 2.73 vs 3.32, 6.71 vs 7.94 ms (1.26×, 1.22×, 1.18×); ctx 1,024: 1.16–1.24×. Q8_0 is a different format (one scale per 32 weights, ~6 % more bytes), and llama.cpp's perplexity was not measured. No 4-bit comparison. | `…/int8/llamacpp_q8_0.json`, `results/2080ti/rerun/llama32-3b_llamacpp_q8_0.json` |
+| int8 prefill slower than fp16 | 1–9 % at 128 tokens, 11–18 % at 512–2,000 (2,000 tokens: 117 vs 102, 115 vs 98, 328 vs 282 ms). Still faster than Q8_0 prefill at every length (1.05–1.72×). | same files, `e2e.prefill` |
+| **int8 kernels add no error beyond fp16 rounding** | Against HF running the same rounded weights (`--ref int8`): perplexity within 0.003 % (−0.0003 / −0.003 / −0.001 %), mean KL 6.6e-6 to 1.3e-5; the strict token gate passes, 15 / 18 / 18 of 20 identical. Against fp16 HF, quantization costs +0.04 / +0.23 / +0.20 % perplexity (mean KL 9.9e-4 to 1.9e-3). Three models, one GPU type. | `…/int8/ppl{,_int8ref}.json`, `gate{,_int8ref}.json` |
+| **Speculative decoding output identical to plain greedy** | Exact token match with no tolerance, `tests/test_spec.py`: 105 of 105 runs on the 2080 Ti and on the A6000 (3B ← 1B at k = 2, 4, 6, 8, and 1B and TinyLlama self-drafting; 7 prompts × 128 tokens; with and without CUDA graphs). | `results/2080ti/spec/test_spec.log`, `results/a6000/merged/test_spec.log` |
+| **Up to 1.39× from speculative decoding** | Llama-3.2-3B target, Llama-3.2-1B draft, 2080 Ti, greedy, batch 1, 7 prompts × 128 new tokens: 1.07× (k = 1) to 1.39× (k = 5 and 6), against 83.7 tok/s plain. Acceptance 0.91 to 0.67. The cost model is within 2 % at every k. One model pair, one GPU type. | `results/2080ti/rerun/spec_llama32-3b_llama32-1b.json` (first run: `results/2080ti/spec/`, same speed-ups) |
+| Verify must use the decode kernels | Verifying through the prefill path changes the output in 16 of 28 self-draft runs (0 of 49 with the 3B target). | `prefill_verify_divergent` in the same files |
+| **Eviction scores computed exactly** | 475 kernel checks pass on the 2080 Ti and the A6000, default and portable kernels: tracked attention outputs bitwise equal to untracked, scores within 9.9e-7 (decode) and 1.7e-6 (prefill) relative of float64, WFL kept sets equal to the reference. Engine test, 38 checks per model (4 models on the 2080 Ti, 2 on the A6000): tracking leaves tokens and logits bitwise unchanged, kept slots equal PyTorch's. Passes only after the fix in `32c801d`. | `results/2080ti/eviction/`, `results/a6000/merged/test_eviction*.log` |
+| Eviction tracking overhead | 2080 Ti, unthrottled: decode-attention kernel +5–33 %, whole Llama-3.2-1B decode step at 4.1k context +1.7 % (4.96 → 5.05 ms). H2O selection 0.03–0.10 ms over all layers and heads; WFL prune 9 ms to 4.2 s depending on shape and rounds, 6.4–25× faster than the PyTorch matrix version where that fit. | `results/2080ti/eviction/bench_eviction.json` |
+| What eviction does **not** show | No accuracy or quality result at any cache budget. The tests show the policies are computed as specified, not how well they preserve outputs. | — |
 
 ## 10. README statements with weak or missing evidence
 
@@ -143,13 +165,15 @@ in an interview without saying so.
 |---|---|
 | "runs on AMD" / "MI300 support" / "cross-vendor performance" | compile-checked only, never executed on AMD |
 | "faster than vLLM" (unqualified) | one model, batch 1, one GPU. vLLM is built for throughput under concurrency, which wasn't measured. |
-| "faster than llama.cpp" (unqualified) | fp16 batch 1 on one GPU; slower at 3B prefill; quantized llama.cpp (its normal mode) not compared |
+| "faster than llama.cpp" (unqualified) | batch 1 on one GPU; slower at 3B fp16 prefill; compared at fp16 and at 8 bits (Q8_0), not at 4 bits (llama.cpp's usual mode) |
+| "speculative decoding makes it 1.4× faster" (unqualified) | one model pair (3B ← 1B), greedy, batch 1, 2080 Ti only; 1.07× at k = 1 |
+| "KV-cache eviction" as a memory or quality result | the kernels compute H2O / WFL exactly; no accuracy at any cache budget was measured |
 | "faster than NCCL" (unqualified) | only for messages ≤ 256 KB, only on a no-P2P PCIe pair; NCCL is level or faster at ≥ 2 MB |
 | "scales to N GPUs" / "multi-node" | only tp = 2 has run; the P2P path has never run |
 | "near-peak bandwidth" / "at the roofline" | 81–87 % of a datasheet-bandwidth floor, and only for 1–3B models at batch 1 |
 | "bit-exact with HF" | logits differ by up to 0.11–2.4 (max abs); "matches HF perplexity within 0.01 %" is accurate |
 | "beats cuBLAS" | 0.84–0.95× on Turing prefill shapes, 0.61–0.85× on Ampere; faster on 2 shapes only |
-| "production-ready" / "serving engine" | no scheduler, no paged KV, greedy only, fp16 only |
+| "production-ready" / "serving engine" | no scheduler, no paged KV, greedy only, int8 weights at most |
 | "profiled with Nsight" | no Nsight or rocprof captures exist |
 
 ## 12. Replacement resume lines
@@ -174,6 +198,15 @@ Each line below is backed by the sections above and can be defended number by nu
   engine code. Each model is gated by a 4-level test ladder: 899 kernel checks, greedy-token match
   against HF with near-tie tolerance, WikiText-2 perplexity within 0.01 % of HF, and 2-GPU-vs-1-GPU
   equivalence."
+- **Quantization:** "Added int8 weight-only quantization (per-row scales): batch-1 decode 1.6–1.8×
+  faster than fp16 and 16–26 % faster than llama.cpp's Q8_0 on an RTX 2080 Ti, with perplexity
+  within 0.003 % of HF running the same int8 weights."
+- **Speculative decoding:** "Greedy speculative decoding whose output is token-identical to plain
+  decoding (105 runs on two GPUs), up to 1.39× on Llama-3.2-3B with a 1B draft (RTX 2080 Ti), with
+  a cost model accurate to 2 %."
+- **Eviction kernels:** "H2O and WFL KV-eviction scoring fused into the attention kernels: bitwise
+  identical attention output, scores within 2e-6 of float64, +1.7 % on a decode step; WFL selection
+  6–25× faster than the PyTorch version."
 - **Profiling (once a trace exists, upgrade the tool name):** "Decomposed the gap between batch-1
   decode and the bandwidth floor from CUDA-event microbenchmarks. GEMVs stream at ~94 % of peak, and
   the rest is fixed per-kernel cost and latency-bound attention."
