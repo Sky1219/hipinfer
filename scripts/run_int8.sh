@@ -56,15 +56,17 @@ for m in $MODELS; do
   int8="$INT8_DIR/$m-int8.bin"
   out="results/$TAG/$m/int8"
   mkdir -p "$out"
+  # HF fp16 and the engine together don't fit on an 11 GB card from 3B up: HF runs first and is freed
+  hf=(); case $m in llama32-3b|llama31-8b) hf=(--hf-first);; esac
   [ -f "$int8" ] || step "$m export --int8" "$out/export.log" $PY scripts/export.py --model "$model" --out "$int8" --int8
   if want gate; then
-    step "$m gate int8 vs fp16 HF" "$out/gate.log" $PY tests/gate.py --model "$model" --weights "$int8" --out "$out/gate.json"
-    step "$m gate int8 vs int8 HF" "$out/gate_int8ref.log" $PY tests/gate.py --model "$model" --weights "$int8" --ref int8 --out "$out/gate_int8ref.json"
-    [ -f "$fp16" ] && step "$m gate fp16 (this build)" "$out/gate_fp16_weights.log" $PY tests/gate.py --model "$model" --weights "$fp16" --out "$out/gate_fp16_weights.json"
+    step "$m gate int8 vs fp16 HF" "$out/gate.log" $PY tests/gate.py --model "$model" --weights "$int8" "${hf[@]}" --out "$out/gate.json"
+    step "$m gate int8 vs int8 HF" "$out/gate_int8ref.log" $PY tests/gate.py --model "$model" --weights "$int8" --ref int8 "${hf[@]}" --out "$out/gate_int8ref.json"
+    [ -f "$fp16" ] && step "$m gate fp16 (this build)" "$out/gate_fp16_weights.log" $PY tests/gate.py --model "$model" --weights "$fp16" "${hf[@]}" --out "$out/gate_fp16_weights.json"
   fi
   if want ppl; then
-    step "$m ppl int8 vs fp16 HF" "$out/ppl.log" $PY tests/ppl.py --model "$model" --weights "$int8" --windows "${PPL_WINDOWS:-16}" --out "$out/ppl.json"
-    step "$m ppl int8 vs int8 HF" "$out/ppl_int8ref.log" $PY tests/ppl.py --model "$model" --weights "$int8" --ref int8 --windows "${PPL_WINDOWS:-16}" --out "$out/ppl_int8ref.json"
+    step "$m ppl int8 vs fp16 HF" "$out/ppl.log" $PY tests/ppl.py --model "$model" --weights "$int8" --windows "${PPL_WINDOWS:-16}" "${hf[@]}" --out "$out/ppl.json"
+    step "$m ppl int8 vs int8 HF" "$out/ppl_int8ref.log" $PY tests/ppl.py --model "$model" --weights "$int8" --ref int8 --windows "${PPL_WINDOWS:-16}" "${hf[@]}" --out "$out/ppl_int8ref.json"
   fi
   if want bench; then
     step "$m bench int8" "$out/bench.log" $PY scripts/bench.py --model "$model" --weights "$int8" --no-hf --out "$out/bench.json"
