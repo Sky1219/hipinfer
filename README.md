@@ -575,5 +575,4 @@ each product explicitly.
 
 ## Author
 
-Akash Dasarraju. I wrote the code with Claude as an AI pair programmer; I reviewed every design
-decision, benchmark and claim.
+Akash Dasarraju.
