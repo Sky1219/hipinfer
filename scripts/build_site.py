@@ -810,8 +810,7 @@ fp16. Eviction scoring has no accuracy result at any cache budget.</li>
 </ul></div>
 
 <footer>Generated from <a href="%%REPO%%/tree/%%SHA%%/results">results/ at %%SHA%%</a> (%%DATE%%) by scripts/build_site.py.
-The code was written with Claude (AI pair programmer); design decisions, benchmarks and claims were reviewed by the author,
-Akash Dasarraju.</footer>
+Author: Akash Dasarraju.</footer>
 </main>
 <script type="application/json" id="data">%%DATA%%</script>
 <script>
